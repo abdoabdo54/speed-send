@@ -343,22 +343,43 @@ def sync_workspace_users(service_account_id: int, admin_email: str):
     db = SessionLocal()
     
     try:
+        logger.info(f"🔄 Starting user sync for account {service_account_id} with admin {admin_email}")
+        
         # Get service account
         service_account = db.query(ServiceAccount).filter(
             ServiceAccount.id == service_account_id
         ).first()
         
         if not service_account:
+            logger.error(f"❌ Service account {service_account_id} not found")
             raise Exception(f"Service account {service_account_id} not found")
         
+        logger.info(f"📧 Service account: {service_account.client_email}")
+        
         # Decrypt service account JSON
-        decrypted_json = encryption_service.decrypt(service_account.encrypted_json)
+        try:
+            decrypted_json = encryption_service.decrypt(service_account.encrypted_json)
+            logger.info("✅ Decrypted service account JSON")
+        except Exception as e:
+            logger.error(f"❌ Failed to decrypt JSON: {str(e)}")
+            raise
         
         # Initialize Google API service
-        google_service = GoogleWorkspaceService(decrypted_json)
+        try:
+            google_service = GoogleWorkspaceService(decrypted_json)
+            logger.info("✅ Initialized Google Workspace Service")
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize Google service: {str(e)}")
+            raise
         
         # Fetch users
-        users = google_service.fetch_workspace_users(admin_email)
+        logger.info(f"🔍 Fetching users from Google Workspace (admin: {admin_email})...")
+        try:
+            users = google_service.fetch_workspace_users(admin_email)
+            logger.info(f"✅ Fetched {len(users)} users from Google Workspace")
+        except Exception as e:
+            logger.error(f"❌ Failed to fetch users from Google: {str(e)}")
+            raise
         
         # Update database
         for user_data in users:
