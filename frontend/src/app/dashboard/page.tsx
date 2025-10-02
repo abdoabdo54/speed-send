@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { dashboardApi, campaignsApi, accountsApi as serviceAccountsApi } from '@/lib/api';
+import { dashboardApi, campaignsApi, serviceAccountsApi } from '@/lib/api';
 import { 
   Mail, 
   Users, 
