@@ -1,13 +1,36 @@
 import axios from 'axios';
 
-// Use environment variable or fallback to relative URL (works in production)
-const API_URL = typeof window !== 'undefined' 
-  ? (process.env.NEXT_PUBLIC_API_URL || window.location.origin.replace(':3000', ':8000'))
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+/**
+ * Get the backend API URL dynamically
+ * This runs in the browser and detects the correct backend URL
+ */
+function getApiUrl(): string {
+  // Server-side rendering: use environment variable or localhost
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  }
+  
+  // Client-side: detect from browser location
+  const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
+  
+  // If accessing via IP or domain, use that IP/domain with port 8000
+  const apiUrl = `${protocol}//${hostname}:8000`;
+  
+  console.log('🌐 API URL Detection:', {
+    hostname,
+    protocol,
+    detectedApiUrl: apiUrl,
+    windowOrigin: window.location.origin
+  });
+  
+  return apiUrl;
+}
 
+const API_URL = getApiUrl();
 const API_V1 = `${API_URL}/api/v1`;
 
-console.log('API Configuration:', { API_URL, API_V1 });
+console.log('✅ API Configuration:', { API_URL, API_V1 });
 
 export const api = axios.create({
   baseURL: API_V1,
@@ -91,4 +114,19 @@ export const dashboardApi = {
   stats: () => api.get('/dashboard/stats'),
   recentActivity: (limit?: number) => api.get('/dashboard/recent-activity', { params: { limit } }),
 };
+
+// Health Check
+export const healthCheck = async (): Promise<boolean> => {
+  try {
+    const response = await axios.get(`${API_URL}/health`, { timeout: 5000 });
+    console.log('✅ Backend health check passed:', response.data);
+    return response.status === 200;
+  } catch (error) {
+    console.error('❌ Backend health check failed:', error);
+    return false;
+  }
+};
+
+// Export API_URL for debugging
+export { API_URL, API_V1 };
 

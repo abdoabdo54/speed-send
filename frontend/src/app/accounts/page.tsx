@@ -5,18 +5,28 @@ import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { serviceAccountsApi } from '@/lib/api';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { serviceAccountsApi, healthCheck, API_URL } from '@/lib/api';
+import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Wifi, WifiOff } from 'lucide-react';
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [uploadData, setUploadData] = useState({ name: '', json: '' });
+  const [backendStatus, setBackendStatus] = useState<boolean | null>(null);
 
   useEffect(() => {
+    checkBackend();
     loadAccounts();
   }, []);
+
+  const checkBackend = async () => {
+    const isHealthy = await healthCheck();
+    setBackendStatus(isHealthy);
+    if (!isHealthy) {
+      console.error('⚠️ Backend is not accessible at:', API_URL);
+    }
+  };
 
   const loadAccounts = async () => {
     try {
@@ -87,8 +97,27 @@ export default function AccountsPage() {
             <div>
               <h1 className="text-3xl font-bold">Service Accounts</h1>
               <p className="text-muted-foreground">Manage Google Workspace service accounts</p>
+              {backendStatus !== null && (
+                <div className="mt-2 flex items-center gap-2">
+                  {backendStatus ? (
+                    <>
+                      <Wifi className="h-4 w-4 text-green-500" />
+                      <span className="text-sm text-green-600">Backend Connected ({API_URL})</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="h-4 w-4 text-red-500" />
+                      <span className="text-sm text-red-600">Backend Offline ({API_URL})</span>
+                      <Button size="sm" variant="outline" onClick={checkBackend}>
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Retry
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
-            <Button onClick={() => setShowUpload(!showUpload)}>
+            <Button onClick={() => setShowUpload(!showUpload)} disabled={!backendStatus}>
               <Plus className="mr-2 h-4 w-4" />
               Add Account
             </Button>
