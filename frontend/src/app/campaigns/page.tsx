@@ -11,8 +11,9 @@ import { Plus, Play, Pause, Copy, Trash2, MoreVertical } from 'lucide-react';
 
 const statusColors: any = {
   draft: 'bg-gray-500',
-  queued: 'bg-yellow-500',
-  running: 'bg-blue-500',
+  preparing: 'bg-blue-400',
+  ready: 'bg-cyan-500',
+  sending: 'bg-blue-600',
   paused: 'bg-orange-500',
   completed: 'bg-green-500',
   failed: 'bg-red-500',
@@ -37,6 +38,24 @@ export default function CampaignsPage() {
       console.error('Failed to load campaigns:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePrepare = async (campaignId: number) => {
+    try {
+      await campaignsApi.prepare(campaignId);
+      loadCampaigns();
+    } catch (error: any) {
+      alert('Failed to prepare: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  const handleLaunch = async (campaignId: number) => {
+    try {
+      await campaignsApi.launch(campaignId);
+      loadCampaigns();
+    } catch (error: any) {
+      alert('Failed to launch: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -121,15 +140,44 @@ export default function CampaignsPage() {
                         
                         <div className="flex gap-2">
                           {campaign.status === 'draft' && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleControl(campaign.id, 'start')}
-                            >
-                              <Play className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handlePrepare(campaign.id)}
+                              >
+                                Prepare
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDelete(campaign.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                           
-                          {campaign.status === 'running' && (
+                          {campaign.status === 'ready' && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleLaunch(campaign.id)}
+                                className="bg-gradient-to-r from-blue-600 to-cyan-600"
+                              >
+                                <Play className="mr-2 h-4 w-4" />
+                                Launch
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handlePrepare(campaign.id)}
+                              >
+                                Re-Prepare
+                              </Button>
+                            </>
+                          )}
+                          
+                          {campaign.status === 'sending' && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -148,21 +196,13 @@ export default function CampaignsPage() {
                             </Button>
                           )}
                           
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDuplicate(campaign.id)}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          
-                          {campaign.status === 'draft' && (
+                          {campaign.status !== 'draft' && (
                             <Button
                               size="sm"
-                              variant="destructive"
-                              onClick={() => handleDelete(campaign.id)}
+                              variant="outline"
+                              onClick={() => handleDuplicate(campaign.id)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Copy className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
