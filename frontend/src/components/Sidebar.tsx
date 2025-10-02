@@ -10,15 +10,18 @@ import {
   Settings,
   Activity,
   Building2,
+  Contact,
+  BarChart3,
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Accounts', href: '/accounts', icon: Building2 },
-  { name: 'Users', href: '/users', icon: Users },
+  { name: 'Contacts', href: '/contacts', icon: Contact },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Users', href: '/users', icon: Users },
   { name: 'Reports', href: '/reports', icon: Activity },
-  { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export function Sidebar() {
@@ -27,7 +30,9 @@ export function Sidebar() {
   return (
     <div className="flex h-screen w-64 flex-col border-r bg-card">
       <div className="flex h-16 items-center border-b px-6">
-        <h1 className="text-xl font-bold">Gmail Bulk Sender</h1>
+        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+          Speed-Send
+        </h1>
       </div>
       
       <nav className="flex-1 space-y-1 px-3 py-4">
@@ -53,7 +58,10 @@ export function Sidebar() {
 
       <div className="border-t p-4">
         <p className="text-xs text-muted-foreground">
-          Version 1.0.0
+          Speed-Send v2.0 Pro
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          PowerMTA Mode ⚡
         </p>
       </div>
     </div>
