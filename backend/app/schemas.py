@@ -56,9 +56,18 @@ class CampaignCreate(BaseModel):
     subject: str
     body_html: Optional[str]
     body_plain: Optional[str]
+    
+    # Advanced sender settings
+    from_name: Optional[str] = None
+    from_email: Optional[str] = None
+    reply_to: Optional[str] = None
+    return_path: Optional[str] = None
+    
     recipients: List[RecipientData]
     sender_account_ids: List[int]
     sender_rotation: str = "round_robin"
+    use_ip_pool: bool = False
+    ip_pool: Optional[List[str]] = []
     custom_headers: Optional[Dict[str, str]] = {}
     attachments: Optional[List[Dict[str, Any]]] = []
     rate_limit: int = 500
@@ -84,6 +93,13 @@ class CampaignResponse(BaseModel):
     subject: str
     body_html: Optional[str]
     body_plain: Optional[str]
+    
+    # Advanced sender settings
+    from_name: Optional[str]
+    from_email: Optional[str]
+    reply_to: Optional[str]
+    return_path: Optional[str]
+    
     total_recipients: int
     status: CampaignStatus
     sent_count: int
@@ -94,6 +110,7 @@ class CampaignResponse(BaseModel):
     is_test: bool
     created_at: datetime
     updated_at: Optional[datetime]
+    prepared_at: Optional[datetime]
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     paused_at: Optional[datetime]

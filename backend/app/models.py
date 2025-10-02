@@ -14,8 +14,9 @@ class AccountStatus(str, enum.Enum):
 
 class CampaignStatus(str, enum.Enum):
     DRAFT = "draft"
-    QUEUED = "queued"
-    RUNNING = "running"
+    PREPARING = "preparing"
+    READY = "ready"
+    SENDING = "sending"
     PAUSED = "paused"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -94,12 +95,20 @@ class Campaign(Base):
     body_html = Column(Text)
     body_plain = Column(Text)
     
+    # Advanced sender settings
+    from_name = Column(String(255))  # Display name for sender
+    from_email = Column(String(255))  # From email (can be different from sender)
+    reply_to = Column(String(255))  # Reply-to address
+    return_path = Column(String(255))  # Return-path for bounces
+    
     # Recipients
     recipients = Column(JSON)  # List of recipient objects with email and variables
     total_recipients = Column(Integer, default=0)
     
     # Sender configuration
     sender_rotation = Column(String(50), default="round_robin")  # round_robin, random, sequential
+    use_ip_pool = Column(Boolean, default=False)  # Use IP pool rotation
+    ip_pool = Column(JSON)  # List of IPs if using pool
     
     # Headers and attachments
     custom_headers = Column(JSON)  # Dict of custom headers
@@ -122,7 +131,8 @@ class Campaign(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    started_at = Column(DateTime(timezone=True))
+    prepared_at = Column(DateTime(timezone=True))  # When emails were prepared
+    started_at = Column(DateTime(timezone=True))  # When sending started
     completed_at = Column(DateTime(timezone=True))
     paused_at = Column(DateTime(timezone=True))
     

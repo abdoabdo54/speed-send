@@ -44,10 +44,16 @@ async def create_campaign(
             subject=campaign.subject,
             body_html=campaign.body_html,
             body_plain=campaign.body_plain,
+            from_name=campaign.from_name,
+            from_email=campaign.from_email,
+            reply_to=campaign.reply_to,
+            return_path=campaign.return_path,
             recipients=[r.dict() for r in campaign.recipients],
             total_recipients=len(campaign.recipients),
             pending_count=len(campaign.recipients),
             sender_rotation=campaign.sender_rotation,
+            use_ip_pool=campaign.use_ip_pool,
+            ip_pool=campaign.ip_pool,
             custom_headers=campaign.custom_headers,
             attachments=campaign.attachments,
             rate_limit=campaign.rate_limit,
@@ -162,6 +168,139 @@ async def update_campaign(
     return campaign
 
 
+@router.post("/{campaign_id}/prepare")
+async def prepare_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Prepare campaign: Create all email log entries (DRAFT → PREPARING → READY)
+    """
+    from app.models import WorkspaceUser
+    from datetime import datetime
+    
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.status not in [CampaignStatus.DRAFT, CampaignStatus.READY]:
+        raise HTTPException(
+            status_code=400,
+            detail="Can only prepare campaigns in DRAFT or READY status"
+        )
+    
+    try:
+        campaign.status = CampaignStatus.PREPARING
+        db.commit()
+        
+        # Get all sender accounts with their users
+        sender_accounts = campaign.sender_accounts
+        if not sender_accounts:
+            raise HTTPException(status_code=400, detail="No sender accounts configured")
+        
+        # Get all active users from sender accounts
+        all_senders = []
+        for account in sender_accounts:
+            users = db.query(WorkspaceUser).filter(
+                WorkspaceUser.service_account_id == account.id,
+                WorkspaceUser.is_active == True
+            ).all()
+            
+            for user in users:
+                all_senders.append({
+                    'user_email': user.email,
+                    'service_account_id': account.id,
+                    'client_email': account.client_email
+                })
+        
+        if not all_senders:
+            raise HTTPException(status_code=400, detail="No active users found in sender accounts")
+        
+        # Delete existing email logs if re-preparing
+        db.query(EmailLog).filter(EmailLog.campaign_id == campaign_id).delete()
+        
+        # Create email log entries for each recipient
+        recipients = campaign.recipients if isinstance(campaign.recipients, list) else []
+        
+        for idx, recipient in enumerate(recipients):
+            # Select sender using rotation strategy
+            if campaign.sender_rotation == "round_robin":
+                sender = all_senders[idx % len(all_senders)]
+            elif campaign.sender_rotation == "random":
+                import random
+                sender = random.choice(all_senders)
+            else:  # sequential
+                sender = all_senders[0]
+            
+            # Create email log entry
+            email_log = EmailLog(
+                campaign_id=campaign_id,
+                recipient_email=recipient.get('email'),
+                recipient_name=recipient.get('variables', {}).get('name', ''),
+                sender_email=sender['user_email'],
+                service_account_id=sender['service_account_id'],
+                subject=campaign.subject,
+                status=EmailStatus.PENDING
+            )
+            db.add(email_log)
+        
+        campaign.status = CampaignStatus.READY
+        campaign.prepared_at = datetime.utcnow()
+        campaign.pending_count = len(recipients)
+        db.commit()
+        
+        return {
+            "message": f"Campaign prepared successfully with {len(recipients)} emails",
+            "total_emails": len(recipients),
+            "total_senders": len(all_senders)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        campaign.status = CampaignStatus.DRAFT
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Failed to prepare campaign: {str(e)}")
+
+
+@router.post("/{campaign_id}/launch")
+async def launch_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Launch prepared campaign: Start sending all emails (READY → SENDING)
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    if campaign.status != CampaignStatus.READY:
+        raise HTTPException(
+            status_code=400,
+            detail="Can only launch campaigns in READY status. Please prepare the campaign first."
+        )
+    
+    # Update status to sending
+    campaign.status = CampaignStatus.SENDING
+    campaign.started_at = datetime.utcnow()
+    db.commit()
+    
+    # Start async task
+    task = send_campaign_emails.delay(campaign_id)
+    campaign.celery_task_id = task.id
+    db.commit()
+    
+    return {
+        "message": "Campaign launched successfully",
+        "task_id": task.id,
+        "total_emails": campaign.total_recipients
+    }
+
+
 @router.post("/{campaign_id}/control")
 async def control_campaign(
     campaign_id: int,
@@ -169,7 +308,7 @@ async def control_campaign(
     db: Session = Depends(get_db)
 ):
     """
-    Control campaign execution: start, pause, resume, cancel
+    Control campaign execution: pause, resume, cancel
     """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     
@@ -177,31 +316,17 @@ async def control_campaign(
         raise HTTPException(status_code=404, detail="Campaign not found")
     
     if control.action == "start":
-        if campaign.status != CampaignStatus.DRAFT:
-            raise HTTPException(
-                status_code=400,
-                detail="Can only start campaigns in DRAFT status"
-            )
-        
-        # Update status to queued
-        campaign.status = CampaignStatus.QUEUED
-        db.commit()
-        
-        # Start async task
-        task = send_campaign_emails.delay(campaign_id)
-        campaign.celery_task_id = task.id
-        db.commit()
-        
-        return {
-            "message": "Campaign started",
-            "task_id": task.id
-        }
+        # Deprecated: Use /prepare and /launch endpoints instead
+        raise HTTPException(
+            status_code=400,
+            detail="Please use /prepare endpoint first, then /launch to start sending"
+        )
     
     elif control.action == "pause":
-        if campaign.status != CampaignStatus.RUNNING:
+        if campaign.status != CampaignStatus.SENDING:
             raise HTTPException(
                 status_code=400,
-                detail="Can only pause RUNNING campaigns"
+                detail="Can only pause SENDING campaigns"
             )
         
         campaign.status = CampaignStatus.PAUSED
@@ -217,14 +342,14 @@ async def control_campaign(
                 detail="Can only resume PAUSED campaigns"
             )
         
-        campaign.status = CampaignStatus.RUNNING
+        campaign.status = CampaignStatus.SENDING
         campaign.paused_at = None
         db.commit()
         
         return {"message": "Campaign resumed"}
     
     elif control.action == "cancel":
-        if campaign.status not in [CampaignStatus.RUNNING, CampaignStatus.PAUSED, CampaignStatus.QUEUED]:
+        if campaign.status not in [CampaignStatus.SENDING, CampaignStatus.PAUSED, CampaignStatus.READY]:
             raise HTTPException(
                 status_code=400,
                 detail="Can only cancel active campaigns"
