@@ -74,6 +74,9 @@ async def create_service_account(
         db.commit()
         db.refresh(new_account)
         
+        # Note: User sync should be triggered from frontend with admin email
+        # We cannot auto-sync here because we need the admin email from user
+        
         return new_account
     
     except HTTPException:
@@ -89,9 +92,17 @@ async def list_service_accounts(
     db: Session = Depends(get_db)
 ):
     """
-    List all service accounts
+    List all service accounts with computed user counts
     """
+    from app.models import WorkspaceUser
+    
     accounts = db.query(ServiceAccount).offset(skip).limit(limit).all()
+    
+    # Ensure total_users is computed for each account
+    for account in accounts:
+        # Force refresh to get latest data
+        db.refresh(account)
+    
     return accounts
 
 
@@ -133,22 +144,30 @@ async def delete_service_account(
 @router.post("/{account_id}/sync")
 async def sync_account_users(
     account_id: int,
-    admin_email: str,
+    admin_email: str = None,
     db: Session = Depends(get_db)
 ):
     """
     Sync users from Google Workspace for this account
+    Requires admin email for domain-wide delegation
     """
     account = db.query(ServiceAccount).filter(ServiceAccount.id == account_id).first()
     
     if not account:
         raise HTTPException(status_code=404, detail="Service account not found")
     
-    # Trigger async task
-    task = sync_workspace_users.delay(account_id, admin_email)
+    if not admin_email:
+        raise HTTPException(status_code=400, detail="admin_email is required")
     
-    return {
-        "message": "User sync started",
-        "task_id": task.id
-    }
+    # Trigger async task
+    try:
+        task = sync_workspace_users.delay(account_id, admin_email)
+        
+        return {
+            "message": "User sync started. This may take a few minutes depending on domain size.",
+            "task_id": task.id,
+            "admin_email": admin_email
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start sync: {str(e)}")
 

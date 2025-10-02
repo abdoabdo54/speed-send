@@ -52,7 +52,39 @@ export default function AccountsPage() {
         json_content: uploadData.json,
       });
       console.log('Upload successful:', response.data);
-      alert('Service account uploaded successfully!');
+      
+      const accountId = response.data.id;
+      
+      // Immediately ask for admin email to sync users
+      const adminEmail = prompt(
+        '✅ Service account added successfully!\n\n' +
+        'To sync workspace users, please enter an admin email address with domain-wide delegation:\n\n' +
+        '(This is required to fetch users from your Google Workspace)'
+      );
+      
+      if (adminEmail && adminEmail.includes('@')) {
+        try {
+          console.log('Starting user sync...');
+          await serviceAccountsApi.sync(accountId, adminEmail);
+          alert(
+            '✅ Service account added and user sync started!\n\n' +
+            'Users will be synced in the background. This may take 1-2 minutes.\n\n' +
+            'Refresh the page in a moment to see the synced users.'
+          );
+        } catch (syncError: any) {
+          alert(
+            '⚠️ Service account added, but user sync failed:\n' +
+            (syncError.message || 'Unknown error') +
+            '\n\nYou can manually sync users later using the Sync button.'
+          );
+        }
+      } else {
+        alert(
+          '✅ Service account added!\n\n' +
+          '⚠️ User sync skipped. Click the Sync button later to fetch workspace users.'
+        );
+      }
+      
       setShowUpload(false);
       setUploadData({ name: '', json: '' });
       loadAccounts();
@@ -185,14 +217,23 @@ export default function AccountsPage() {
                           )}
                         </CardTitle>
                         <CardDescription>{account.client_email}</CardDescription>
+                        <div className="mt-2 text-sm">
+                          <span className="font-medium">Synced Users: </span>
+                          <span className={account.total_users > 0 ? "text-green-600 font-semibold" : "text-amber-600"}>
+                            {account.total_users || 0}
+                            {account.total_users === 0 && " ⚠️ Click Sync button →"}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleSync(account.id)}
+                          title="Sync workspace users from Google"
                         >
-                          <RefreshCw className="h-4 w-4" />
+                          <RefreshCw className="h-4 w-4 mr-1" />
+                          Sync Users
                         </Button>
                         <Button
                           size="sm"
