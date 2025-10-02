@@ -1,7 +1,13 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use environment variable or fallback to relative URL (works in production)
+const API_URL = typeof window !== 'undefined' 
+  ? (process.env.NEXT_PUBLIC_API_URL || window.location.origin.replace(':3000', ':8000'))
+  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+
 const API_V1 = `${API_URL}/api/v1`;
+
+console.log('API Configuration:', { API_URL, API_V1 });
 
 export const api = axios.create({
   baseURL: API_V1,
@@ -9,23 +15,46 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 30000, // 30 second timeout
+  validateStatus: (status) => status < 500, // Don't reject on 4xx errors
 });
+
+// Add request interceptor for debugging
+api.interceptors.request.use(
+  (config) => {
+    console.log('API Request:', config.method?.toUpperCase(), config.url);
+    return config;
+  },
+  (error) => {
+    console.error('Request Error:', error);
+    return Promise.reject(error);
+  }
+);
 
 // Add response interceptor for better error handling
 api.interceptors.response.use(
-  response => response,
+  response => {
+    console.log('API Response:', response.status, response.config.url);
+    return response;
+  },
   error => {
-    console.error('API Error:', error);
+    console.error('API Error Details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url,
+    });
+    
     if (error.response) {
       // Server responded with error
-      console.error('Response error:', error.response.data);
+      const message = error.response.data?.detail || error.response.data?.message || 'Server error';
+      return Promise.reject(new Error(message));
     } else if (error.request) {
       // Request made but no response
-      console.error('No response received');
+      return Promise.reject(new Error('Cannot connect to server. Please check if backend is running.'));
     } else {
-      console.error('Error:', error.message);
+      return Promise.reject(new Error(error.message || 'Unknown error'));
     }
-    return Promise.reject(error);
   }
 );
 

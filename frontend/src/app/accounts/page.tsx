@@ -30,16 +30,26 @@ export default function AccountsPage() {
   };
 
   const handleUpload = async () => {
+    if (!uploadData.name || !uploadData.json) {
+      alert('Please provide both account name and JSON content');
+      return;
+    }
+
     try {
-      await serviceAccountsApi.create({
+      console.log('Uploading service account...', { name: uploadData.name });
+      const response = await serviceAccountsApi.create({
         name: uploadData.name,
         json_content: uploadData.json,
       });
+      console.log('Upload successful:', response.data);
+      alert('Service account uploaded successfully!');
       setShowUpload(false);
       setUploadData({ name: '', json: '' });
       loadAccounts();
     } catch (error: any) {
-      alert('Failed to upload: ' + (error.response?.data?.detail || error.message));
+      console.error('Upload error:', error);
+      const errorMessage = error.message || error.response?.data?.detail || 'Failed to upload';
+      alert('Failed to upload: ' + errorMessage);
     }
   };
 
