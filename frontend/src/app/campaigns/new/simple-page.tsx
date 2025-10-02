@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { accountsApi as serviceAccountsApi, campaignsApi } from '@/lib/api';
+import { serviceAccountsApi, campaignsApi } from '@/lib/api';
 import { ArrowLeft, Send, TestTube, Upload } from 'lucide-react';
 
 export default function SimpleCampaignPage() {
