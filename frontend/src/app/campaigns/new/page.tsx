@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { serviceAccountsApi, campaignsApi } from '@/lib/api';
 import { ArrowLeft, Send, TestTube, Upload } from 'lucide-react';
+import TestApi from './test-api';
 
 export default function NewCampaignPage() {
   const router = useRouter();
@@ -186,6 +187,16 @@ export default function NewCampaignPage() {
               </Button>
             </div>
           </div>
+
+          {/* API Test */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>🧪 API Test</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TestApi />
+            </CardContent>
+          </Card>
 
           {/* Account Status */}
           <Card className="mb-6">
