@@ -8,7 +8,26 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 second timeout
 });
+
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  response => response,
+  error => {
+    console.error('API Error:', error);
+    if (error.response) {
+      // Server responded with error
+      console.error('Response error:', error.response.data);
+    } else if (error.request) {
+      // Request made but no response
+      console.error('No response received');
+    } else {
+      console.error('Error:', error.message);
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Service Accounts
 export const serviceAccountsApi = {

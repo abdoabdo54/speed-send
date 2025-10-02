@@ -1,10 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
+import logging
 
 from app.config import settings
 from app.database import engine, Base
 from app.routers import accounts, users, campaigns, dashboard
+from app.middleware import PerformanceMiddleware
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -13,29 +23,41 @@ async def lifespan(app: FastAPI):
     Startup and shutdown events
     """
     # Startup: Create database tables
+    logger.info("🚀 Starting Gmail Bulk Sender SaaS...")
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created")
+    logger.info("✅ Database tables created/verified")
+    logger.info(f"🌐 Environment: {settings.ENVIRONMENT}")
+    logger.info(f"📊 PowerMTA Mode: ENABLED (100 worker concurrency)")
     
     yield
     
     # Shutdown
-    print("👋 Shutting down")
+    logger.info("👋 Shutting down")
 
 
 # Create FastAPI application
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
+    redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
 )
 
-# Configure CORS
+# Add performance middleware
+app.add_middleware(PerformanceMiddleware)
+
+# Add GZip compression for faster responses
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Configure CORS - Allow all origins in production for now
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Include routers
@@ -43,6 +65,10 @@ app.include_router(accounts.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(campaigns.router, prefix=settings.API_V1_PREFIX)
 app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
+
+logger.info(f"✅ All routers loaded")
+logger.info(f"📚 API Documentation: /docs (disabled in production)")
+logger.info(f"🔥 Ready to handle requests!")
 
 
 @app.get("/")

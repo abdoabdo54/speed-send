@@ -42,9 +42,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-bytes-long}
-      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENVIRONMENT: production
     volumes:
-      - ./backend:/app
       - service_accounts:/app/service_accounts
     ports:
       - "8000:8000"
@@ -53,7 +52,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    restart: unless-stopped
 
   # Celery Worker (PowerMTA Mode - High Concurrency)
   celery_worker:
@@ -66,9 +66,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-bytes-long}
-      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENVIRONMENT: production
     volumes:
-      - ./backend:/app
       - service_accounts:/app/service_accounts
     depends_on:
       postgres:
@@ -78,6 +77,7 @@ services:
     # PowerMTA Mode: High concurrency for instant parallel sending
     # Each worker handles multiple senders simultaneously
     command: celery -A app.celery_app worker --loglevel=info --concurrency=100 --pool=threads
+    restart: unless-stopped
 
   # Celery Beat (for scheduled tasks)
   celery_beat:
@@ -90,8 +90,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-bytes-long}
+      ENVIRONMENT: production
     volumes:
-      - ./backend:/app
       - service_accounts:/app/service_accounts
     depends_on:
       postgres:
@@ -99,6 +99,7 @@ services:
       redis:
         condition: service_healthy
     command: celery -A app.celery_app beat --loglevel=info
+    restart: unless-stopped
 
   # Frontend (Next.js)
   frontend:
@@ -108,15 +109,12 @@ services:
     container_name: gmail_saas_frontend
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+      NODE_ENV: production
     ports:
       - "3000:3000"
     depends_on:
       - backend
-    command: npm run dev
+    restart: unless-stopped
 
 volumes:
   postgres_data:
