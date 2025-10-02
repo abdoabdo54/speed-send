@@ -280,6 +280,16 @@ wait_for_service "Frontend" 3000
 
 sleep 5  # Extra buffer for full initialization
 
+# Database Migration: Add admin_email column if not exists
+print_section "🔄 Database Migration"
+
+print_info "Adding admin_email column to service_accounts table..."
+docker-compose exec -T postgres psql -U gmailsaas -d gmail_saas -c \
+    "ALTER TABLE service_accounts ADD COLUMN IF NOT EXISTS admin_email VARCHAR(255);" \
+    >/dev/null 2>&1 || print_warning "Admin email column may already exist"
+
+print_success "Database migration completed"
+
 # Verify all services
 print_section "✅ Verification"
 
@@ -329,11 +339,16 @@ echo -e "${CYAN}🎯 Quick Start Guide:${NC}"
 echo -e "${WHITE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${YELLOW}1.${NC} Open browser: ${BLUE}http://$SERVER_IP:3000${NC}"
-echo -e "  ${YELLOW}2.${NC} Go to ${WHITE}Accounts${NC} → Upload your service account JSONs"
-echo -e "  ${YELLOW}3.${NC} Click ${WHITE}Sync${NC} to fetch Workspace users"
-echo -e "  ${YELLOW}4.${NC} Go to ${WHITE}Campaigns${NC} → Create new campaign"
-echo -e "  ${YELLOW}5.${NC} Add recipients, compose email, and click ${WHITE}Start${NC}"
-echo -e "  ${YELLOW}6.${NC} Watch your emails send in ${GREEN}<15 seconds!${NC} ⚡"
+echo -e "  ${YELLOW}2.${NC} Go to ${WHITE}Accounts${NC} → Click ${GREEN}Add Account${NC}"
+echo -e "  ${YELLOW}3.${NC} Upload your service account JSON file"
+echo -e "  ${YELLOW}4.${NC} When prompted, enter your ${CYAN}admin email${NC} (e.g., admin@yourdomain.com)"
+echo -e "  ${YELLOW}5.${NC} Users will sync automatically (or click ${WHITE}Sync Users${NC} button)"
+echo -e "  ${YELLOW}6.${NC} Go to ${WHITE}Campaigns${NC} → Create new campaign"
+echo -e "  ${YELLOW}7.${NC} Add recipients, compose email, and click ${WHITE}Start${NC}"
+echo -e "  ${YELLOW}8.${NC} Watch your emails send in ${GREEN}<15 seconds!${NC} ⚡"
+echo ""
+echo -e "  ${CYAN}📝 Note:${NC} You need domain-wide delegation enabled in Google Admin Console"
+echo -e "     Required scopes: admin.directory.user.readonly, gmail.send"
 echo ""
 
 echo -e "${CYAN}🔧 Management Commands:${NC}"
