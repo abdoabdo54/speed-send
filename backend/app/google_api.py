@@ -53,6 +53,9 @@ class GoogleWorkspaceService:
         Returns:
             List of user dictionaries
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         try:
             # Auto-detect admin email from service account if not provided
             if not admin_email:
@@ -71,8 +74,17 @@ class GoogleWorkspaceService:
                 else:
                     raise Exception("Admin email is required and could not be auto-detected")
             
+            logger.info(f"🔐 Fetching users with admin email: {admin_email}")
+            logger.info(f"📋 Using scopes: {settings.ADMIN_SCOPES}")
+            logger.info(f"🔑 Service account: {self.service_account_info.get('client_email')}")
+            
             credentials = self.get_delegated_credentials(admin_email, settings.ADMIN_SCOPES)
+            
+            logger.info("✅ Credentials created successfully")
+            
             service = build('admin', 'directory_v1', credentials=credentials)
+            
+            logger.info("🌐 Admin Directory service built, requesting users...")
             
             users = []
             page_token = None
@@ -91,6 +103,8 @@ class GoogleWorkspaceService:
                 if not page_token:
                     break
             
+            logger.info(f"✅ Successfully fetched {len(users)} users from Google Workspace")
+            
             # Parse user data
             parsed_users = []
             for user in users:
@@ -102,10 +116,21 @@ class GoogleWorkspaceService:
                     'is_active': not user.get('suspended', False)
                 })
             
+            logger.info(f"📊 Parsed {len(parsed_users)} user records")
+            
             return parsed_users
         
         except HttpError as error:
+            logger.error(f"❌ Google API HttpError: {error}")
+            logger.error(f"Error details: {error.resp.status if hasattr(error, 'resp') else 'N/A'}")
+            logger.error(f"Error content: {error.content if hasattr(error, 'content') else 'N/A'}")
             raise Exception(f"Failed to fetch users: {error}")
+        except Exception as e:
+            logger.error(f"❌ Unexpected error: {str(e)}")
+            logger.error(f"Error type: {type(e).__name__}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     def send_email(
         self,
