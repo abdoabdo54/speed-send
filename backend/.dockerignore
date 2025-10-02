@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.env
+.env.local
+service_accounts/
+*.json
+*.log
+.git
+.gitignore
+README.md
+
