@@ -1,6 +1,20 @@
-# Gmail Bulk Sender SaaS - Professional Email Campaign Management
+# Gmail Bulk Sender SaaS - PowerMTA Mode ⚡
 
-A professional, full-stack web application for sending bulk emails via Google Workspace accounts using service account JSONs with domain-wide delegation. Built with modern technologies and designed for scalability.
+**Send 15,000 emails in <15 seconds!**
+
+A professional, full-stack web application for sending bulk emails via Google Workspace accounts using service account JSONs with domain-wide delegation. Built with PowerMTA-style instant parallel sending.
+
+## ⚡ **ONE-COMMAND INSTALLATION**
+
+```bash
+git clone https://github.com/abdoabdo54/speed-send.git
+cd speed-send
+chmod +x deploy.sh && ./deploy.sh
+```
+
+**Done!** Everything installs automatically in 5-10 minutes.
+
+---
 
 ## 🚀 Features
 
@@ -84,82 +98,73 @@ A professional, full-stack web application for sending bulk emails via Google Wo
      - `https://www.googleapis.com/auth/gmail.modify`
      - `https://www.googleapis.com/auth/admin.directory.user.readonly`
 
-## 🚀 Quick Start (Development)
+## 🚀 Quick Start - ONE COMMAND INSTALLATION! ⚡
 
-### 1. Clone the Repository
-
-```bash
-git clone <your-repo-url>
-cd gmail-bulk-sender-saas
-```
-
-### 2. Configure Environment
-
-Create a `.env` file in the root directory:
+### **100% Automated - Zero Configuration Required!**
 
 ```bash
-cp .env.example .env
+# 1. Clone repository
+git clone https://github.com/abdoabdo54/speed-send.git
+cd speed-send
+
+# 2. Run ONE command (installs EVERYTHING automatically!)
+chmod +x deploy.sh && ./deploy.sh
 ```
 
-Edit `.env` and update the following:
+### **That's It! 🎉**
 
-```env
-# Database
-POSTGRES_USER=gmailsaas
-POSTGRES_PASSWORD=your_secure_password_here
-POSTGRES_DB=gmail_saas
+The automated installer will:
+- ✅ Install Docker & Docker Compose
+- ✅ Install all system dependencies  
+- ✅ Generate secure encryption keys automatically
+- ✅ Configure PostgreSQL database
+- ✅ Build all containers
+- ✅ Start all services
+- ✅ Wait for services to be ready
+- ✅ Open application in browser
 
-# Backend Security
-SECRET_KEY=your-secret-key-min-32-characters-change-this
-ENCRYPTION_KEY=your-encryption-key-exactly-32-chars
+**Total Time: 5-10 minutes**
 
-# Frontend
-NEXT_PUBLIC_API_URL=http://localhost:8000
+### **For Windows Users:**
 
-# Email Configuration
-DEFAULT_RATE_LIMIT=500
-WORKSPACE_RATE_LIMIT=2000
-CONCURRENCY_PER_ACCOUNT=5
-GLOBAL_CONCURRENCY=50
-```
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop)
+2. Double-click `deploy.bat`
+3. Done!
 
-### 3. Start the Application
+### **Access Your Application:**
+
+After installation completes:
+- 🌐 **Frontend**: http://YOUR_IP:3000
+- ⚙️ **Backend API**: http://YOUR_IP:8000  
+- 📚 **API Docs**: http://YOUR_IP:8000/docs
+
+(The installer displays your IP automatically)
+
+### **Quick Start Guide:**
+
+1. **Upload Service Account** (Accounts page)
+   - Click "Add Account"
+   - Paste your Google Cloud service account JSON
+   - Click "Sync" to fetch users
+
+2. **Create Campaign** (Campaigns page)
+   - Click "New Campaign"
+   - Select your accounts (all 12 for max speed!)
+   - Add recipients (email,name,company format)
+   - Compose email with {{variables}}
+   - Click "Create Campaign"
+
+3. **Send at Light Speed** ⚡
+   - Click **"Start"** button
+   - Watch **15,000 emails send in <15 seconds!**
+   - See real-time progress bars
+
+### **Update Existing Installation:**
 
 ```bash
-docker-compose up -d
+# One command to update
+chmod +x update.sh && ./update.sh
 ```
-
-This will start:
-- PostgreSQL (port 5432)
-- Redis (port 6379)
-- FastAPI Backend (port 8000)
-- Celery Worker
-- Celery Beat
-- Next.js Frontend (port 3000)
-
-### 4. Access the Application
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-
-### 5. Upload Service Account
-
-1. Go to the **Accounts** page
-2. Click **Add Account**
-3. Enter a name for your account
-4. Paste your service account JSON
-5. Click **Upload**
-6. Click the **Sync** button and enter an admin email to fetch users
-
-### 6. Create a Campaign
-
-1. Go to **Campaigns** → **New Campaign**
-2. **Step 1**: Select sender accounts
-3. **Step 2**: Add recipients (CSV format: email, name, company)
-4. **Step 3**: Compose your email with subject and body
-5. **Step 4**: Review and create
-6. Back on campaigns page, click **Play** to start
 
 ## 🌐 Production Deployment (Ubuntu Server)
 
