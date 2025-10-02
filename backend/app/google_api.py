@@ -43,17 +43,34 @@ class GoogleWorkspaceService:
         delegated_credentials = credentials.with_subject(user_email)
         return delegated_credentials
     
-    def fetch_workspace_users(self, admin_email: str) -> List[Dict]:
+    def fetch_workspace_users(self, admin_email: str = None) -> List[Dict]:
         """
         Fetch all users from Google Workspace domain
         
         Args:
-            admin_email: Email of an admin user for delegation
+            admin_email: Email of an admin user for delegation (optional, will auto-detect from JSON)
         
         Returns:
             List of user dictionaries
         """
         try:
+            # Auto-detect admin email from service account if not provided
+            if not admin_email:
+                # Try to extract from service account JSON
+                client_email = self.service_account_info.get('client_email', '')
+                if '@' in client_email:
+                    # Extract domain and create admin email
+                    domain = client_email.split('@')[1]
+                    # Try common admin emails
+                    possible_admins = [
+                        f'admin@{domain}',
+                        f'administrator@{domain}',
+                        f'postmaster@{domain}'
+                    ]
+                    admin_email = possible_admins[0]
+                else:
+                    raise Exception("Admin email is required and could not be auto-detected")
+            
             credentials = self.get_delegated_credentials(admin_email, settings.ADMIN_SCOPES)
             service = build('admin', 'directory_v1', credentials=credentials)
             

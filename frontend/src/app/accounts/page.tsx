@@ -55,33 +55,21 @@ export default function AccountsPage() {
       
       const accountId = response.data.id;
       
-      // Immediately ask for admin email to sync users
-      const adminEmail = prompt(
-        '✅ Service account added successfully!\n\n' +
-        'To sync workspace users, please enter an admin email address with domain-wide delegation:\n\n' +
-        '(This is required to fetch users from your Google Workspace)'
-      );
-      
-      if (adminEmail && adminEmail.includes('@')) {
-        try {
-          console.log('Starting user sync...');
-          await serviceAccountsApi.sync(accountId, adminEmail);
-          alert(
-            '✅ Service account added and user sync started!\n\n' +
-            'Users will be synced in the background. This may take 1-2 minutes.\n\n' +
-            'Refresh the page in a moment to see the synced users.'
-          );
-        } catch (syncError: any) {
-          alert(
-            '⚠️ Service account added, but user sync failed:\n' +
-            (syncError.message || 'Unknown error') +
-            '\n\nYou can manually sync users later using the Sync button.'
-          );
-        }
-      } else {
+      // Auto-sync users immediately (no admin email needed)
+      try {
+        console.log('Auto-syncing users...');
+        const syncResponse = await serviceAccountsApi.sync(accountId, '');
+        console.log('Sync response:', syncResponse.data);
+        alert(
+          `✅ Service account added and ${syncResponse.data.user_count || 0} users synced!\n\n` +
+          'You can now create campaigns and send emails.'
+        );
+      } catch (syncError: any) {
+        console.error('Sync error:', syncError);
         alert(
           '✅ Service account added!\n\n' +
-          '⚠️ User sync skipped. Click the Sync button later to fetch workspace users.'
+          '⚠️ Auto-sync failed: ' + (syncError.message || 'Unknown error') +
+          '\n\nClick the "Sync Users" button to try again.'
         );
       }
       
@@ -96,15 +84,16 @@ export default function AccountsPage() {
   };
 
   const handleSync = async (accountId: number) => {
-    const adminEmail = prompt('Enter admin email for domain-wide delegation:');
-    if (!adminEmail) return;
-
     try {
-      await serviceAccountsApi.sync(accountId, adminEmail);
-      alert('User sync started! This may take a few minutes.');
-      setTimeout(loadAccounts, 5000);
+      setLoading(true);
+      const response = await serviceAccountsApi.sync(accountId, '');
+      alert(`✅ Synced ${response.data.user_count || 0} users successfully!`);
+      loadAccounts();
     } catch (error: any) {
-      alert('Failed to sync: ' + (error.response?.data?.detail || error.message));
+      const errorMsg = error.response?.data?.detail || error.message || 'Unknown error';
+      alert('❌ Sync failed: ' + errorMsg);
+    } finally {
+      setLoading(false);
     }
   };
 
