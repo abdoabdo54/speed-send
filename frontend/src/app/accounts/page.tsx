@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { serviceAccountsApi, healthCheck, API_URL } from '@/lib/api';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Wifi, WifiOff } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Wifi, WifiOff, Upload } from 'lucide-react';
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -14,6 +14,7 @@ export default function AccountsPage() {
   const [showUpload, setShowUpload] = useState(false);
   const [uploadData, setUploadData] = useState({ name: '', json: '' });
   const [backendStatus, setBackendStatus] = useState<boolean | null>(null);
+  const [uploadMethod, setUploadMethod] = useState<'file' | 'paste'>('file');
 
   useEffect(() => {
     checkBackend();
@@ -42,6 +43,14 @@ export default function AccountsPage() {
   const handleUpload = async () => {
     if (!uploadData.name || !uploadData.json) {
       alert('Please provide both account name and JSON content');
+      return;
+    }
+
+    // Validate JSON
+    try {
+      JSON.parse(uploadData.json);
+    } catch (e) {
+      alert('Invalid JSON format. Please check your service account JSON.');
       return;
     }
 
@@ -99,6 +108,18 @@ export default function AccountsPage() {
       const errorMessage = error.message || error.response?.data?.detail || 'Failed to upload';
       alert('Failed to upload: ' + errorMessage);
     }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      setUploadData({ ...uploadData, json: content });
+    };
+    reader.readAsText(file);
   };
 
   const handleSync = async (accountId: number) => {
@@ -196,18 +217,72 @@ export default function AccountsPage() {
                     onChange={(e) => setUploadData({ ...uploadData, name: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Service Account JSON</label>
-                  <textarea
-                    className="w-full h-32 p-3 text-sm border rounded-md"
-                    placeholder="Paste your service account JSON here..."
-                    value={uploadData.json}
-                    onChange={(e) => setUploadData({ ...uploadData, json: e.target.value })}
-                  />
+
+                {/* Upload Method Toggle */}
+                <div className="flex gap-2 border-b pb-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={uploadMethod === 'file' ? 'default' : 'outline'}
+                    onClick={() => setUploadMethod('file')}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload File
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={uploadMethod === 'paste' ? 'default' : 'outline'}
+                    onClick={() => setUploadMethod('paste')}
+                  >
+                    Paste JSON
+                  </Button>
                 </div>
+
+                {/* File Upload */}
+                {uploadMethod === 'file' && (
+                  <div>
+                    <label className="text-sm font-medium">Service Account JSON File</label>
+                    <div className="mt-2">
+                      <Input
+                        type="file"
+                        accept=".json"
+                        onChange={handleFileUpload}
+                        className="cursor-pointer"
+                      />
+                    </div>
+                    {uploadData.json && (
+                      <p className="text-sm text-green-600 mt-2">
+                        ✓ JSON file loaded ({uploadData.json.length} characters)
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Paste JSON */}
+                {uploadMethod === 'paste' && (
+                  <div>
+                    <label className="text-sm font-medium">Service Account JSON</label>
+                    <textarea
+                      className="w-full h-32 p-3 text-sm border rounded-md font-mono mt-2"
+                      placeholder="Paste your service account JSON here..."
+                      value={uploadData.json}
+                      onChange={(e) => setUploadData({ ...uploadData, json: e.target.value })}
+                    />
+                  </div>
+                )}
+
                 <div className="flex gap-2">
-                  <Button onClick={handleUpload}>Upload</Button>
-                  <Button variant="outline" onClick={() => setShowUpload(false)}>Cancel</Button>
+                  <Button onClick={handleUpload} disabled={!uploadData.name || !uploadData.json}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload & Sync
+                  </Button>
+                  <Button variant="outline" onClick={() => {
+                    setShowUpload(false);
+                    setUploadData({ name: '', json: '' });
+                  }}>
+                    Cancel
+                  </Button>
                 </div>
               </CardContent>
             </Card>
