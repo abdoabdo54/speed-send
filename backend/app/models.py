@@ -37,6 +37,7 @@ class ServiceAccount(Base):
     client_email = Column(String(255), nullable=False, unique=True)
     domain = Column(String(255), nullable=False)
     project_id = Column(String(255))
+    admin_email = Column(String(255))  # Admin email for domain-wide delegation
     
     # Encrypted JSON content
     encrypted_json = Column(Text, nullable=False)

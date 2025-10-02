@@ -149,7 +149,7 @@ async def sync_account_users(
 ):
     """
     Sync users from Google Workspace - RUNS SYNCHRONOUSLY for immediate results
-    Admin email is optional - will auto-detect from service account domain
+    Requires admin email from your workspace domain (e.g., admin@yourdomain.com)
     """
     from app.models import WorkspaceUser
     from app.google_api import GoogleWorkspaceService
@@ -164,15 +164,30 @@ async def sync_account_users(
     if not account:
         raise HTTPException(status_code=404, detail="Service account not found")
     
+    # Use provided admin_email or stored admin_email
+    if admin_email:
+        # Update stored admin email
+        account.admin_email = admin_email
+        db.commit()
+    elif account.admin_email:
+        # Use stored admin email
+        admin_email = account.admin_email
+    else:
+        # No admin email available
+        raise HTTPException(
+            status_code=400, 
+            detail="Admin email is required. Please provide an admin email from your workspace domain (e.g., admin@yourdomain.com)"
+        )
+    
     try:
         # Decrypt service account JSON
         decrypted_json = encryption_service.decrypt(account.encrypted_json)
-        logger.info(f"🔄 Starting sync for account: {account.client_email}")
+        logger.info(f"🔄 Starting sync for account: {account.client_email} with admin: {admin_email}")
         
         # Initialize Google API service
         google_service = GoogleWorkspaceService(decrypted_json)
         
-        # Fetch users (admin_email is optional now - will auto-detect)
+        # Fetch users with the provided admin email
         users = google_service.fetch_workspace_users(admin_email)
         logger.info(f"✅ Fetched {len(users)} users from Google")
         

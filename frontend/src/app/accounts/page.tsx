@@ -55,21 +55,39 @@ export default function AccountsPage() {
       
       const accountId = response.data.id;
       
-      // Auto-sync users immediately (no admin email needed)
-      try {
-        console.log('Auto-syncing users...');
-        const syncResponse = await serviceAccountsApi.sync(accountId, '');
-        console.log('Sync response:', syncResponse.data);
-        alert(
-          `✅ Service account added and ${syncResponse.data.user_count || 0} users synced!\n\n` +
-          'You can now create campaigns and send emails.'
-        );
-      } catch (syncError: any) {
-        console.error('Sync error:', syncError);
+      // Ask for admin email to sync users
+      const adminEmail = prompt(
+        '✅ Service account added!\n\n' +
+        'Enter an admin email from your workspace to sync users:\n' +
+        '(Example: admin@yourdomain.com)\n\n' +
+        'This email must have admin privileges in Google Workspace.'
+      );
+      
+      if (adminEmail && adminEmail.includes('@')) {
+        try {
+          console.log('Syncing users with admin email:', adminEmail);
+          const syncResponse = await serviceAccountsApi.sync(accountId, adminEmail);
+          console.log('Sync response:', syncResponse.data);
+          alert(
+            `✅ Successfully synced ${syncResponse.data.user_count || 0} users!\n\n` +
+            'You can now create campaigns and send emails.'
+          );
+        } catch (syncError: any) {
+          console.error('Sync error:', syncError);
+          const errorMsg = syncError.response?.data?.detail || syncError.message || 'Unknown error';
+          alert(
+            '⚠️ Sync failed: ' + errorMsg +
+            '\n\nPlease check:\n' +
+            '1. The admin email is correct\n' +
+            '2. Domain-wide delegation is set up in Google Admin Console\n' +
+            '3. The admin has super admin privileges\n\n' +
+            'Click "Sync Users" button to try again.'
+          );
+        }
+      } else {
         alert(
           '✅ Service account added!\n\n' +
-          '⚠️ Auto-sync failed: ' + (syncError.message || 'Unknown error') +
-          '\n\nClick the "Sync Users" button to try again.'
+          'Click the "Sync Users" button to sync workspace users later.'
         );
       }
       
@@ -84,14 +102,31 @@ export default function AccountsPage() {
   };
 
   const handleSync = async (accountId: number) => {
+    const adminEmail = prompt(
+      'Enter admin email from your workspace:\n' +
+      '(Example: admin@yourdomain.com)\n\n' +
+      'This email must have admin privileges.'
+    );
+    
+    if (!adminEmail || !adminEmail.includes('@')) {
+      alert('Please provide a valid admin email.');
+      return;
+    }
+    
     try {
       setLoading(true);
-      const response = await serviceAccountsApi.sync(accountId, '');
-      alert(`✅ Synced ${response.data.user_count || 0} users successfully!`);
+      const response = await serviceAccountsApi.sync(accountId, adminEmail);
+      alert(`✅ Successfully synced ${response.data.user_count || 0} users!`);
       loadAccounts();
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail || error.message || 'Unknown error';
-      alert('❌ Sync failed: ' + errorMsg);
+      alert(
+        '❌ Sync failed: ' + errorMsg +
+        '\n\nPlease verify:\n' +
+        '1. Admin email is correct\n' +
+        '2. Domain-wide delegation is enabled\n' +
+        '3. Correct OAuth scopes are authorized'
+      );
     } finally {
       setLoading(false);
     }
