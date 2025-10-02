@@ -32,7 +32,7 @@ import sys
 import json
 from app.database import SessionLocal
 from app.models import ServiceAccount
-from app.encryption import decrypt_data
+from app.encryption import encryption_service
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -58,7 +58,7 @@ try:
     print()
     
     # Decrypt the JSON
-    decrypted = decrypt_data(account.encrypted_json)
+    decrypted = encryption_service.decrypt(account.encrypted_json)
     sa_info = json.loads(decrypted)
     
     print("🔑 Service Account Details:")
