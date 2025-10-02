@@ -30,15 +30,19 @@ class Settings(BaseSettings):
     CONCURRENCY_PER_ACCOUNT: int = 5
     GLOBAL_CONCURRENCY: int = 50
     
-    # Google API Scopes
+    # Google API Scopes (Must match what's authorized in Google Admin Console)
     GMAIL_SCOPES: list = [
         'https://www.googleapis.com/auth/gmail.send',
         'https://www.googleapis.com/auth/gmail.compose',
         'https://www.googleapis.com/auth/gmail.insert',
-        'https://www.googleapis.com/auth/gmail.modify'
+        'https://www.googleapis.com/auth/gmail.modify',
+        'https://www.googleapis.com/auth/gmail.readonly'
     ]
     ADMIN_SCOPES: list = [
-        'https://www.googleapis.com/auth/admin.directory.user.readonly'
+        'https://www.googleapis.com/auth/admin.directory.user',
+        'https://www.googleapis.com/auth/admin.directory.user.security',
+        'https://www.googleapis.com/auth/admin.directory.orgunit',
+        'https://www.googleapis.com/auth/admin.directory.domain.readonly'
     ]
     
     # File Storage
