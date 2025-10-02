@@ -29,10 +29,13 @@ export default function NewCampaignPage() {
 
   const loadAccounts = async () => {
     try {
+      console.log('🔄 Loading accounts...');
       const response = await serviceAccountsApi.list();
+      console.log('✅ Accounts loaded:', response.data);
       setAccounts(response.data);
     } catch (error) {
-      console.error('Failed to load accounts:', error);
+      console.error('❌ Failed to load accounts:', error);
+      alert('Failed to load accounts: ' + (error as any)?.message || 'Unknown error');
     }
   };
 
@@ -187,7 +190,17 @@ export default function NewCampaignPage() {
           {/* Account Status */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>📊 Account Status</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                📊 Account Status
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={loadAccounts}
+                  disabled={loading}
+                >
+                  {loading ? 'Loading...' : 'Refresh'}
+                </Button>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {accounts.length === 0 ? (
@@ -196,12 +209,19 @@ export default function NewCampaignPage() {
                   <p className="text-sm text-muted-foreground mt-1">
                     Please add accounts first in the Accounts section
                   </p>
-                  <Button 
-                    className="mt-3" 
-                    onClick={() => router.push('/accounts')}
-                  >
-                    Add Accounts
-                  </Button>
+                  <div className="flex gap-2 justify-center mt-3">
+                    <Button 
+                      onClick={() => router.push('/accounts')}
+                    >
+                      Add Accounts
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={loadAccounts}
+                    >
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
