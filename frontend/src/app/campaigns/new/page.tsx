@@ -9,6 +9,7 @@ export default function NewCampaignPage() {
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [selectedSenders, setSelectedSenders] = useState<string[]>([]);
   
   // Form state
   const [name, setName] = useState('');
@@ -53,9 +54,20 @@ export default function NewCampaignPage() {
     }
   };
 
-  const handleAddUser = (userEmail: string) => {
-    if (!userEmail) return;
-    setRecipients(prev => prev ? `${prev}\n${userEmail}` : userEmail);
+  const toggleSender = (userEmail: string) => {
+    setSelectedSenders(prev => 
+      prev.includes(userEmail) 
+        ? prev.filter(e => e !== userEmail)
+        : [...prev, userEmail]
+    );
+  };
+
+  const selectAllSenders = () => {
+    setSelectedSenders(users.map((u: any) => u.primary_email || u.email));
+  };
+
+  const clearSenders = () => {
+    setSelectedSenders([]);
   };
 
   const handleSendTest = async () => {
@@ -71,31 +83,51 @@ export default function NewCampaignPage() {
 
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/api/v1/campaigns/`, {
+      console.log('=== SENDING TEST ===');
+      console.log('API URL:', API_URL);
+      console.log('Accounts:', accounts);
+      
+      const payload = {
         name: `TEST-${name || 'Campaign'}`,
         subject: `[TEST] ${subject}`,
         body_html: message,
         from_name: fromName || 'Test',
         recipients: [{ email: testEmail, variables: {} }],
-        sender_account_ids: [accounts[0].id],
+        sender_account_ids: accounts.map(a => a.id),
         sender_rotation: 'round_robin',
         custom_headers: {},
         attachments: [],
         rate_limit: 100,
         concurrency: 1
-      });
+      };
+      
+      console.log('Payload:', JSON.stringify(payload, null, 2));
+      
+      const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
+      console.log('✅ Success:', response.data);
       alert('✅ Test email sent!');
     } catch (err: any) {
-      console.error('Test error:', err);
+      console.error('=== ERROR DETAILS ===');
+      console.error('Full error:', err);
+      console.error('Response status:', err?.response?.status);
+      console.error('Response data:', err?.response?.data);
+      
       let msg = 'Test failed';
-      if (err?.response?.data?.detail) {
-        msg = typeof err.response.data.detail === 'string' 
-          ? err.response.data.detail 
-          : JSON.stringify(err.response.data.detail);
+      if (err?.response?.data) {
+        const data = err.response.data;
+        if (typeof data === 'string') {
+          msg = data;
+        } else if (data.detail) {
+          msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+        } else {
+          msg = JSON.stringify(data);
+        }
       } else if (err?.message) {
         msg = err.message;
       }
+      
       alert('❌ ' + msg);
+      console.error('Final error message:', msg);
     } finally {
       setLoading(false);
     }
@@ -112,6 +144,11 @@ export default function NewCampaignPage() {
       return;
     }
 
+    if (selectedSenders.length === 0) {
+      alert('⚠️ Please select at least one sender from Google Workspace Users!');
+      return;
+    }
+
     const recipientList = recipients
       .split('\n')
       .map(e => e.trim())
@@ -125,7 +162,13 @@ export default function NewCampaignPage() {
 
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/api/v1/campaigns/`, {
+      console.log('=== CREATING CAMPAIGN ===');
+      console.log('API URL:', API_URL);
+      console.log('Accounts:', accounts);
+      console.log('Selected Senders:', selectedSenders);
+      console.log('Recipients count:', recipientList.length);
+      
+      const payload = {
         name,
         subject,
         body_html: message,
@@ -137,40 +180,58 @@ export default function NewCampaignPage() {
         attachments: [],
         rate_limit: 10000,
         concurrency: 100
-      });
-      alert('✅ Campaign created!');
+      };
+      
+      console.log('Payload:', JSON.stringify(payload, null, 2));
+      
+      const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
+      console.log('✅ Campaign created:', response.data);
+      alert('✅ Campaign created! Use Prepare → Launch in Campaigns page.');
       router.push('/campaigns');
     } catch (err: any) {
-      console.error('Campaign error:', err);
+      console.error('=== CAMPAIGN ERROR ===');
+      console.error('Full error:', err);
+      console.error('Response status:', err?.response?.status);
+      console.error('Response data:', err?.response?.data);
+      
       let msg = 'Failed to create campaign';
-      if (err?.response?.data?.detail) {
-        msg = typeof err.response.data.detail === 'string' 
-          ? err.response.data.detail 
-          : JSON.stringify(err.response.data.detail);
+      if (err?.response?.data) {
+        const data = err.response.data;
+        if (typeof data === 'string') {
+          msg = data;
+        } else if (data.detail) {
+          msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+        } else {
+          msg = JSON.stringify(data);
+        }
       } else if (err?.message) {
         msg = err.message;
       }
+      
       alert('❌ ' + msg);
+      console.error('Final error message:', msg);
     } finally {
       setLoading(false);
     }
   };
 
+  const totalSenders = accounts.reduce((sum, acc) => sum + (acc.total_users || 0), 0);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Send Email Campaign</h1>
-          <p className="text-gray-600">Simple bulk email sender</p>
+          <h1 className="text-3xl font-bold mb-2">🚀 Send Email Campaign</h1>
+          <p className="text-gray-600">Select senders from Google Workspace, add recipients, and launch!</p>
         </div>
 
         {/* Account Status */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <h2 className="font-bold text-lg mb-3">Account Status</h2>
+          <h2 className="font-bold text-lg mb-3">📊 Sending Infrastructure</h2>
           {accounts.length === 0 ? (
             <div className="text-center py-4">
-              <p className="text-red-600 font-bold">⚠️ No accounts</p>
+              <p className="text-red-600 font-bold">⚠️ No accounts configured</p>
               <button
                 onClick={() => router.push('/accounts')}
                 className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -179,32 +240,38 @@ export default function NewCampaignPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold text-green-600">{accounts.length}</div>
-                <div className="text-sm text-gray-600">Accounts</div>
+            <div className="grid grid-cols-4 gap-4 text-center">
+              <div className="bg-blue-50 p-4 rounded">
+                <div className="text-3xl font-bold text-blue-600">{accounts.length}</div>
+                <div className="text-sm text-gray-600">Service Accounts</div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-blue-600">
-                  {accounts.reduce((sum, acc) => sum + (acc.total_users || 0), 0)}
+              <div className="bg-green-50 p-4 rounded">
+                <div className="text-3xl font-bold text-green-600">{totalSenders}</div>
+                <div className="text-sm text-gray-600">Available Senders</div>
+              </div>
+              <div className="bg-purple-50 p-4 rounded">
+                <div className="text-3xl font-bold text-purple-600">{selectedSenders.length}</div>
+                <div className="text-sm text-gray-600">Selected Senders</div>
+              </div>
+              <div className="bg-yellow-50 p-4 rounded">
+                <div className="text-3xl font-bold text-yellow-600">
+                  {recipients.split('\n').filter(Boolean).length}
                 </div>
-                <div className="text-sm text-gray-600">Senders</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-purple-600">Ready</div>
-                <div className="text-sm text-gray-600">Status</div>
+                <div className="text-sm text-gray-600">Recipients</div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Main Form */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Left Column */}
+        {/* Main Form - 3 Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Column 1: Campaign Setup */}
           <div className="space-y-6">
-            {/* Campaign Details */}
             <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="font-bold text-lg mb-4">Campaign Details</h2>
+              <h2 className="font-bold text-lg mb-4 flex items-center">
+                <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center mr-2">1</span>
+                Campaign Setup
+              </h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Campaign Name *</label>
@@ -237,95 +304,171 @@ export default function NewCampaignPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Test Email</label>
-                  <input
-                    type="email"
-                    value={testEmail}
-                    onChange={(e) => setTestEmail(e.target.value)}
-                    placeholder="test@example.com"
-                    className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  <label className="block text-sm font-medium mb-1">Email Message (HTML) *</label>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="<h1>Hello!</h1><p>Your message...</p>"
+                    rows={8}
+                    className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Google Users */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="font-bold text-lg mb-4">Google Workspace Users</h2>
-              <div className="max-h-64 overflow-auto border rounded p-2">
-                {users.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No users. Sync accounts first.</p>
-                ) : (
-                  users.map((user: any) => (
-                    <div key={user.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                      <span className="text-sm">{user.primary_email || user.email}</span>
-                      <button
-                        onClick={() => handleAddUser(user.primary_email || user.email)}
-                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  ))
-                )}
+            {/* Test Email */}
+            <div className="bg-yellow-50 rounded-lg shadow p-4 border-2 border-yellow-300">
+              <h2 className="font-bold text-lg mb-4">🧪 Test Email</h2>
+              <div className="space-y-3">
+                <input
+                  type="email"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  placeholder="test@example.com"
+                  className="w-full px-3 py-2 border rounded"
+                />
+                <button
+                  onClick={handleSendTest}
+                  disabled={loading || !testEmail || !subject || !message}
+                  className="w-full px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+                >
+                  {loading ? 'Sending...' : '🧪 Send Test Email'}
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* Message */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="font-bold text-lg mb-4">Email Message</h2>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="<h1>Hello!</h1><p>Your message...</p>"
-                rows={12}
-                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-              />
+          {/* Column 2: Select Senders */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="font-bold text-lg mb-4 flex items-center">
+              <span className="bg-green-600 text-white w-8 h-8 rounded-full flex items-center justify-center mr-2">2</span>
+              Select Senders (Google Workspace)
+            </h2>
+            
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
+              <p className="text-sm text-green-800 font-medium">
+                ✅ These users will SEND emails via Gmail API
+              </p>
+              <p className="text-xs text-green-600 mt-1">
+                Select users who will act as senders. More senders = faster sending!
+              </p>
             </div>
 
-            {/* Recipients */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="font-bold text-lg mb-4">Recipients</h2>
-              <textarea
-                value={recipients}
-                onChange={(e) => setRecipients(e.target.value)}
-                placeholder="user1@example.com&#10;user2@example.com"
-                rows={8}
-                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-              />
-              <p className="text-sm text-gray-600 mt-2">
-                {recipients.split('\n').filter(Boolean).length} recipients
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={selectAllSenders}
+                className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+              >
+                Select All ({users.length})
+              </button>
+              <button
+                onClick={clearSenders}
+                className="flex-1 px-3 py-2 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
+              >
+                Clear
+              </button>
+            </div>
+
+            <div className="max-h-[600px] overflow-auto border rounded p-2">
+              {users.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-2">No users synced</p>
+                  <button
+                    onClick={() => router.push('/accounts')}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Sync Accounts
+                  </button>
+                </div>
+              ) : (
+                users.map((user: any) => {
+                  const email = user.primary_email || user.email;
+                  const isSelected = selectedSenders.includes(email);
+                  return (
+                    <div 
+                      key={user.id} 
+                      className={`flex items-center py-2 px-3 border-b last:border-0 hover:bg-gray-50 cursor-pointer ${
+                        isSelected ? 'bg-green-50 border-l-4 border-l-green-600' : ''
+                      }`}
+                      onClick={() => toggleSender(email)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSender(email)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{email}</div>
+                        {user.full_name && (
+                          <div className="text-xs text-gray-500">{user.full_name}</div>
+                        )}
+                      </div>
+                      {isSelected && (
+                        <span className="text-green-600 font-bold text-xs">✓ SENDER</span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="mt-4 p-3 bg-blue-50 rounded">
+              <p className="text-sm font-bold text-blue-900">
+                📊 {selectedSenders.length} senders selected
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Tip: More senders = faster bulk sending (PowerMTA mode)
               </p>
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-4 mt-6">
-          <button
-            onClick={() => router.push('/campaigns')}
-            disabled={loading}
-            className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSendTest}
-            disabled={loading}
-            className="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
-          >
-            {loading ? 'Sending...' : 'Send Test'}
-          </button>
-          <button
-            onClick={handleSendCampaign}
-            disabled={loading}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-          >
-            {loading ? 'Creating...' : 'Send Campaign'}
-          </button>
+          {/* Column 3: Recipients */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="font-bold text-lg mb-4 flex items-center">
+              <span className="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center mr-2">3</span>
+              Recipients
+            </h2>
+
+            <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded">
+              <p className="text-sm text-purple-800 font-medium">
+                📧 These people will RECEIVE emails
+              </p>
+              <p className="text-xs text-purple-600 mt-1">
+                Add one email per line
+              </p>
+            </div>
+
+            <textarea
+              value={recipients}
+              onChange={(e) => setRecipients(e.target.value)}
+              placeholder="recipient1@example.com&#10;recipient2@example.com&#10;recipient3@example.com"
+              rows={20}
+              className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono text-sm"
+            />
+
+            <div className="mt-4 space-y-3">
+              <div className="p-3 bg-gray-50 rounded">
+                <p className="text-sm font-bold text-gray-900">
+                  📊 {recipients.split('\n').filter(Boolean).length} recipients
+                </p>
+              </div>
+
+              <button
+                onClick={handleSendCampaign}
+                disabled={loading || !name || !subject || !message || !recipients || selectedSenders.length === 0}
+                className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-lg shadow-lg"
+              >
+                {loading ? 'Creating...' : '🚀 Create Campaign'}
+              </button>
+
+              {selectedSenders.length === 0 && (
+                <p className="text-sm text-red-600 text-center font-medium">
+                  ⚠️ Please select senders first!
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
