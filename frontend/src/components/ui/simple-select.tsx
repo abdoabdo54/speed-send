@@ -1,11 +1,11 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+export interface SimpleSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   onValueChange?: (value: string) => void
 }
 
-const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
+const SimpleSelect = React.forwardRef<HTMLSelectElement, SimpleSelectProps>(
   ({ className, onValueChange, children, ...props }, ref) => {
     return (
       <select
@@ -27,14 +27,6 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     )
   }
 )
-Select.displayName = "Select"
+SimpleSelect.displayName = "SimpleSelect"
 
-const SelectTrigger = Select
-const SelectValue = ({ children }: { children?: React.ReactNode }) => <>{children}</>
-const SelectContent = ({ children }: { children?: React.ReactNode }) => <>{children}</>
-const SelectItem = ({ value, children }: { value: string; children: React.ReactNode }) => (
-  <option value={value}>{children}</option>
-)
-
-export { Select, SelectTrigger, SelectValue, SelectContent, SelectItem }
-
+export { SimpleSelect }
