@@ -7,7 +7,7 @@ import logging
 from app.database import get_db
 from app.models import (
     Campaign, CampaignStatus, ServiceAccount, EmailLog, EmailStatus,
-    CampaignSender
+    CampaignSender, WorkspaceUser
 )
 from app.schemas import (
     CampaignCreate, CampaignUpdate, CampaignResponse,
@@ -788,4 +788,43 @@ async def duplicate_campaign(
     except Exception as e:
         logger.error(f"❌ Duplicate failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to duplicate campaign: {str(e)}")
+
+
+@router.delete("/{campaign_id}")
+async def delete_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a campaign
+    """
+    try:
+        # Get campaign
+        campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        # Only allow deletion of draft campaigns
+        if campaign.status != CampaignStatus.DRAFT:
+            raise HTTPException(status_code=400, detail=f"Cannot delete campaign in {campaign.status} status. Only draft campaigns can be deleted.")
+        
+        # Delete associated email logs
+        db.query(EmailLog).filter(EmailLog.campaign_id == campaign_id).delete()
+        
+        # Delete campaign sender associations
+        db.query(CampaignSender).filter(CampaignSender.campaign_id == campaign_id).delete()
+        
+        # Delete campaign
+        db.delete(campaign)
+        db.commit()
+        
+        logger.info(f"🗑️ Campaign {campaign_id} deleted")
+        
+        return {"message": "Campaign deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Delete failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete campaign: {str(e)}")
 
