@@ -79,15 +79,6 @@ export default function CampaignsPage() {
     }
   };
 
-  const handleDuplicate = async (campaignId: number) => {
-    try {
-      await campaignsApi.duplicate(campaignId);
-      loadCampaigns();
-    } catch (error: any) {
-      alert('Failed to duplicate: ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
   const handleDelete = async (campaignId: number) => {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
 
