@@ -91,6 +91,7 @@ export default function NewCampaignPage() {
         name: `TEST-${name || 'Campaign'}`,
         subject: `[TEST] ${subject}`,
         body_html: message,
+        body_plain: message.replace(/<[^>]*>/g, ''), // Strip HTML tags for plain text
         from_name: fromName || 'Test',
         recipients: [{ email: testEmail, variables: {} }],
         sender_account_ids: accounts.map(a => a.id),
@@ -172,6 +173,7 @@ export default function NewCampaignPage() {
         name,
         subject,
         body_html: message,
+        body_plain: message.replace(/<[^>]*>/g, ''), // Strip HTML tags for plain text
         from_name: fromName || 'Sender',
         recipients: recipientList,
         sender_account_ids: accounts.map(a => a.id),
