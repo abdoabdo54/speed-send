@@ -105,20 +105,9 @@ export default function NewCampaignPage() {
       console.log('Payload:', JSON.stringify(payload, null, 2));
       
       const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
-      console.log('✅ Campaign created:', response.data);
+      console.log('✅ Campaign created and emails sent:', response.data);
       
-      // For test emails, we need to prepare and launch immediately
-      const campaignId = response.data.id;
-      console.log('📋 Preparing test campaign...');
-      
-      // Step 1: Prepare campaign
-      await axios.post(`${API_URL}/api/v1/campaigns/${campaignId}/prepare`);
-      console.log('✅ Campaign prepared');
-      
-      // Step 2: Launch campaign (this actually sends the email)
-      await axios.post(`${API_URL}/api/v1/campaigns/${campaignId}/launch`);
-      console.log('🚀 Campaign launched - email should be sent!');
-      
+      // Campaign creation now immediately sends all emails
       alert('✅ Test email sent via Gmail API!');
     } catch (err: any) {
       console.error('=== ERROR DETAILS ===');
@@ -200,21 +189,10 @@ export default function NewCampaignPage() {
       console.log('Payload:', JSON.stringify(payload, null, 2));
       
       const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
-      console.log('✅ Campaign created:', response.data);
+      console.log('✅ Campaign created and emails sent:', response.data);
       
-      // For regular campaigns, we also need to prepare and launch
-      const campaignId = response.data.id;
-      console.log('📋 Preparing campaign...');
-      
-      // Step 1: Prepare campaign
-      await axios.post(`${API_URL}/api/v1/campaigns/${campaignId}/prepare`);
-      console.log('✅ Campaign prepared');
-      
-      // Step 2: Launch campaign (this actually sends the emails)
-      await axios.post(`${API_URL}/api/v1/campaigns/${campaignId}/launch`);
-      console.log('🚀 Campaign launched - emails are being sent!');
-      
-      alert('✅ Campaign created and launched! Emails are being sent via Gmail API!');
+      // Campaign creation now immediately sends all emails
+      alert('✅ Campaign created and emails sent via Gmail API!');
       router.push('/campaigns');
     } catch (err: any) {
       console.error('=== CAMPAIGN ERROR ===');
