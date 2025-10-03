@@ -289,16 +289,120 @@ async def launch_campaign(
     campaign.started_at = datetime.utcnow()
     db.commit()
     
-    # Start async task
-    task = send_campaign_emails.delay(campaign_id)
-    campaign.celery_task_id = task.id
-    db.commit()
-    
-    return {
-        "message": "Campaign launched successfully",
-        "task_id": task.id,
-        "total_emails": campaign.total_recipients
-    }
+    # DIRECT SENDING - No Celery, immediate Gmail API calls
+    try:
+        from app.google_api import GoogleWorkspaceService
+        from app.encryption import encryption_service
+        from app.models import EmailLog, EmailStatus
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"🚀 DIRECT SENDING: Campaign {campaign_id}")
+        
+        # Get all email logs for this campaign
+        email_logs = db.query(EmailLog).filter(
+            EmailLog.campaign_id == campaign_id,
+            EmailLog.status == EmailStatus.PENDING
+        ).all()
+        
+        if not email_logs:
+            raise HTTPException(status_code=400, detail="No pending emails found")
+        
+        # Get sender accounts
+        sender_accounts = campaign.sender_accounts
+        if not sender_accounts:
+            raise HTTPException(status_code=400, detail="No sender accounts configured")
+        
+        # Build sender pool
+        sender_pool = []
+        for account in sender_accounts:
+            users = db.query(WorkspaceUser).filter(
+                WorkspaceUser.service_account_id == account.id,
+                WorkspaceUser.is_active == True
+            ).all()
+            
+            # Decrypt service account JSON
+            decrypted_json = encryption_service.decrypt(account.encrypted_json)
+            
+            for user in users:
+                sender_pool.append({
+                    'service_account_id': account.id,
+                    'service_account_json': decrypted_json,
+                    'user_email': user.email,
+                    'user_id': user.id
+                })
+        
+        if not sender_pool:
+            raise HTTPException(status_code=400, detail="No active users available for sending")
+        
+        logger.info(f"📊 Sending {len(email_logs)} emails using {len(sender_pool)} senders")
+        
+        # Send emails directly
+        sent_count = 0
+        failed_count = 0
+        
+        for idx, email_log in enumerate(email_logs):
+            try:
+                # Select sender (round-robin)
+                sender = sender_pool[idx % len(sender_pool)]
+                
+                # Update email log
+                email_log.status = EmailStatus.SENDING
+                email_log.sender_email = sender['user_email']
+                email_log.service_account_id = sender['service_account_id']
+                db.commit()
+                
+                # Create Google service
+                google_service = GoogleWorkspaceService(sender['service_account_json'])
+                
+                # Send email
+                message_id = google_service.send_email(
+                    sender_email=sender['user_email'],
+                    recipient_email=email_log.recipient_email,
+                    subject=campaign.subject,
+                    body_html=campaign.body_html,
+                    body_plain=campaign.body_plain,
+                    custom_headers=campaign.custom_headers,
+                    attachments=campaign.attachments
+                )
+                
+                # Update email log
+                email_log.status = EmailStatus.SENT
+                email_log.message_id = message_id
+                email_log.sent_at = datetime.utcnow()
+                db.commit()
+                
+                sent_count += 1
+                logger.info(f"✅ Sent: {email_log.recipient_email} via {sender['user_email']}")
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to send to {email_log.recipient_email}: {e}")
+                email_log.status = EmailStatus.FAILED
+                email_log.error_message = str(e)
+                db.commit()
+                failed_count += 1
+        
+        # Update campaign
+        campaign.sent_count = sent_count
+        campaign.failed_count = failed_count
+        campaign.status = CampaignStatus.COMPLETED
+        campaign.completed_at = datetime.utcnow()
+        db.commit()
+        
+        logger.info(f"🎉 Campaign {campaign_id} completed: {sent_count} sent, {failed_count} failed")
+        
+        return {
+            "message": f"Campaign completed successfully! {sent_count} emails sent, {failed_count} failed",
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "total_emails": campaign.total_recipients
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Campaign {campaign_id} failed: {e}")
+        campaign.status = CampaignStatus.FAILED
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Campaign failed: {str(e)}")
 
 
 @router.post("/{campaign_id}/control")
