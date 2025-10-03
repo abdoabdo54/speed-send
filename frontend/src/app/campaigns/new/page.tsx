@@ -2,28 +2,31 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sidebar } from '@/components/Sidebar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { usersApi, serviceAccountsApi, campaignsApi } from '@/lib/api';
-import { ArrowLeft, Send, TestTube, Mail } from 'lucide-react';
+import axios from 'axios';
 
 export default function NewCampaignPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   
-  // Simple form data
-  const [campaignName, setCampaignName] = useState('');
+  // Form state
+  const [name, setName] = useState('');
   const [fromName, setFromName] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [recipients, setRecipients] = useState('');
   const [testEmail, setTestEmail] = useState('');
-  const [workspaceUsers, setWorkspaceUsers] = useState<any[]>([]);
-  const [selectedUserEmails, setSelectedUserEmails] = useState<string>('');
+
+  // Get API URL
+  const getApiUrl = () => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.protocol}//${window.location.hostname}:8000`;
+    }
+    return 'http://localhost:8000';
+  };
+
+  const API_URL = getApiUrl();
 
   useEffect(() => {
     loadAccounts();
@@ -32,365 +35,281 @@ export default function NewCampaignPage() {
 
   const loadAccounts = async () => {
     try {
-      console.log('🔄 Loading accounts...');
-      const response = await serviceAccountsApi.list();
-      console.log('✅ Accounts loaded:', response.data);
-      setAccounts(response.data);
-    } catch (error) {
-      console.error('❌ Failed to load accounts:', error);
-      alert('Failed to load accounts: ' + (error as any)?.message || 'Unknown error');
+      const response = await axios.get(`${API_URL}/api/v1/accounts/`);
+      setAccounts(response.data || []);
+      console.log('Accounts loaded:', response.data);
+    } catch (err) {
+      console.error('Failed to load accounts:', err);
     }
   };
 
   const loadUsers = async () => {
     try {
-      const response = await usersApi.list();
-      setWorkspaceUsers(response.data || []);
-    } catch (e) {
-      console.error('Failed to load users', e);
+      const response = await axios.get(`${API_URL}/api/v1/users/`);
+      setUsers(response.data || []);
+      console.log('Users loaded:', response.data);
+    } catch (err) {
+      console.error('Failed to load users:', err);
     }
   };
 
-  const sendTest = async () => {
+  const handleAddUser = (userEmail: string) => {
+    if (!userEmail) return;
+    setRecipients(prev => prev ? `${prev}\n${userEmail}` : userEmail);
+  };
+
+  const handleSendTest = async () => {
     if (!testEmail || !subject || !message) {
-      alert('Please fill in test email, subject, and message');
+      alert('Please fill: Test Email, Subject, Message');
       return;
     }
 
     if (accounts.length === 0) {
-      alert('No accounts available. Please add an account first.');
+      alert('No accounts available. Add account first.');
       return;
     }
 
     setLoading(true);
     try {
-      const testData = {
-        name: `Test - ${campaignName || 'Campaign'}`,
+      await axios.post(`${API_URL}/api/v1/campaigns/`, {
+        name: `TEST-${name || 'Campaign'}`,
         subject: `[TEST] ${subject}`,
         body_html: message,
-        from_name: fromName || 'Test Sender',
+        from_name: fromName || 'Test',
         recipients: [{ email: testEmail, variables: {} }],
         sender_account_ids: [accounts[0].id],
         sender_rotation: 'round_robin',
         custom_headers: {},
         attachments: [],
         rate_limit: 100,
-        concurrency: 1,
-        is_test: true,
-        test_recipients: [testEmail]
-      };
-
-      await campaignsApi.create(testData);
-      alert('✅ Test email sent successfully!');
-    } catch (error: any) {
-      alert('❌ Test failed: ' + (error.response?.data?.detail || error.message));
+        concurrency: 1
+      });
+      alert('✅ Test email sent!');
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Test failed';
+      alert('❌ ' + msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const sendCampaign = async () => {
-    if (!campaignName || !subject || !message) {
-      alert('Please fill in all required fields');
+  const handleSendCampaign = async () => {
+    if (!name || !subject || !message || !recipients) {
+      alert('Please fill: Name, Subject, Message, Recipients');
       return;
     }
 
     if (accounts.length === 0) {
-      alert('No accounts available. Please add an account first.');
+      alert('No accounts available. Add account first.');
       return;
     }
 
-    const combinedRecipients = [
-      ...recipients.split('\n').filter(Boolean),
-      ...selectedUserEmails.split('\n').filter(Boolean)
-    ];
+    const recipientList = recipients
+      .split('\n')
+      .map(e => e.trim())
+      .filter(Boolean)
+      .map(email => ({ email, variables: {} }));
 
-    if (combinedRecipients.length === 0) {
-      alert('Please add at least one recipient (manual or from users)');
+    if (recipientList.length === 0) {
+      alert('Add at least one recipient');
       return;
     }
 
     setLoading(true);
     try {
-      const recipientList = combinedRecipients.map(email => ({ email: email.trim(), variables: {} }));
-      const allAccountIds = accounts.map(acc => acc.id);
-
-      const campaignData = {
-        name: campaignName,
-        subject: subject,
+      await axios.post(`${API_URL}/api/v1/campaigns/`, {
+        name,
+        subject,
         body_html: message,
-        from_name: fromName || 'Campaign Sender',
+        from_name: fromName || 'Sender',
         recipients: recipientList,
-        sender_account_ids: allAccountIds,
+        sender_account_ids: accounts.map(a => a.id),
         sender_rotation: 'round_robin',
         custom_headers: {},
         attachments: [],
         rate_limit: 10000,
-        concurrency: 100,
-        is_test: false,
-        test_recipients: []
-      };
-
-      await campaignsApi.create(campaignData);
-      alert('✅ Campaign created successfully!');
+        concurrency: 100
+      });
+      alert('✅ Campaign created!');
       router.push('/campaigns');
-    } catch (error: any) {
-      alert('Failed to create campaign: ' + (error.response?.data?.detail || error.message));
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Failed';
+      alert('❌ ' + msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-8 max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="mb-8 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => router.push('/campaigns')}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Send Email Campaign</h1>
+          <p className="text-gray-600">Simple bulk email sender</p>
+        </div>
+
+        {/* Account Status */}
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <h2 className="font-bold text-lg mb-3">Account Status</h2>
+          {accounts.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-red-600 font-bold">⚠️ No accounts</p>
+              <button
+                onClick={() => router.push('/accounts')}
+                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Add Account
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <h1 className="text-3xl font-bold">Simple Email Sender</h1>
-                <p className="text-muted-foreground">Send emails quickly and easily</p>
+                <div className="text-2xl font-bold text-green-600">{accounts.length}</div>
+                <div className="text-sm text-gray-600">Accounts</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-blue-600">
+                  {accounts.reduce((sum, acc) => sum + (acc.total_users || 0), 0)}
+                </div>
+                <div className="text-sm text-gray-600">Senders</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-purple-600">Ready</div>
+                <div className="text-sm text-gray-600">Status</div>
               </div>
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => router.push('/campaigns')}>
-                Cancel
-              </Button>
-              <Button onClick={sendTest} disabled={loading} variant="outline">
-                {loading ? 'Sending...' : (
-                  <>
-                    <TestTube className="mr-2 h-4 w-4" />
-                    Send Test
-                  </>
+          )}
+        </div>
+
+        {/* Main Form */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left Column */}
+          <div className="space-y-6">
+            {/* Campaign Details */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h2 className="font-bold text-lg mb-4">Campaign Details</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Campaign Name *</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="My Campaign"
+                    className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">From Name *</label>
+                  <input
+                    type="text"
+                    value={fromName}
+                    onChange={(e) => setFromName(e.target.value)}
+                    placeholder="Support Team"
+                    className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Subject *</label>
+                  <input
+                    type="text"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="Email subject"
+                    className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Test Email</label>
+                  <input
+                    type="email"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    placeholder="test@example.com"
+                    className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Google Users */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h2 className="font-bold text-lg mb-4">Google Workspace Users</h2>
+              <div className="max-h-64 overflow-auto border rounded p-2">
+                {users.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No users. Sync accounts first.</p>
+                ) : (
+                  users.map((user: any) => (
+                    <div key={user.id} className="flex justify-between items-center py-2 border-b last:border-0">
+                      <span className="text-sm">{user.primary_email || user.email}</span>
+                      <button
+                        onClick={() => handleAddUser(user.primary_email || user.email)}
+                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ))
                 )}
-              </Button>
-              <Button onClick={sendCampaign} disabled={loading}>
-                {loading ? 'Sending...' : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Send Campaign
-                  </>
-                )}
-              </Button>
+              </div>
             </div>
           </div>
 
-          {/* Account Status */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Account Status
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={loadAccounts}
-                  disabled={loading}
-                >
-                  {loading ? 'Loading...' : 'Refresh'}
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {accounts.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-red-600 font-medium">⚠️ No accounts configured</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Please add accounts first in the Accounts section
-                  </p>
-                  <Button 
-                    className="mt-3" 
-                    onClick={() => router.push('/accounts')}
-                  >
-                    Add Accounts
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {accounts.length}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Accounts</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {accounts.reduce((sum, acc) => sum + (acc.total_users || 0), 0)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Total Senders</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      Ready
-                    </div>
-                    <div className="text-sm text-muted-foreground">Auto-selected</div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Simple Form */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* LEFT COLUMN */}
-            <div className="space-y-6">
-              {/* Basic Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>📝 Campaign Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Campaign Name *
-                    </label>
-                    <Input
-                      value={campaignName}
-                      onChange={(e) => setCampaignName(e.target.value)}
-                      placeholder="e.g., Newsletter October 2025"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      From Name *
-                    </label>
-                    <Input
-                      value={fromName}
-                      onChange={(e) => setFromName(e.target.value)}
-                      placeholder="e.g., Support Team"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Subject Line *
-                    </label>
-                    <Input
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      placeholder="Email subject"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Test Email */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>🧪 Test Email</CardTitle>
-                  <CardDescription>Send a test before launching</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Test Email Address
-                    </label>
-                    <Input
-                      type="email"
-                      value={testEmail}
-                      onChange={(e) => setTestEmail(e.target.value)}
-                      placeholder="your-email@example.com"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+          {/* Right Column */}
+          <div className="space-y-6">
+            {/* Message */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h2 className="font-bold text-lg mb-4">Email Message</h2>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="<h1>Hello!</h1><p>Your message...</p>"
+                rows={12}
+                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+              />
             </div>
 
-            {/* RIGHT COLUMN */}
-            <div className="space-y-6">
-              {/* Message */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>✉️ Message Content</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Email Message (HTML) *
-                    </label>
-                    <Textarea
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder="<h1>Hello!</h1><p>Your message here...</p>"
-                      rows={12}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Recipients */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>👥 Recipients</CardTitle>
-                  <CardDescription>One email per line</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Email Addresses *
-                    </label>
-                    <Textarea
-                      value={recipients}
-                      onChange={(e) => setRecipients(e.target.value)}
-                      placeholder={'user1@example.com\nuser2@example.com\nuser3@example.com'}
-                      rows={8}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-
-                  <div className="text-sm text-muted-foreground mt-2">
-                    📊 {recipients.split('\n').filter(l => l.trim()).length} recipients
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Recipients from Workspace Users */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>👥 Add Recipients From Google Users</CardTitle>
-                  <CardDescription>Select or copy emails from synced users</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-3">
-                    <div className="max-h-48 overflow-auto border rounded p-2 text-sm">
-                      {workspaceUsers.length === 0 ? (
-                        <div className="text-muted-foreground">No users loaded. Sync accounts, then refresh.</div>
-                      ) : (
-                        workspaceUsers.map((u:any) => (
-                          <div key={u.id} className="flex items-center justify-between py-1">
-                            <span>{u.primary_email || u.email}</span>
-                            <Button size="sm" variant="outline" onClick={() => {
-                              const email = (u.primary_email || u.email || '').trim();
-                              if (!email) return;
-                              setSelectedUserEmails(prev => prev ? `${prev}\n${email}` : email);
-                            }}>Add</Button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Selected User Emails</label>
-                    <Textarea
-                      value={selectedUserEmails}
-                      onChange={(e) => setSelectedUserEmails(e.target.value)}
-                      placeholder={'selected1@example.com\nselected2@example.com'}
-                      rows={6}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Recipients */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h2 className="font-bold text-lg mb-4">Recipients</h2>
+              <textarea
+                value={recipients}
+                onChange={(e) => setRecipients(e.target.value)}
+                placeholder="user1@example.com&#10;user2@example.com"
+                rows={8}
+                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+              />
+              <p className="text-sm text-gray-600 mt-2">
+                {recipients.split('\n').filter(Boolean).length} recipients
+              </p>
             </div>
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-4 mt-6">
+          <button
+            onClick={() => router.push('/campaigns')}
+            disabled={loading}
+            className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSendTest}
+            disabled={loading}
+            className="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
+          >
+            {loading ? 'Sending...' : 'Send Test'}
+          </button>
+          <button
+            onClick={handleSendCampaign}
+            disabled={loading}
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+          >
+            {loading ? 'Creating...' : 'Send Campaign'}
+          </button>
         </div>
       </div>
     </div>
