@@ -117,54 +117,30 @@ export default function NewCampaignPage() {
     };
     
     try {
-      log('🚀 STARTING TEST EMAIL PROCESS', 'yellow');
+      log('🚀 STARTING DIRECT TEST EMAIL (NO CAMPAIGN)', 'yellow');
       log(`API URL: ${API_URL}`, 'cyan');
       log(`Test Email: ${testEmail}`, 'cyan');
       log(`Subject: ${subject}`, 'cyan');
       log(`Message: ${message}`, 'cyan');
       log(`Accounts: ${JSON.stringify(accounts, null, 2)}`, 'cyan');
       
-      const payload = {
-        name: `TEST-${name || 'Campaign'}`,
+      // DIRECT EMAIL SENDING - No campaign creation
+      log('📤 SENDING DIRECT EMAIL VIA GMAIL API...', 'yellow');
+      
+      // Use the direct Gmail API test endpoint
+      const response = await axios.post(`${API_URL}/api/v1/test-email/`, {
+        recipient_email: testEmail,
         subject: `[TEST] ${subject}`,
         body_html: message,
         body_plain: message.replace(/<[^>]*>/g, ''),
         from_name: fromName || 'Test',
-        recipients: [{ email: testEmail, variables: {} }],
-        sender_account_ids: accounts.map(a => a.id),
-        sender_rotation: 'round_robin',
-        custom_headers: {},
-        attachments: [],
-        rate_limit: 100,
-        concurrency: 1
-      };
+        sender_account_id: accounts[0].id
+      });
       
-      log('📤 SENDING REQUEST TO BACKEND...', 'yellow');
-      log(`Payload: ${JSON.stringify(payload, null, 2)}`, 'white');
-      
-      const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
-      
-      log('✅ BACKEND RESPONSE RECEIVED', 'green');
+      log('✅ DIRECT EMAIL SENT!', 'green');
       log(`Response: ${JSON.stringify(response.data, null, 2)}`, 'white');
       
-      // Check campaign status
-      const campaignId = response.data.id;
-      log(`Campaign ID: ${campaignId}`, 'cyan');
-      log(`Campaign Status: ${response.data.status}`, 'cyan');
-      log(`Sent Count: ${response.data.sent_count}`, 'cyan');
-      log(`Failed Count: ${response.data.failed_count}`, 'cyan');
-      
-      if (response.data.status === 'completed' && response.data.sent_count > 0) {
-        log('🎉 EMAIL SENT SUCCESSFULLY!', 'green');
-        alert('✅ Test email sent via Gmail API!');
-      } else if (response.data.status === 'failed') {
-        log('❌ CAMPAIGN FAILED', 'red');
-        alert('❌ Campaign failed to send email');
-      } else {
-        log('⚠️ CAMPAIGN CREATED BUT NOT SENT', 'orange');
-        log('This means the immediate sending code is not working', 'red');
-        alert('⚠️ Campaign created but email not sent. Check logs above.');
-      }
+      alert('✅ Test email sent directly via Gmail API!');
       
     } catch (err: any) {
       log('❌ ERROR OCCURRED', 'red');
@@ -172,7 +148,6 @@ export default function NewCampaignPage() {
       log(`Error Message: ${err.message}`, 'red');
       log(`Response Status: ${err?.response?.status}`, 'red');
       log(`Response Data: ${JSON.stringify(err?.response?.data, null, 2)}`, 'red');
-      log(`Full Error: ${JSON.stringify(err, null, 2)}`, 'red');
       
       let msg = 'Test failed';
       if (err?.response?.data) {
@@ -253,10 +228,10 @@ export default function NewCampaignPage() {
       console.log('Payload:', JSON.stringify(payload, null, 2));
       
       const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
-      console.log('✅ Campaign created and emails sent:', response.data);
+      console.log('✅ Campaign created:', response.data);
       
-      // Campaign creation now immediately sends all emails
-      alert('✅ Campaign created and emails sent via Gmail API!');
+      // Campaign created in DRAFT status - ready for preparation and launch
+      alert(`✅ Campaign created! ID: ${response.data.id}\n\nNow go to Campaigns page to prepare and launch.`);
       router.push('/campaigns');
     } catch (err: any) {
       console.error('=== CAMPAIGN ERROR ===');
