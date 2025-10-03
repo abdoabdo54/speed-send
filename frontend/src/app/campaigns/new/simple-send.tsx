@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { serviceAccountsApi, campaignsApi } from '@/lib/api';
 import { ArrowLeft, Send, TestTube, Mail } from 'lucide-react';
 
-export default function NewCampaignPage() {
+export default function SimpleSendPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
