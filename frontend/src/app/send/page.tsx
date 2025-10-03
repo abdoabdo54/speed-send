@@ -61,7 +61,8 @@ export default function SendPage() {
         throw new Error('Test failed');
       }
     } catch (error) {
-      alert('❌ Test failed: ' + error.message);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert('❌ Test failed: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,8 @@ export default function SendPage() {
         throw new Error('Campaign failed');
       }
     } catch (error) {
-      alert('❌ Campaign failed: ' + error.message);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert('❌ Campaign failed: ' + errorMessage);
     } finally {
       setLoading(false);
     }
