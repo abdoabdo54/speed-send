@@ -105,8 +105,21 @@ export default function NewCampaignPage() {
       console.log('Payload:', JSON.stringify(payload, null, 2));
       
       const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
-      console.log('✅ Success:', response.data);
-      alert('✅ Test email sent!');
+      console.log('✅ Campaign created:', response.data);
+      
+      // For test emails, we need to prepare and launch immediately
+      const campaignId = response.data.id;
+      console.log('📋 Preparing test campaign...');
+      
+      // Step 1: Prepare campaign
+      await axios.post(`${API_URL}/api/v1/campaigns/${campaignId}/prepare`);
+      console.log('✅ Campaign prepared');
+      
+      // Step 2: Launch campaign (this actually sends the email)
+      await axios.post(`${API_URL}/api/v1/campaigns/${campaignId}/launch`);
+      console.log('🚀 Campaign launched - email should be sent!');
+      
+      alert('✅ Test email sent via Gmail API!');
     } catch (err: any) {
       console.error('=== ERROR DETAILS ===');
       console.error('Full error:', err);
@@ -188,7 +201,20 @@ export default function NewCampaignPage() {
       
       const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
       console.log('✅ Campaign created:', response.data);
-      alert('✅ Campaign created! Use Prepare → Launch in Campaigns page.');
+      
+      // For regular campaigns, we also need to prepare and launch
+      const campaignId = response.data.id;
+      console.log('📋 Preparing campaign...');
+      
+      // Step 1: Prepare campaign
+      await axios.post(`${API_URL}/api/v1/campaigns/${campaignId}/prepare`);
+      console.log('✅ Campaign prepared');
+      
+      // Step 2: Launch campaign (this actually sends the emails)
+      await axios.post(`${API_URL}/api/v1/campaigns/${campaignId}/launch`);
+      console.log('🚀 Campaign launched - emails are being sent!');
+      
+      alert('✅ Campaign created and launched! Emails are being sent via Gmail API!');
       router.push('/campaigns');
     } catch (err: any) {
       console.error('=== CAMPAIGN ERROR ===');
