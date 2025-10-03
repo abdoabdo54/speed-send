@@ -82,16 +82,53 @@ export default function NewCampaignPage() {
     }
 
     setLoading(true);
+    
+    // Create detailed logging container
+    const logContainer = document.createElement('div');
+    logContainer.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      color: white;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 20px;
+      z-index: 9999;
+      overflow-y: auto;
+    `;
+    
+    const logContent = document.createElement('div');
+    logContainer.appendChild(logContent);
+    document.body.appendChild(logContainer);
+    
+    const log = (message: string, color = 'white') => {
+      const line = document.createElement('div');
+      line.style.color = color;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logContent.appendChild(line);
+      console.log(message);
+    };
+    
+    const closeLog = () => {
+      document.body.removeChild(logContainer);
+    };
+    
     try {
-      console.log('=== SENDING TEST ===');
-      console.log('API URL:', API_URL);
-      console.log('Accounts:', accounts);
+      log('🚀 STARTING TEST EMAIL PROCESS', 'yellow');
+      log(`API URL: ${API_URL}`, 'cyan');
+      log(`Test Email: ${testEmail}`, 'cyan');
+      log(`Subject: ${subject}`, 'cyan');
+      log(`Message: ${message}`, 'cyan');
+      log(`Accounts: ${JSON.stringify(accounts, null, 2)}`, 'cyan');
       
       const payload = {
         name: `TEST-${name || 'Campaign'}`,
         subject: `[TEST] ${subject}`,
         body_html: message,
-        body_plain: message.replace(/<[^>]*>/g, ''), // Strip HTML tags for plain text
+        body_plain: message.replace(/<[^>]*>/g, ''),
         from_name: fromName || 'Test',
         recipients: [{ email: testEmail, variables: {} }],
         sender_account_ids: accounts.map(a => a.id),
@@ -102,18 +139,40 @@ export default function NewCampaignPage() {
         concurrency: 1
       };
       
-      console.log('Payload:', JSON.stringify(payload, null, 2));
+      log('📤 SENDING REQUEST TO BACKEND...', 'yellow');
+      log(`Payload: ${JSON.stringify(payload, null, 2)}`, 'white');
       
       const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
-      console.log('✅ Campaign created and emails sent:', response.data);
       
-      // Campaign creation now immediately sends all emails
-      alert('✅ Test email sent via Gmail API!');
+      log('✅ BACKEND RESPONSE RECEIVED', 'green');
+      log(`Response: ${JSON.stringify(response.data, null, 2)}`, 'white');
+      
+      // Check campaign status
+      const campaignId = response.data.id;
+      log(`Campaign ID: ${campaignId}`, 'cyan');
+      log(`Campaign Status: ${response.data.status}`, 'cyan');
+      log(`Sent Count: ${response.data.sent_count}`, 'cyan');
+      log(`Failed Count: ${response.data.failed_count}`, 'cyan');
+      
+      if (response.data.status === 'completed' && response.data.sent_count > 0) {
+        log('🎉 EMAIL SENT SUCCESSFULLY!', 'green');
+        alert('✅ Test email sent via Gmail API!');
+      } else if (response.data.status === 'failed') {
+        log('❌ CAMPAIGN FAILED', 'red');
+        alert('❌ Campaign failed to send email');
+      } else {
+        log('⚠️ CAMPAIGN CREATED BUT NOT SENT', 'orange');
+        log('This means the immediate sending code is not working', 'red');
+        alert('⚠️ Campaign created but email not sent. Check logs above.');
+      }
+      
     } catch (err: any) {
-      console.error('=== ERROR DETAILS ===');
-      console.error('Full error:', err);
-      console.error('Response status:', err?.response?.status);
-      console.error('Response data:', err?.response?.data);
+      log('❌ ERROR OCCURRED', 'red');
+      log(`Error Type: ${err.name}`, 'red');
+      log(`Error Message: ${err.message}`, 'red');
+      log(`Response Status: ${err?.response?.status}`, 'red');
+      log(`Response Data: ${JSON.stringify(err?.response?.data, null, 2)}`, 'red');
+      log(`Full Error: ${JSON.stringify(err, null, 2)}`, 'red');
       
       let msg = 'Test failed';
       if (err?.response?.data) {
@@ -129,10 +188,15 @@ export default function NewCampaignPage() {
         msg = err.message;
       }
       
+      log(`Final Error Message: ${msg}`, 'red');
       alert('❌ ' + msg);
-      console.error('Final error message:', msg);
     } finally {
       setLoading(false);
+      log('🏁 TEST PROCESS COMPLETED', 'yellow');
+      log('Click anywhere to close this log', 'cyan');
+      
+      // Add click to close
+      logContainer.onclick = closeLog;
     }
   };
 
