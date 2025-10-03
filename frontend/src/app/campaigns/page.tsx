@@ -52,10 +52,21 @@ export default function CampaignsPage() {
 
   const handleLaunch = async (campaignId: number) => {
     try {
-      await campaignsApi.launch(campaignId);
+      const response = await campaignsApi.launch(campaignId);
+      alert(`🚀 Campaign launched! ${response.data.sent_count} emails sent, ${response.data.failed_count} failed.`);
       loadCampaigns();
     } catch (error: any) {
       alert('Failed to launch: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  const handleDuplicate = async (campaignId: number) => {
+    try {
+      await campaignsApi.duplicate(campaignId);
+      alert('✅ Campaign duplicated successfully!');
+      loadCampaigns();
+    } catch (error: any) {
+      alert('Failed to duplicate: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -143,9 +154,19 @@ export default function CampaignsPage() {
                             <>
                               <Button
                                 size="sm"
-                                onClick={() => handlePrepare(campaign.id)}
+                                onClick={() => handleLaunch(campaign.id)}
+                                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white"
                               >
-                                Prepare
+                                <Play className="mr-2 h-4 w-4" />
+                                🚀 Launch
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDuplicate(campaign.id)}
+                              >
+                                <Copy className="mr-2 h-4 w-4" />
+                                Duplicate
                               </Button>
                               <Button
                                 size="sm"

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+import logging
 
 from app.database import get_db
 from app.models import (
@@ -577,4 +578,214 @@ async def get_campaign_logs(
     
     logs = query.order_by(EmailLog.created_at.desc()).offset(skip).limit(limit).all()
     return logs
+
+
+@router.post("/{campaign_id}/launch")
+async def launch_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Launch a campaign - send all emails immediately
+    """
+    try:
+        # Get campaign
+        campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        if campaign.status != CampaignStatus.DRAFT:
+            raise HTTPException(status_code=400, detail=f"Campaign must be in DRAFT status to launch. Current status: {campaign.status}")
+        
+        logger.info(f"🚀 LAUNCHING CAMPAIGN: {campaign_id}")
+        
+        # Get sender accounts
+        sender_accounts = campaign.sender_accounts
+        if not sender_accounts:
+            raise HTTPException(status_code=400, detail="No sender accounts configured")
+        
+        # Build sender pool
+        from app.google_api import GoogleWorkspaceService
+        from app.encryption import encryption_service
+        from app.models import WorkspaceUser, EmailLog, EmailStatus
+        
+        sender_pool = []
+        for account in sender_accounts:
+            users = db.query(WorkspaceUser).filter(
+                WorkspaceUser.service_account_id == account.id,
+                WorkspaceUser.is_active == True
+            ).all()
+            
+            # Decrypt service account JSON
+            decrypted_json = encryption_service.decrypt(account.encrypted_json)
+            
+            for user in users:
+                sender_pool.append({
+                    'service_account_id': account.id,
+                    'service_account_json': decrypted_json,
+                    'user_email': user.email,
+                    'user_id': user.id
+                })
+        
+        if not sender_pool:
+            raise HTTPException(status_code=400, detail="No active users available for sending")
+        
+        # Create email logs for each recipient
+        email_logs = []
+        for idx, recipient in enumerate(campaign.recipients):
+            # Select sender (round-robin)
+            sender = sender_pool[idx % len(sender_pool)]
+            
+            email_log = EmailLog(
+                campaign_id=campaign.id,
+                recipient_email=recipient.get('email'),
+                recipient_name=recipient.get('variables', {}).get('name', ''),
+                sender_email=sender['user_email'],
+                service_account_id=sender['service_account_id'],
+                subject=campaign.subject,
+                status=EmailStatus.PENDING
+            )
+            db.add(email_log)
+            email_logs.append(email_log)
+        
+        db.commit()
+        
+        # Update campaign status
+        campaign.status = CampaignStatus.SENDING
+        campaign.started_at = datetime.utcnow()
+        db.commit()
+        
+        logger.info(f"📊 Sending {len(email_logs)} emails using {len(sender_pool)} senders")
+        
+        # Send emails directly
+        sent_count = 0
+        failed_count = 0
+        
+        for idx, email_log in enumerate(email_logs):
+            try:
+                # Select sender (round-robin)
+                sender = sender_pool[idx % len(sender_pool)]
+                
+                # Update email log
+                email_log.status = EmailStatus.SENDING
+                email_log.sender_email = sender['user_email']
+                email_log.service_account_id = sender['service_account_id']
+                db.commit()
+                
+                # Create Google service
+                google_service = GoogleWorkspaceService(sender['service_account_json'])
+                
+                # Send email
+                message_id = google_service.send_email(
+                    sender_email=sender['user_email'],
+                    recipient_email=email_log.recipient_email,
+                    subject=campaign.subject,
+                    body_html=campaign.body_html,
+                    body_plain=campaign.body_plain,
+                    custom_headers=campaign.custom_headers,
+                    attachments=campaign.attachments
+                )
+                
+                # Update email log
+                email_log.status = EmailStatus.SENT
+                email_log.message_id = message_id
+                email_log.sent_at = datetime.utcnow()
+                db.commit()
+                
+                sent_count += 1
+                logger.info(f"✅ Sent: {email_log.recipient_email} via {sender['user_email']}")
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to send to {email_log.recipient_email}: {e}")
+                email_log.status = EmailStatus.FAILED
+                email_log.error_message = str(e)
+                db.commit()
+                failed_count += 1
+        
+        # Update campaign
+        campaign.sent_count = sent_count
+        campaign.failed_count = failed_count
+        campaign.status = CampaignStatus.COMPLETED
+        campaign.completed_at = datetime.utcnow()
+        db.commit()
+        
+        logger.info(f"🎉 Campaign {campaign.id} completed: {sent_count} sent, {failed_count} failed")
+        
+        return {
+            "message": "Campaign launched successfully",
+            "campaign_id": campaign.id,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "status": campaign.status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Launch failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to launch campaign: {str(e)}")
+
+
+@router.post("/{campaign_id}/duplicate")
+async def duplicate_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Duplicate a campaign
+    """
+    try:
+        # Get original campaign
+        original = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+        if not original:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        # Create duplicate
+        duplicate = Campaign(
+            name=f"{original.name} (Copy)",
+            subject=original.subject,
+            body_html=original.body_html,
+            body_plain=original.body_plain,
+            from_name=original.from_name,
+            from_email=original.from_email,
+            reply_to=original.reply_to,
+            return_path=original.return_path,
+            recipients=original.recipients,
+            total_recipients=original.total_recipients,
+            pending_count=original.total_recipients,
+            sender_rotation=original.sender_rotation,
+            use_ip_pool=original.use_ip_pool,
+            ip_pool=original.ip_pool,
+            custom_headers=original.custom_headers,
+            attachments=original.attachments,
+            rate_limit=original.rate_limit,
+            concurrency=original.concurrency,
+            is_test=original.is_test,
+            test_recipients=original.test_recipients,
+            status=CampaignStatus.DRAFT
+        )
+        
+        db.add(duplicate)
+        db.flush()
+        
+        # Copy sender accounts
+        for sender_account in original.sender_accounts:
+            association = CampaignSender(
+                campaign_id=duplicate.id,
+                service_account_id=sender_account.id
+            )
+            db.add(association)
+        
+        db.commit()
+        db.refresh(duplicate)
+        
+        logger.info(f"📋 Campaign {campaign_id} duplicated as {duplicate.id}")
+        
+        return duplicate
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Duplicate failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to duplicate campaign: {str(e)}")
 
