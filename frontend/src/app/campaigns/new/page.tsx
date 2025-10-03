@@ -86,7 +86,15 @@ export default function NewCampaignPage() {
       });
       alert('✅ Test email sent!');
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.message || 'Test failed';
+      console.error('Test error:', err);
+      let msg = 'Test failed';
+      if (err?.response?.data?.detail) {
+        msg = typeof err.response.data.detail === 'string' 
+          ? err.response.data.detail 
+          : JSON.stringify(err.response.data.detail);
+      } else if (err?.message) {
+        msg = err.message;
+      }
       alert('❌ ' + msg);
     } finally {
       setLoading(false);
@@ -133,7 +141,15 @@ export default function NewCampaignPage() {
       alert('✅ Campaign created!');
       router.push('/campaigns');
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.message || 'Failed';
+      console.error('Campaign error:', err);
+      let msg = 'Failed to create campaign';
+      if (err?.response?.data?.detail) {
+        msg = typeof err.response.data.detail === 'string' 
+          ? err.response.data.detail 
+          : JSON.stringify(err.response.data.detail);
+      } else if (err?.message) {
+        msg = err.message;
+      }
       alert('❌ ' + msg);
     } finally {
       setLoading(false);
