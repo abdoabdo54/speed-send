@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { serviceAccountsApi, campaignsApi } from '@/lib/api';
+import { usersApi, serviceAccountsApi, campaignsApi } from '@/lib/api';
 import { ArrowLeft, Send, TestTube, Mail } from 'lucide-react';
 
 export default function NewCampaignPage() {
@@ -22,9 +22,12 @@ export default function NewCampaignPage() {
   const [message, setMessage] = useState('');
   const [recipients, setRecipients] = useState('');
   const [testEmail, setTestEmail] = useState('');
+  const [workspaceUsers, setWorkspaceUsers] = useState<any[]>([]);
+  const [selectedUserEmails, setSelectedUserEmails] = useState<string>('');
 
   useEffect(() => {
     loadAccounts();
+    loadUsers();
   }, []);
 
   const loadAccounts = async () => {
@@ -36,6 +39,15 @@ export default function NewCampaignPage() {
     } catch (error) {
       console.error('❌ Failed to load accounts:', error);
       alert('Failed to load accounts: ' + (error as any)?.message || 'Unknown error');
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      const response = await usersApi.list();
+      setWorkspaceUsers(response.data || []);
+    } catch (e) {
+      console.error('Failed to load users', e);
     }
   };
 
@@ -78,7 +90,7 @@ export default function NewCampaignPage() {
   };
 
   const sendCampaign = async () => {
-    if (!campaignName || !subject || !message || !recipients) {
+    if (!campaignName || !subject || !message) {
       alert('Please fill in all required fields');
       return;
     }
@@ -88,19 +100,19 @@ export default function NewCampaignPage() {
       return;
     }
 
+    const combinedRecipients = [
+      ...recipients.split('\n').filter(Boolean),
+      ...selectedUserEmails.split('\n').filter(Boolean)
+    ];
+
+    if (combinedRecipients.length === 0) {
+      alert('Please add at least one recipient (manual or from users)');
+      return;
+    }
+
     setLoading(true);
     try {
-      const recipientList = recipients.split('\n').filter(email => email.trim()).map(email => ({
-        email: email.trim(),
-        variables: {}
-      }));
-
-      if (recipientList.length === 0) {
-        alert('Please add at least one recipient');
-        setLoading(false);
-        return;
-      }
-
+      const recipientList = combinedRecipients.map(email => ({ email: email.trim(), variables: {} }));
       const allAccountIds = accounts.map(acc => acc.id);
 
       const campaignData = {
@@ -336,6 +348,44 @@ export default function NewCampaignPage() {
 
                   <div className="text-sm text-muted-foreground mt-2">
                     📊 {recipients.split('\n').filter(l => l.trim()).length} recipients
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Recipients from Workspace Users */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>👥 Add Recipients From Google Users</CardTitle>
+                  <CardDescription>Select or copy emails from synced users</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-3">
+                    <div className="max-h-48 overflow-auto border rounded p-2 text-sm">
+                      {workspaceUsers.length === 0 ? (
+                        <div className="text-muted-foreground">No users loaded. Sync accounts, then refresh.</div>
+                      ) : (
+                        workspaceUsers.map((u:any) => (
+                          <div key={u.id} className="flex items-center justify-between py-1">
+                            <span>{u.primary_email || u.email}</span>
+                            <Button size="sm" variant="outline" onClick={() => {
+                              const email = (u.primary_email || u.email || '').trim();
+                              if (!email) return;
+                              setSelectedUserEmails(prev => prev ? `${prev}\n${email}` : email);
+                            }}>Add</Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Selected User Emails</label>
+                    <Textarea
+                      value={selectedUserEmails}
+                      onChange={(e) => setSelectedUserEmails(e.target.value)}
+                      placeholder={'selected1@example.com\nselected2@example.com'}
+                      rows={6}
+                      className="font-mono text-sm"
+                    />
                   </div>
                 </CardContent>
               </Card>
