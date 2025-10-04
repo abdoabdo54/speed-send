@@ -113,6 +113,8 @@ export default function NewCampaignPage() {
     clickRate: 0
   });
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // Derived state
   const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
@@ -120,16 +122,58 @@ export default function NewCampaignPage() {
   const queuedCount = recipients.length;
   const estDuration = Math.ceil(queuedCount / (config.workers * 10));
 
+  // Backend health check
+  const checkBackendHealth = async () => {
+    try {
+      setBackendStatus('checking');
+      const response = await axios.get(`${API_URL}/health`, {
+        timeout: 5000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.status === 200) {
+        setBackendStatus('connected');
+        setConnectionError(null);
+        console.log('✅ Backend health check passed');
+        return true;
+      } else {
+        setBackendStatus('disconnected');
+        setConnectionError('Backend returned unexpected status');
+        return false;
+      }
+    } catch (error: any) {
+      setBackendStatus('disconnected');
+      if (error.code === 'ECONNREFUSED') {
+        setConnectionError('Cannot connect to backend server. Please check if the server is running on port 8000.');
+      } else if (error.response?.status === 404) {
+        setConnectionError('Backend health endpoint not found. Please check server configuration.');
+      } else {
+        setConnectionError(`Backend connection failed: ${error.message}`);
+      }
+      console.error('❌ Backend health check failed:', error);
+      return false;
+    }
+  };
+
   // Load data on mount
   useEffect(() => {
     const initializeData = async () => {
       try {
-        await Promise.all([
-          loadAccounts(),
-          loadUsers(),
-          loadTemplates(),
-          loadRecipientLists()
-        ]);
+        // First check backend health
+        const isHealthy = await checkBackendHealth();
+        
+        if (isHealthy) {
+          await Promise.all([
+            loadAccounts(),
+            loadUsers(),
+            loadTemplates(),
+            loadRecipientLists()
+          ]);
+        } else {
+          showNotification('Backend server is not available. Please check server status.', 'error');
+        }
       } catch (error) {
         console.error('Failed to initialize data:', error);
         showNotification('Failed to load initial data', 'error');
@@ -175,25 +219,77 @@ export default function NewCampaignPage() {
   // API Functions
   const loadAccounts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/v1/accounts/`);
-      setAccounts(Array.isArray(response.data) ? response.data : []);
-      console.log('Accounts loaded:', response.data);
-    } catch (error) {
-      console.error('Failed to load accounts:', error);
+      console.log('🔄 Loading Google Workspace accounts...');
+      const response = await axios.get(`${API_URL}/api/v1/accounts/`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.data && Array.isArray(response.data)) {
+        setAccounts(response.data);
+        console.log('✅ Accounts loaded successfully:', response.data.length, 'accounts');
+        showNotification(`Loaded ${response.data.length} Google Workspace accounts`, 'success');
+      } else {
+        console.warn('⚠️ Invalid response format:', response.data);
+        setAccounts([]);
+        showNotification('No accounts found. Please add Google Workspace service accounts first.', 'info');
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to load accounts:', error);
       setAccounts([]);
-      showNotification('Failed to load accounts', 'error');
+      
+      let errorMessage = 'Failed to load accounts';
+      if (error.response?.status === 404) {
+        errorMessage = 'Backend API not found. Please check if the server is running.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Backend server error. Please check server logs.';
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = 'Cannot connect to backend server. Please check if the server is running on port 8000.';
+      } else if (error.message) {
+        errorMessage = `Failed to load accounts: ${error.message}`;
+      }
+      
+      showNotification(errorMessage, 'error');
     }
   };
 
   const loadUsers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/v1/users/`);
-      setUsers(Array.isArray(response.data) ? response.data : []);
-      console.log('Users loaded:', response.data);
-    } catch (error) {
-      console.error('Failed to load users:', error);
+      console.log('🔄 Loading Google Workspace users...');
+      const response = await axios.get(`${API_URL}/api/v1/users/`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.data && Array.isArray(response.data)) {
+        setUsers(response.data);
+        console.log('✅ Users loaded successfully:', response.data.length, 'users');
+        showNotification(`Loaded ${response.data.length} Google Workspace users`, 'success');
+      } else {
+        console.warn('⚠️ Invalid response format:', response.data);
+        setUsers([]);
+        showNotification('No users found. Please sync accounts first.', 'info');
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to load users:', error);
       setUsers([]);
-      showNotification('Failed to load users', 'error');
+      
+      let errorMessage = 'Failed to load users';
+      if (error.response?.status === 404) {
+        errorMessage = 'Users API not found. Please check backend configuration.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Backend server error while loading users.';
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = 'Cannot connect to backend server.';
+      } else if (error.message) {
+        errorMessage = `Failed to load users: ${error.message}`;
+      }
+      
+      showNotification(errorMessage, 'error');
     }
   };
 
@@ -561,18 +657,92 @@ export default function NewCampaignPage() {
           <p className="text-gray-600 mt-2">PowerMTA-style sending via Google Workspace API — multi-domain, high-speed delivery</p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Backend Status Indicator */}
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${
+              backendStatus === 'connected' ? 'bg-green-500' : 
+              backendStatus === 'checking' ? 'bg-yellow-500 animate-pulse' : 
+              'bg-red-500'
+            }`}></div>
+            <span className="text-sm text-gray-600">
+              {backendStatus === 'connected' ? 'Backend Connected' : 
+               backendStatus === 'checking' ? 'Checking...' : 
+               'Backend Disconnected'}
+            </span>
+          </div>
+          
           <div className="text-sm text-gray-600">
             Active accounts <span className="font-semibold text-blue-600">{accounts.length}</span>
           </div>
           <div className="text-xs text-gray-500 hidden md:block">
             Shortcuts: Ctrl+S (Save), Ctrl+P (Preview), Ctrl+T (Test), Ctrl+Enter (Create)
           </div>
-          <Button variant="outline" size="sm" onClick={loadAccounts}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const isHealthy = await checkBackendHealth();
+              if (isHealthy) {
+                await Promise.all([loadAccounts(), loadUsers()]);
+              }
+            }}
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
+          
+          {backendStatus === 'disconnected' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                console.log('🔍 Running backend diagnostics...');
+                showNotification('Running backend diagnostics...', 'info');
+                
+                // Test multiple endpoints
+                const endpoints = [
+                  { name: 'Health', url: '/health' },
+                  { name: 'Accounts', url: '/api/v1/accounts/' },
+                  { name: 'Users', url: '/api/v1/users/' }
+                ];
+                
+                for (const endpoint of endpoints) {
+                  try {
+                    const response = await axios.get(`${API_URL}${endpoint.url}`, { timeout: 5000 });
+                    console.log(`✅ ${endpoint.name}:`, response.status, response.data);
+                  } catch (error: any) {
+                    console.error(`❌ ${endpoint.name}:`, error.response?.status, error.message);
+                  }
+                }
+                
+                showNotification('Diagnostics complete. Check browser console for details.', 'info');
+              }}
+            >
+              🔍 Diagnose
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Connection Error Display */}
+      {backendStatus === 'disconnected' && connectionError && (
+        <Alert className="mb-4 border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Backend Connection Error</AlertTitle>
+          <AlertDescription>
+            {connectionError}
+            <div className="mt-2 text-sm">
+              <strong>Troubleshooting steps:</strong>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                <li>Check if the backend server is running on port 8000</li>
+                <li>Verify Docker containers are running: <code>docker-compose ps</code></li>
+                <li>Check backend logs: <code>docker-compose logs backend</code></li>
+                <li>Restart backend: <code>docker-compose restart backend</code></li>
+              </ul>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Notifications */}
       {notifications.map(notification => (
@@ -651,8 +821,28 @@ export default function NewCampaignPage() {
                   </div>
                 ))}
                 {accounts.length === 0 && (
-                  <div className="text-center py-4 text-gray-500">
-                    No accounts available. Add accounts first.
+                  <div className="text-center py-4">
+                    {backendStatus === 'disconnected' ? (
+                      <div className="text-red-600">
+                        <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                        <p className="font-medium">Backend Connection Failed</p>
+                        <p className="text-sm">Cannot load Google Workspace accounts</p>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500">
+                        <Users className="h-8 w-8 mx-auto mb-2" />
+                        <p className="font-medium">No Google Workspace Accounts</p>
+                        <p className="text-sm">Add service accounts first in the Accounts page</p>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="mt-2"
+                          onClick={() => window.location.href = '/accounts'}
+                        >
+                          Go to Accounts
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
