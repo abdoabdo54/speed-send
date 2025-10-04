@@ -31,19 +31,22 @@ export default function AnalyticsPage() {
         campaignsApi.list()
       ]);
       setStats(statsRes.data);
-      setCampaigns(campaignsRes.data);
+      setCampaigns(Array.isArray(campaignsRes.data) ? campaignsRes.data : []);
     } catch (error) {
       console.error('Failed to load analytics:', error);
+      setCampaigns([]);
     } finally {
       setLoading(false);
     }
   };
 
   const calculateTotalSent = () => {
+    if (!campaigns || !Array.isArray(campaigns)) return 0;
     return campaigns.reduce((sum, c) => sum + (c.sent_count || 0), 0);
   };
 
   const calculateTotalFailed = () => {
+    if (!campaigns || !Array.isArray(campaigns)) return 0;
     return campaigns.reduce((sum, c) => sum + (c.failed_count || 0), 0);
   };
 
@@ -134,7 +137,7 @@ export default function AnalyticsPage() {
               <CardDescription>Detailed breakdown by campaign</CardDescription>
             </CardHeader>
             <CardContent>
-              {campaigns.length === 0 ? (
+              {!campaigns || campaigns.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">No campaigns yet</p>
               ) : (
                 <div className="space-y-4">

@@ -47,10 +47,13 @@ export default function DashboardPage() {
       ]);
 
       setStats(statsRes.data);
-      setRecentCampaigns(campaignsRes.data.slice(0, 5));
-      setAccounts(accountsRes.data);
+      setRecentCampaigns(Array.isArray(campaignsRes.data) ? campaignsRes.data.slice(0, 5) : []);
+      setAccounts(Array.isArray(accountsRes.data) ? accountsRes.data : []);
     } catch (error) {
       console.error('Failed to load dashboard:', error);
+      // Ensure arrays are always initialized even on error
+      setRecentCampaigns([]);
+      setAccounts([]);
     } finally {
       setLoading(false);
     }
@@ -174,7 +177,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentCampaigns.length === 0 ? (
+                  {!recentCampaigns || recentCampaigns.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       No campaigns yet
                     </p>
@@ -213,7 +216,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {accounts.length === 0 ? (
+                  {!accounts || accounts.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       No accounts configured
                     </p>
