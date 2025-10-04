@@ -548,7 +548,7 @@ async def delete_campaign(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     
-    if campaign.status in [CampaignStatus.RUNNING, CampaignStatus.QUEUED]:
+    if campaign.status in [CampaignStatus.SENDING, CampaignStatus.PREPARING]:
         raise HTTPException(
             status_code=400,
             detail="Cannot delete active campaigns"
