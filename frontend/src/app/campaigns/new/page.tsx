@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sidebar } from '@/components/Sidebar';
+import { API_URL as DETECTED_API_URL } from '@/lib/api';
 import { 
   Send, 
   Users, 
@@ -31,8 +32,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-// API Configuration
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// API Configuration - Use dynamic API URL detection
+const API_URL = DETECTED_API_URL;
 
 // Types
 interface Account {
