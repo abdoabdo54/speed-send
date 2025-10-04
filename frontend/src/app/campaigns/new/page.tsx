@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Sidebar } from '@/components/Sidebar';
 import { 
   Send, 
   Users, 
@@ -650,7 +651,11 @@ export default function NewCampaignPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="flex h-screen bg-background">
+      <Sidebar />
+      
+      <div className="flex-1 overflow-auto">
+        <div className="min-h-screen bg-gray-50 p-8">
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
@@ -1637,6 +1642,8 @@ export default function NewCampaignPage() {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }
