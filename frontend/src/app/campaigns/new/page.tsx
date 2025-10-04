@@ -47,10 +47,11 @@ export default function NewCampaignPage() {
   const loadUsers = async () => {
     try {
       const response = await axios.get(`${API_URL}/api/v1/users/`);
-      setUsers(response.data || []);
+      setUsers(Array.isArray(response.data) ? response.data : []);
       console.log('Users loaded:', response.data);
     } catch (err) {
       console.error('Failed to load users:', err);
+      setUsers([]);
     }
   };
 
@@ -63,6 +64,7 @@ export default function NewCampaignPage() {
   };
 
   const selectAllSenders = () => {
+    if (!users || !Array.isArray(users)) return;
     setSelectedSenders(users.map((u: any) => u.primary_email || u.email));
   };
 
@@ -426,7 +428,7 @@ export default function NewCampaignPage() {
                   </button>
                 </div>
               ) : (
-                users.map((user: any) => {
+                users && Array.isArray(users) ? users.map((user: any) => {
                   const email = user.primary_email || user.email;
                   const isSelected = selectedSenders.includes(email);
                   return (
@@ -454,8 +456,11 @@ export default function NewCampaignPage() {
                       )}
                     </div>
                   );
-                })
-              )}
+                }) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No users available
+                  </div>
+                )}
             </div>
 
             <div className="mt-4 p-3 bg-blue-50 rounded">

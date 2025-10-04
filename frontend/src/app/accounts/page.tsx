@@ -32,9 +32,10 @@ export default function AccountsPage() {
   const loadAccounts = async () => {
     try {
       const response = await serviceAccountsApi.list();
-      setAccounts(response.data);
+      setAccounts(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to load accounts:', error);
+      setAccounts([]);
     } finally {
       setLoading(false);
     }
@@ -302,7 +303,7 @@ export default function AccountsPage() {
                 </CardContent>
               </Card>
             ) : (
-              accounts.map((account) => (
+              accounts && Array.isArray(accounts) ? accounts.map((account) => (
                 <Card key={account.id}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
@@ -369,7 +370,11 @@ export default function AccountsPage() {
                     </div>
                   </CardContent>
                 </Card>
-              ))
+              )) : (
+                <div className="text-center py-4 text-gray-500">
+                  No accounts available
+                </div>
+              )}
             )}
           </div>
         </div>
