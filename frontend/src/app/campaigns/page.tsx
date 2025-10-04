@@ -51,12 +51,94 @@ export default function CampaignsPage() {
   };
 
   const handleLaunch = async (campaignId: number) => {
+    // Create detailed logging container
+    const logContainer = document.createElement('div');
+    logContainer.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      color: white;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 20px;
+      z-index: 9999;
+      overflow-y: auto;
+    `;
+    
+    const logContent = document.createElement('div');
+    logContainer.appendChild(logContent);
+    document.body.appendChild(logContainer);
+    
+    const log = (message: string, color = 'white') => {
+      const line = document.createElement('div');
+      line.style.color = color;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logContent.appendChild(line);
+      console.log(message);
+    };
+    
+    const closeLog = () => {
+      document.body.removeChild(logContainer);
+    };
+    
     try {
+      log('🚀 STARTING CAMPAIGN LAUNCH', 'yellow');
+      log(`Campaign ID: ${campaignId}`, 'cyan');
+      
+      log('📤 SENDING LAUNCH REQUEST...', 'yellow');
       const response = await campaignsApi.launch(campaignId);
-      alert(`🚀 Campaign launched! ${response.data.sent_count} emails sent, ${response.data.failed_count} failed.`);
+      
+      log('✅ LAUNCH RESPONSE RECEIVED', 'green');
+      log(`Full Response: ${JSON.stringify(response, null, 2)}`, 'white');
+      log(`Response Data: ${JSON.stringify(response.data, null, 2)}`, 'white');
+      log(`Sent Count: ${response.data?.sent_count}`, 'cyan');
+      log(`Failed Count: ${response.data?.failed_count}`, 'cyan');
+      log(`Status: ${response.data?.status}`, 'cyan');
+      
+      if (response.data?.sent_count !== undefined && response.data?.failed_count !== undefined) {
+        log('🎉 LAUNCH SUCCESSFUL!', 'green');
+        alert(`🚀 Campaign launched! ${response.data.sent_count} emails sent, ${response.data.failed_count} failed.`);
+      } else {
+        log('⚠️ LAUNCH RESPONSE MISSING DATA', 'orange');
+        log('This means the backend response is incomplete', 'red');
+        alert(`⚠️ Campaign launched but response incomplete. Check logs above.`);
+      }
+      
       loadCampaigns();
+      
     } catch (error: any) {
-      alert('Failed to launch: ' + (error.response?.data?.detail || error.message));
+      log('❌ LAUNCH ERROR OCCURRED', 'red');
+      log(`Error Type: ${error.name}`, 'red');
+      log(`Error Message: ${error.message}`, 'red');
+      log(`Response Status: ${error?.response?.status}`, 'red');
+      log(`Response Data: ${JSON.stringify(error?.response?.data, null, 2)}`, 'red');
+      log(`Full Error: ${JSON.stringify(error, null, 2)}`, 'red');
+      
+      let msg = 'Launch failed';
+      if (error?.response?.data) {
+        const data = error.response.data;
+        if (typeof data === 'string') {
+          msg = data;
+        } else if (data.detail) {
+          msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+        } else {
+          msg = JSON.stringify(data);
+        }
+      } else if (error?.message) {
+        msg = error.message;
+      }
+      
+      log(`Final Error Message: ${msg}`, 'red');
+      alert('❌ Failed to launch: ' + msg);
+    } finally {
+      log('🏁 LAUNCH PROCESS COMPLETED', 'yellow');
+      log('Click anywhere to close this log', 'cyan');
+      
+      // Add click to close
+      logContainer.onclick = closeLog;
     }
   };
 
@@ -82,11 +164,84 @@ export default function CampaignsPage() {
   const handleDelete = async (campaignId: number) => {
     if (!confirm('Are you sure you want to delete this campaign?')) return;
 
+    // Create detailed logging container
+    const logContainer = document.createElement('div');
+    logContainer.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      color: white;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 20px;
+      z-index: 9999;
+      overflow-y: auto;
+    `;
+    
+    const logContent = document.createElement('div');
+    logContainer.appendChild(logContent);
+    document.body.appendChild(logContainer);
+    
+    const log = (message: string, color = 'white') => {
+      const line = document.createElement('div');
+      line.style.color = color;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logContent.appendChild(line);
+      console.log(message);
+    };
+    
+    const closeLog = () => {
+      document.body.removeChild(logContainer);
+    };
+    
     try {
-      await campaignsApi.delete(campaignId);
+      log('🗑️ STARTING CAMPAIGN DELETE', 'yellow');
+      log(`Campaign ID: ${campaignId}`, 'cyan');
+      
+      log('📤 SENDING DELETE REQUEST...', 'yellow');
+      const response = await campaignsApi.delete(campaignId);
+      
+      log('✅ DELETE RESPONSE RECEIVED', 'green');
+      log(`Full Response: ${JSON.stringify(response, null, 2)}`, 'white');
+      log(`Response Data: ${JSON.stringify(response.data, null, 2)}`, 'white');
+      
+      log('🎉 DELETE SUCCESSFUL!', 'green');
+      alert('✅ Campaign deleted successfully!');
       loadCampaigns();
+      
     } catch (error: any) {
-      alert('Failed to delete: ' + (error.response?.data?.detail || error.message));
+      log('❌ DELETE ERROR OCCURRED', 'red');
+      log(`Error Type: ${error.name}`, 'red');
+      log(`Error Message: ${error.message}`, 'red');
+      log(`Response Status: ${error?.response?.status}`, 'red');
+      log(`Response Data: ${JSON.stringify(error?.response?.data, null, 2)}`, 'red');
+      log(`Full Error: ${JSON.stringify(error, null, 2)}`, 'red');
+      
+      let msg = 'Delete failed';
+      if (error?.response?.data) {
+        const data = error.response.data;
+        if (typeof data === 'string') {
+          msg = data;
+        } else if (data.detail) {
+          msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+        } else {
+          msg = JSON.stringify(data);
+        }
+      } else if (error?.message) {
+        msg = error.message;
+      }
+      
+      log(`Final Error Message: ${msg}`, 'red');
+      alert('❌ Failed to delete: ' + msg);
+    } finally {
+      log('🏁 DELETE PROCESS COMPLETED', 'yellow');
+      log('Click anywhere to close this log', 'cyan');
+      
+      // Add click to close
+      logContainer.onclick = closeLog;
     }
   };
 
