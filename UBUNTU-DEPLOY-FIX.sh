@@ -56,19 +56,19 @@ echo "🔄 Step 7: Starting services in correct order..."
 
 # Start database first
 echo "📊 Starting PostgreSQL database..."
-docker-compose up -d db
+docker-compose up -d postgres
 
 echo "⏳ Waiting for database to be ready..."
 sleep 20
 
 # Test database connection
 echo "🔍 Testing database connection..."
-docker-compose exec -T db psql -U postgres -d speed_send -c "SELECT 1;" || {
+docker-compose exec -T postgres psql -U gmailsaas -d gmail_saas -c "SELECT 1;" || {
     echo "❌ Database connection failed. Retrying..."
     sleep 10
-    docker-compose exec -T db psql -U postgres -d speed_send -c "SELECT 1;" || {
+    docker-compose exec -T postgres psql -U gmailsaas -d gmail_saas -c "SELECT 1;" || {
         echo "❌ Database still not ready. Check logs:"
-        docker-compose logs db
+        docker-compose logs postgres
         exit 1
     }
 }

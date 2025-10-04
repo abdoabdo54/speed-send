@@ -29,14 +29,14 @@ docker-compose build --no-cache
 echo ""
 echo "🔄 Step 4: Starting services in correct order..."
 # Start database first
-docker-compose up -d db redis
+docker-compose up -d postgres redis
 
 echo "⏳ Waiting for database to be ready..."
 sleep 15
 
 # Check database connection
 echo "🔍 Testing database connection..."
-docker-compose exec db psql -U postgres -d speed_send -c "SELECT 1;" || echo "❌ Database connection failed"
+docker-compose exec postgres psql -U gmailsaas -d gmail_saas -c "SELECT 1;" || echo "❌ Database connection failed"
 
 echo ""
 echo "🔄 Step 5: Starting backend..."
