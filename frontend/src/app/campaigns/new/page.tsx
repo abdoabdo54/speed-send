@@ -437,7 +437,10 @@ export default function NewCampaignPage() {
                 <h3 className="text-lg font-semibold">Email Composer</h3>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setVarsModalOpen(true)} className="text-sm text-blue-600">Personalization</button>
-                  <button onClick={() => handleSaveTemplate(prompt('Template name'))} className="text-sm text-gray-500">Save as Template</button>
+                  <button onClick={() => {
+                    const name = prompt('Template name')?.trim();
+                    if (name) handleSaveTemplate(name);
+                  }} className="text-sm text-gray-500">Save as Template</button>
                 </div>
               </div>
               <input placeholder="Subject" value={config.subject} onChange={(e) => setCampaignConfig({ subject: e.target.value })} className="w-full rounded-md border px-3 py-2 mb-3" />
