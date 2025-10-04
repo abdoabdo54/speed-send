@@ -95,15 +95,35 @@ async def list_service_accounts(
     List all service accounts with computed user counts
     """
     from app.models import WorkspaceUser
+    import logging
     
-    accounts = db.query(ServiceAccount).offset(skip).limit(limit).all()
+    logger = logging.getLogger(__name__)
     
-    # Ensure total_users is computed for each account
-    for account in accounts:
-        # Force refresh to get latest data
-        db.refresh(account)
-    
-    return accounts
+    try:
+        logger.info("🔄 Fetching service accounts...")
+        accounts = db.query(ServiceAccount).offset(skip).limit(limit).all()
+        logger.info(f"✅ Found {len(accounts)} service accounts")
+        
+        # Ensure total_users is computed for each account
+        for account in accounts:
+            # Count active users for this account
+            user_count = db.query(WorkspaceUser).filter(
+                WorkspaceUser.service_account_id == account.id,
+                WorkspaceUser.is_active == True
+            ).count()
+            
+            # Update the account's total_users if different
+            if account.total_users != user_count:
+                account.total_users = user_count
+                db.commit()
+                logger.info(f"📊 Updated user count for {account.client_email}: {user_count}")
+        
+        logger.info(f"✅ Returning {len(accounts)} accounts with user counts")
+        return accounts
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to list service accounts: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list service accounts: {str(e)}")
 
 
 @router.get("/{account_id}", response_model=ServiceAccountResponse)

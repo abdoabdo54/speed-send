@@ -20,16 +20,29 @@ async def list_workspace_users(
     """
     List workspace users with optional filters
     """
-    query = db.query(WorkspaceUser)
+    import logging
+    logger = logging.getLogger(__name__)
     
-    if service_account_id:
-        query = query.filter(WorkspaceUser.service_account_id == service_account_id)
-    
-    if is_active is not None:
-        query = query.filter(WorkspaceUser.is_active == is_active)
-    
-    users = query.offset(skip).limit(limit).all()
-    return users
+    try:
+        logger.info("🔄 Fetching workspace users...")
+        query = db.query(WorkspaceUser)
+        
+        if service_account_id:
+            query = query.filter(WorkspaceUser.service_account_id == service_account_id)
+            logger.info(f"🔍 Filtering by service_account_id: {service_account_id}")
+        
+        if is_active is not None:
+            query = query.filter(WorkspaceUser.is_active == is_active)
+            logger.info(f"🔍 Filtering by is_active: {is_active}")
+        
+        users = query.offset(skip).limit(limit).all()
+        logger.info(f"✅ Found {len(users)} workspace users")
+        
+        return users
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to list workspace users: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list workspace users: {str(e)}")
 
 
 @router.get("/{user_id}", response_model=WorkspaceUserResponse)
