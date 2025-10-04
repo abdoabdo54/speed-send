@@ -47,6 +47,13 @@ export default function AccountsPage() {
       return;
     }
 
+    // Get admin email for delegation
+    const adminEmail = prompt('Enter admin email for domain-wide delegation:');
+    if (!adminEmail || !adminEmail.includes('@')) {
+      alert('Please enter a valid admin email address');
+      return;
+    }
+
     // Validate JSON
     try {
       JSON.parse(uploadData.json);
@@ -60,6 +67,7 @@ export default function AccountsPage() {
       const response = await serviceAccountsApi.create({
         name: uploadData.name,
         json_content: uploadData.json,
+        admin_email: adminEmail,
       });
       console.log('Upload successful:', response.data);
       

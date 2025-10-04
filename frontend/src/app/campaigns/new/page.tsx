@@ -1,690 +1,762 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { getRecipientLists, saveRecipientList, deleteRecipientList, type RecipientList } from '../../../lib/recipients';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { 
+  Send, 
+  Users, 
+  Settings, 
+  Mail, 
+  Play, 
+  Pause, 
+  RefreshCw, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle,
+  Upload,
+  Download,
+  Trash2,
+  Copy,
+  Eye,
+  TestTube
+} from 'lucide-react';
 
-/**
- * Advanced Send Page for bulk-email SaaS
- * Features: 3-column layout, advanced sender management, recipient sources, 
- * email composer, templates, personalization, and real-time campaign launching
- */
+// API Configuration
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// ---------------------------
 // Types
-// ---------------------------
-
-type AccountStatus = "active" | "paused" | "error" | "disabled";
-
 interface Account {
-  id: string;
+  id: number;
   name: string;
-  email: string;
-  avatar?: string;
-  status: AccountStatus;
-  quota: { used: number; total: number };
-  region?: string;
+  client_email: string;
+  status: string;
+  total_users: number;
+  quota_used_today: number;
+  quota_limit: number;
 }
 
-interface Recipient {
-  id: string;
+interface User {
+  id: number;
   email: string;
-  vars?: Record<string, string>;
-}
-
-interface RecipientSource {
-  id: string;
   name: string;
-  type: "csv" | "crm" | "api" | "manual";
-  count?: number;
-  samples?: Recipient[];
+  is_active: boolean;
+  service_account_id: number;
 }
-
-type SendMode = "aggressive" | "one_by_one" | "scheduled";
 
 interface CampaignConfig {
   name: string;
-  sendMode: SendMode;
-  scheduledAt?: string | null;
-  workers: number;
-  delayMs: number;
-  dailyLimit: number;
-  perAccountLimit?: number;
   subject: string;
-  headerHtml: string;
-  bodyHtml: string;
-  templateslot?: string;
-  variables: Record<string, string>;
-  trackOpens: boolean;
-  trackClicks: boolean;
-  addUnsubscribe: boolean;
-  warmup: boolean;
+  body_html: string;
+  body_plain: string;
+  from_name: string;
+  daily_limit: number;
+  workers: number;
+  delay_ms: number;
 }
 
-// ---------------------------
-// API Integration
-// ---------------------------
-
-const getApiUrl = () => {
-  if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.hostname}:8000`;
-  }
-  return 'http://localhost:8000';
-};
-
-const API_URL = getApiUrl();
-
-const api = {
-  async listAccounts(): Promise<Account[]> {
-    const response = await axios.get(`${API_URL}/api/v1/accounts/`);
-    // Adapt backend data to the frontend's Account type
-    return response.data.map((acc: any) => ({
-      id: acc.id.toString(),
-      name: acc.name,
-      email: acc.client_email,
-      status: acc.status === 'active' ? 'active' : 'disabled',
-      quota: { used: acc.quota_used_today || 0, total: acc.quota_limit || 500 }, // Default quota
-      region: 'N/A'
-    }));
-  },
-
-  async sendTest(payload: { to: string; subject: string; body: string; fromName: string; accountId: string; }) {
-    const response = await axios.post(`${API_URL}/api/v1/test-email`, {
-      recipient_email: payload.to,
-      subject: payload.subject,
-      body_html: payload.body,
-      body_plain: payload.body.replace(/<[^>]*>/g, ''),
-      from_name: payload.fromName,
-      sender_account_id: parseInt(payload.accountId)
-    });
-    return { ok: true, id: response.data.message_id };
-  },
-
-  async launchCampaign(payload: any) {
-    const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
-    return { ok: true, campaignId: response.data.id };
-  },
-};
-
-// ---------------------------
-// Utilities & small components
-// ---------------------------
-
-const IconSearch = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true" stroke="currentColor" strokeWidth={1.6}><path d="M21 21l-4.35-4.35" /><circle cx="11" cy="11" r="6" /></svg>
-);
-
-const IconClock = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true" stroke="currentColor" strokeWidth={1.6}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-);
-
-function Toast({ message, type = "info" }: { message: string; type?: "info" | "success" | "error" }) {
-  const bg = type === "error" ? "bg-red-50 text-red-700" : type === "success" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700";
-  return (
-    <div role="status" className={`px-4 py-2 rounded-md shadow-lg animate-fade-in-up ${bg}`}>
-      {message}
-    </div>
-  );
+interface RecipientList {
+  id: string;
+  name: string;
+  recipients: string[];
+  createdAt: string;
 }
-
-// ---------------------------
-// Main Component
-// ---------------------------
 
 export default function NewCampaignPage() {
   const router = useRouter();
   
-  // Data state
-  const [accounts, setAccounts] = useState<Account[] | null>(null);
-  const [recipientsText, setRecipientsText] = useState("");
-
-  // UI state
-  const [searchAccounts, setSearchAccounts] = useState("");
-  const [accountFilter, setAccountFilter] = useState<"all" | "active" | "problem">("all");
-  const [selectedAccounts, setSelectedAccounts] = useState<Record<string, boolean>>({});
-  const [selectAllVisible, setSelectAllVisible] = useState(false);
-
+  // State
+  const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
+  const [recipientsText, setRecipientsText] = useState('');
   const [config, setConfig] = useState<CampaignConfig>({
-    name: "New Campaign " + new Date().toLocaleDateString(),
-    sendMode: "one_by_one",
-    scheduledAt: null,
+    name: '',
+    subject: '',
+    body_html: '',
+    body_plain: '',
+    from_name: 'Campaign',
+    daily_limit: 2000,
     workers: 6,
-    delayMs: 200,
-    dailyLimit: 2000,
-    perAccountLimit: 0,
-    subject: "",
-    headerHtml: "",
-    bodyHtml: "",
-    templateslot: undefined,
-    variables: {},
-    trackOpens: true,
-    trackClicks: true,
-    addUnsubscribe: true,
-    warmup: false,
+    delay_ms: 200
   });
-
-  const [loadingLaunch, setLoadingLaunch] = useState(false);
-  const [toast, setToast] = useState<{ id: number; msg: string; type?: "info" | "success" | "error" } | null>(null);
-  const [testModalOpen, setTestModalOpen] = useState(false);
-  const [varsModalOpen, setVarsModalOpen] = useState(false);
-  const [templates, setTemplates] = useState<Record<string, CampaignConfig>>(loadTemplates());
+  const [testEmail, setTestEmail] = useState('');
   const [recipientLists, setRecipientLists] = useState<RecipientList[]>([]);
-  const [selectedListId, setSelectedListId] = useState<string>("");
+  const [selectedRecipientListId, setSelectedRecipientListId] = useState<string | null>(null);
+  const [newListName, setNewListName] = useState('');
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [showRecipientModal, setShowRecipientModal] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
 
+  // Derived state
+  const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
+  const totalSenders = users.filter(u => selectedAccounts.includes(u.service_account_id)).length;
+  const queuedCount = recipients.length;
+  const estDuration = Math.ceil(queuedCount / (config.workers * 10)); // Rough estimate
+
+  // Load data on mount
   useEffect(() => {
-    (async () => {
-      try {
-        const accs = await api.listAccounts();
-        setAccounts(accs);
-        const sel: Record<string, boolean> = {};
-        accs.filter((x) => x.status === "active").slice(0, 1).forEach((acc) => (sel[acc.id] = true));
-        setSelectedAccounts(sel);
-      } catch (error) {
-        console.error('Failed to load accounts:', error);
-        notice('Failed to load accounts. Please check backend connection.', 'error');
-      }
-      // Load saved recipient lists from localStorage
-      setRecipientLists(getRecipientLists());
-    })();
+    loadAccounts();
+    loadUsers();
+    loadRecipientLists();
   }, []);
 
-  const recipients = useMemo(() => {
-    return recipientsText.split('\n').map(e => e.trim()).filter(Boolean);
-  }, [recipientsText]);
+  // API Functions
+  const loadAccounts = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/v1/accounts/`);
+      setAccounts(Array.isArray(response.data) ? response.data : []);
+      console.log('Accounts loaded:', response.data);
+    } catch (error) {
+      console.error('Failed to load accounts:', error);
+      setAccounts([]);
+      showNotification('Failed to load accounts', 'error');
+    }
+  };
 
-  const activeAccountsCount = accounts ? accounts.filter((a) => a.status === "active").length : 0;
-  const selectedAccountsCount = Object.keys(selectedAccounts).filter(k => selectedAccounts[k]).length;
-  const queuedCount = recipients.length;
-  const estDuration = estimateDuration({ queued: queuedCount * selectedAccountsCount, workers: config.workers, delayMs: config.delayMs });
+  const loadUsers = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/v1/users/`);
+      setUsers(Array.isArray(response.data) ? response.data : []);
+      console.log('Users loaded:', response.data);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+      setUsers([]);
+      showNotification('Failed to load users', 'error');
+    }
+  };
 
-  const visibleAccounts = useMemo(() => {
-    if (!accounts) return [];
-    return accounts.filter((acc) => {
-      if (accountFilter === "active" && acc.status !== "active") return false;
-      if (accountFilter === "problem" && (acc.status === "active" || acc.status === 'disabled')) return false;
-      if (searchAccounts && !`${acc.name} ${acc.email}`.toLowerCase().includes(searchAccounts.toLowerCase())) return false;
-      return true;
-    });
-  }, [accounts, searchAccounts, accountFilter]);
+  const loadRecipientLists = () => {
+    try {
+      const lists = JSON.parse(localStorage.getItem('recipient_lists') || '[]');
+      setRecipientLists(lists);
+    } catch (error) {
+      console.error('Failed to load recipient lists:', error);
+      setRecipientLists([]);
+    }
+  };
 
-  useEffect(() => {
-    setSelectAllVisible(visibleAccounts.length > 0 && visibleAccounts.some((a) => !selectedAccounts[a.id]));
-  }, [visibleAccounts, selectedAccounts]);
+  const saveRecipientList = (list: RecipientList) => {
+    try {
+      const lists = [...recipientLists];
+      const existingIndex = lists.findIndex(l => l.id === list.id);
+      
+      if (existingIndex > -1) {
+        lists[existingIndex] = list;
+      } else {
+        lists.push(list);
+      }
+      
+      localStorage.setItem('recipient_lists', JSON.stringify(lists));
+      setRecipientLists(lists);
+      showNotification('Recipient list saved', 'success');
+    } catch (error) {
+      console.error('Failed to save recipient list:', error);
+      showNotification('Failed to save recipient list', 'error');
+    }
+  };
 
-  useEffect(() => saveTemplates(templates), [templates]);
+  const deleteRecipientList = (id: string) => {
+    try {
+      const lists = recipientLists.filter(l => l.id !== id);
+      localStorage.setItem('recipient_lists', JSON.stringify(lists));
+      setRecipientLists(lists);
+      showNotification('Recipient list deleted', 'success');
+    } catch (error) {
+      console.error('Failed to delete recipient list:', error);
+      showNotification('Failed to delete recipient list', 'error');
+    }
+  };
 
-  function toggleAccount(id: string) {
-    setSelectedAccounts((s) => ({ ...s, [id]: !s[id] }));
-  }
+  // Utility Functions
+  const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
+    const id = Date.now().toString();
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 5000);
+  };
 
-  function bulkSelectVisible() {
-    const copy = { ...selectedAccounts };
-    visibleAccounts.forEach((a) => (copy[a.id] = true));
-    setSelectedAccounts(copy);
-  }
+  const stripHtml = (html: string) => {
+    if (typeof window === 'undefined') return html.replace(/<[^>]*>/g, '');
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  };
 
-  function clearSelection() {
-    setSelectedAccounts({});
-  }
+  // Event Handlers
+  const handleAccountToggle = (accountId: number) => {
+    setSelectedAccounts(prev => 
+      prev.includes(accountId) 
+        ? prev.filter(id => id !== accountId)
+        : [...prev, accountId]
+    );
+  };
 
-  function setCampaignConfig(part: Partial<CampaignConfig>) {
-    setConfig((c) => ({ ...c, ...part }));
-  }
+  const handleSelectAllAccounts = () => {
+    if (selectedAccounts.length === accounts.length) {
+      setSelectedAccounts([]);
+    } else {
+      setSelectedAccounts(accounts.map(a => a.id));
+    }
+  };
 
-  async function handleLaunch() {
-    const enabledAccountIds = Object.keys(selectedAccounts).filter((k) => selectedAccounts[k]);
-    if (enabledAccountIds.length === 0) return notice("Please select at least one sender account.", "error");
-    if (recipients.length === 0) return notice("Please add at least one recipient.", "error");
-    if (!config.subject) return notice("Please enter an email subject.", "error");
-    if (!config.name) return notice("Please enter a campaign name.", "error");
+  const handleSendTest = async () => {
+    if (!testEmail.trim()) {
+      showNotification('Please enter a test email address', 'error');
+      return;
+    }
 
-    setLoadingLaunch(true);
-    notice("Launching campaign...", "info");
+    if (selectedAccounts.length === 0) {
+      showNotification('Please select at least one account', 'error');
+      return;
+    }
+
+    if (!config.subject.trim()) {
+      showNotification('Please enter a subject', 'error');
+      return;
+    }
+
+    if (!config.body_html.trim()) {
+      showNotification('Please enter email content', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/api/v1/test-email`, {
+        recipient_email: testEmail,
+        subject: `[TEST] ${config.subject}`,
+        body_html: config.body_html,
+        body_plain: stripHtml(config.body_html),
+        from_name: config.from_name,
+        sender_account_id: selectedAccounts[0]
+      });
+
+      showNotification(`Test email sent to ${testEmail}`, 'success');
+      setShowTestModal(false);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || error.message || 'Failed to send test email';
+      showNotification(`Test failed: ${errorMsg}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateCampaign = async () => {
+    if (!config.name.trim()) {
+      showNotification('Please enter a campaign name', 'error');
+      return;
+    }
+
+    if (!config.subject.trim()) {
+      showNotification('Please enter a subject', 'error');
+      return;
+    }
+
+    if (!config.body_html.trim()) {
+      showNotification('Please enter email content', 'error');
+      return;
+    }
+
+    if (selectedAccounts.length === 0) {
+      showNotification('Please select at least one account', 'error');
+      return;
+    }
+
+    if (recipients.length === 0) {
+      showNotification('Please add at least one recipient', 'error');
+      return;
+    }
+
+    setLoading(true);
     try {
       const payload = {
         name: config.name,
         subject: config.subject,
-        body_html: config.bodyHtml,
-        body_plain: stripHtml(config.bodyHtml),
-        from_name: 'Campaign', // You may want to make this configurable
+        body_html: config.body_html,
+        body_plain: stripHtml(config.body_html),
+        from_name: config.from_name,
         recipients: recipients.map(email => ({ email, variables: {} })),
-        sender_account_ids: enabledAccountIds.map(id => parseInt(id)),
-        // Below are placeholders, your backend might not use them yet
+        sender_account_ids: selectedAccounts,
         sender_rotation: 'round_robin',
         custom_headers: {},
         attachments: [],
-        rate_limit: config.dailyLimit,
+        rate_limit: config.daily_limit,
         concurrency: config.workers
       };
+
+      const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
       
-      const res = await api.launchCampaign(payload);
-      notice("Campaign successfully created & launched: " + res.campaignId, "success");
-      setTimeout(() => router.push('/campaigns'), 1500);
-    } catch (e: any) {
-      const errorMsg = e.response?.data?.detail || e.message || "An unknown error occurred.";
-      notice(`Failed to launch campaign: ${errorMsg}`, "error");
+      showNotification(`Campaign created successfully! ID: ${response.data.id}`, 'success');
+      router.push('/campaigns');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || error.message || 'Failed to create campaign';
+      showNotification(`Campaign creation failed: ${errorMsg}`, 'error');
     } finally {
-      setLoadingLaunch(false);
+      setLoading(false);
     }
-  }
+  };
 
-  async function handleSaveTemplate(name: string) {
-    if (!name) return;
-    const id = `tpl_${Date.now()}`;
-    setTemplates((t) => ({ ...t, [id]: { ...(config as any), name } }));
-    notice(`Template saved: ${name}`, "success");
-  }
-
-  function handleLoadTemplate(id: string) {
-    const tpl = templates[id];
-    if (!tpl) return;
-    setConfig(tpl);
-    notice(`Template loaded: ${tpl.name}`, "success");
-  }
-
-  async function handleSendTest(to: string) {
-    const enabledAccountIds = Object.keys(selectedAccounts).filter((k) => selectedAccounts[k]);
-    if(enabledAccountIds.length === 0) {
-      notice("Please select an account to send the test from.", "error");
-      return Promise.reject();
+  const handleSaveRecipientList = () => {
+    if (!newListName.trim()) {
+      showNotification('Please enter a name for the recipient list', 'error');
+      return;
     }
-    
-    try {
-      await api.sendTest({ 
-        to, 
-        subject: `[TEST] ${config.subject}`, 
-        body: config.bodyHtml,
-        fromName: "Test Send",
-        accountId: enabledAccountIds[0]
-      });
-      notice(`Test sent to ${to}`, "success");
-    } catch (e: any) {
-      const errorMsg = e.response?.data?.detail || e.message || "An unknown error occurred.";
-      notice(`Test send failed: ${errorMsg}`, "error");
-      throw e;
+
+    if (recipients.length === 0) {
+      showNotification('Recipient list is empty', 'error');
+      return;
     }
-  }
 
-  function notice(msg: string, type: "info" | "success" | "error" = "info") {
-    setToast({ id: Date.now(), msg, type });
-    setTimeout(() => setToast(null), 4000);
-  }
+    const newList: RecipientList = {
+      id: `list_${Date.now()}`,
+      name: newListName.trim(),
+      recipients: recipients,
+      createdAt: new Date().toISOString()
+    };
 
-  // Recipient list helpers
-  function refreshRecipientLists() {
-    setRecipientLists(getRecipientLists());
-  }
+    saveRecipientList(newList);
+    setNewListName('');
+    setShowRecipientModal(false);
+  };
 
-  function handleSelectRecipientList(id: string) {
-    setSelectedListId(id);
-    const list = recipientLists.find(l => l.id === id);
-    if (list) {
-      setRecipientsText(list.recipients.join('\n'));
-      notice(`Loaded list: ${list.name}`, 'info');
-    }
-  }
-
-  function handleSaveRecipients() {
-    const cleaned = recipients;
-    if (cleaned.length === 0) {
-      return notice('No recipients to save', 'error');
-    }
-    const name = prompt('Save recipient list as:')?.trim();
-    if (!name) return;
-    saveRecipientList(name, cleaned);
-    refreshRecipientLists();
-    notice('Recipient list saved', 'success');
-  }
-
-  function handleDeleteRecipients() {
-    if (!selectedListId) return notice('Select a saved list first', 'error');
-    const list = recipientLists.find(l => l.id === selectedListId);
-    if (!list) return;
-    if (!confirm(`Delete recipient list: ${list.name}?`)) return;
-    deleteRecipientList(selectedListId);
-    refreshRecipientLists();
-    setSelectedListId("");
-    notice('Recipient list deleted', 'success');
-  }
+  const handleLoadRecipientList = (list: RecipientList) => {
+    setRecipientsText(list.recipients.join('\n'));
+    setSelectedRecipientListId(list.id);
+    showNotification(`Recipient list "${list.name}" loaded`, 'info');
+  };
 
   return (
-    <div className="min-h-screen bg-[#F7FAFC] p-6 sm:p-10">
-      <div className="max-w-[1200px] mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-[#101828]">Send Campaign</h1>
-            <p className="text-sm text-gray-500 mt-1">Advanced campaign builder — multi-account, high-speed sending.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex gap-2 items-center">
-              <div className="text-sm text-gray-600">Active accounts</div>
-              <div className="px-3 py-1 rounded-md bg-blue-50 text-blue-700 font-semibold">{activeAccountsCount}</div>
-            </div>
-            <button onClick={() => router.push('/accounts')} className="px-4 py-2 rounded-md bg-gradient-to-r from-[#2563EB] to-[#1E3A8A] text-white hover:opacity-95">Account Settings</button>
-          </div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Send Campaign</h1>
+        <p className="text-gray-600 mt-2">Advanced campaign builder — multi-account, high-speed sending</p>
+      </div>
+
+      {/* Notifications */}
+      {notifications.map(notification => (
+        <Alert key={notification.id} className={`mb-4 ${
+          notification.type === 'success' ? 'border-green-200 bg-green-50' :
+          notification.type === 'error' ? 'border-red-200 bg-red-50' :
+          'border-blue-200 bg-blue-50'
+        }`}>
+          <AlertDescription className={
+            notification.type === 'success' ? 'text-green-800' :
+            notification.type === 'error' ? 'text-red-800' :
+            'text-blue-800'
+          }>
+            {notification.message}
+          </AlertDescription>
+        </Alert>
+      ))}
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left Column - Accounts & Recipients */}
+        <div className="space-y-6">
+          
+          {/* Accounts Panel */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Accounts ({accounts.length})
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSelectAllAccounts}
+                  >
+                    {selectedAccounts.length === accounts.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={loadAccounts}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {accounts.map(account => (
+                  <div key={account.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                    <Checkbox
+                      checked={selectedAccounts.includes(account.id)}
+                      onCheckedChange={() => handleAccountToggle(account.id)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {account.name || account.client_email}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {account.client_email}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant={account.status === 'active' ? 'default' : 'secondary'}>
+                          {account.status}
+                        </Badge>
+                        <span className="text-xs text-gray-500">
+                          {account.total_users || 0} users
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {accounts.length === 0 && (
+                  <div className="text-center py-4 text-gray-500">
+                    No accounts available. Add accounts first.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recipients Panel */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Recipients ({recipients.length})
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowRecipientModal(true)}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Manage Lists
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="recipients">Email Addresses (one per line)</Label>
+                  <Textarea
+                    id="recipients"
+                    placeholder="recipient1@example.com&#10;recipient2@example.com&#10;recipient3@example.com"
+                    value={recipientsText}
+                    onChange={(e) => setRecipientsText(e.target.value)}
+                    rows={8}
+                    className="mt-1"
+                  />
+                </div>
+                
+                {recipients.length > 0 && (
+                  <div className="text-sm text-gray-600">
+                    <p>Valid recipients: {recipients.length}</p>
+                    <p>Invalid entries: {recipientsText.split('\n').length - recipients.length}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <aside className="lg:col-span-3">
-            <div className="sticky top-20 space-y-4">
-              <div className="rounded-xl bg-white border p-4 shadow">
-                <div className="flex items-center gap-2 mb-3">
-                  <input placeholder="Search accounts" value={searchAccounts} onChange={(e) => setSearchAccounts(e.target.value)} className="flex-1 rounded-md border px-3 py-2 focus:ring-2 focus:ring-blue-300" />
-                  <button onClick={() => setSearchAccounts("")} className="p-2 rounded-md bg-gray-50" aria-label="clear"><IconSearch /></button>
+        {/* Middle Column - Campaign Configuration */}
+        <div className="space-y-6">
+          
+          {/* Campaign Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Campaign Configuration
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="campaign-name">Campaign Name</Label>
+                <Input
+                  id="campaign-name"
+                  placeholder="Enter campaign name"
+                  value={config.name}
+                  onChange={(e) => setConfig(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="from-name">From Name</Label>
+                <Input
+                  id="from-name"
+                  placeholder="Enter sender name"
+                  value={config.from_name}
+                  onChange={(e) => setConfig(prev => ({ ...prev, from_name: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="subject">Subject</Label>
+                <Input
+                  id="subject"
+                  placeholder="Enter email subject"
+                  value={config.subject}
+                  onChange={(e) => setConfig(prev => ({ ...prev, subject: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="daily-limit">Daily Limit</Label>
+                  <Input
+                    id="daily-limit"
+                    type="number"
+                    value={config.daily_limit}
+                    onChange={(e) => setConfig(prev => ({ ...prev, daily_limit: parseInt(e.target.value) || 0 }))}
+                  />
                 </div>
-                <div className="flex gap-2 items-center text-xs text-gray-600 mb-3">
-                  <button onClick={() => setAccountFilter("all")} className={`px-2 py-1 rounded ${accountFilter === "all" ? "bg-blue-50 text-blue-700" : "bg-gray-50"}`}>All</button>
-                  <button onClick={() => setAccountFilter("active")} className={`px-2 py-1 rounded ${accountFilter === "active" ? "bg-blue-50 text-blue-700" : "bg-gray-50"}`}>Active</button>
-                  <button onClick={() => setAccountFilter("problem")} className={`px-2 py-1 rounded ${accountFilter === "problem" ? "bg-blue-50 text-blue-700" : "bg-gray-50"}`}>Problems</button>
+                <div>
+                  <Label htmlFor="workers">Workers</Label>
+                  <Input
+                    id="workers"
+                    type="number"
+                    value={config.workers}
+                    onChange={(e) => setConfig(prev => ({ ...prev, workers: parseInt(e.target.value) || 1 }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="delay">Delay (ms)</Label>
+                <Input
+                  id="delay"
+                  type="number"
+                  value={config.delay_ms}
+                  onChange={(e) => setConfig(prev => ({ ...prev, delay_ms: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Email Composer */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Email Composer
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="email-body">Email Body (HTML)</Label>
+                  <Textarea
+                    id="email-body"
+                    placeholder="Enter your email content here... You can use HTML tags for formatting."
+                    value={config.body_html}
+                    onChange={(e) => setConfig(prev => ({ ...prev, body_html: e.target.value }))}
+                    rows={12}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Stats & Actions */}
+        <div className="space-y-6">
+          
+          {/* Stats Panel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                Campaign Stats
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-600">{queuedCount}</div>
+                  <div className="text-sm text-gray-600">Recipients</div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div>
+                    <div className="text-lg font-semibold text-green-600">{totalSenders}</div>
+                    <div className="text-xs text-gray-600">Active Senders</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-semibold text-purple-600">{estDuration}m</div>
+                    <div className="text-xs text-gray-600">Est. Duration</div>
+                  </div>
                 </div>
 
-                <div className="max-h-[360px] overflow-auto space-y-2" role="list">
-                  {!accounts ? (
-                    <div className="space-y-2">
-                      {[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-gray-100 rounded animate-pulse" />)}
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm text-gray-600">{visibleAccounts.length} accounts visible</div>
-                        <div className="flex items-center gap-2">
-                          {selectAllVisible && <button onClick={bulkSelectVisible} className="text-sm text-blue-600">Select all</button>}
-                          <button onClick={clearSelection} className="text-sm text-gray-500">Clear</button>
-                        </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Selected Accounts:</span>
+                    <span className="font-medium">{selectedAccounts.length}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Daily Limit:</span>
+                    <span className="font-medium">{config.daily_limit}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Workers:</span>
+                    <span className="font-medium">{config.workers}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Actions Panel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Play className="h-5 w-5" />
+                Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button
+                onClick={() => setShowTestModal(true)}
+                variant="outline"
+                className="w-full"
+                disabled={loading || selectedAccounts.length === 0}
+              >
+                <TestTube className="h-4 w-4 mr-2" />
+                Send Test Email
+              </Button>
+
+              <Button
+                onClick={handleCreateCampaign}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                disabled={loading || selectedAccounts.length === 0 || recipients.length === 0}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {loading ? 'Creating...' : 'Create Campaign'}
+              </Button>
+
+              <div className="text-xs text-gray-500 text-center">
+                Campaign will be created in DRAFT status.<br />
+                Go to Campaigns page to launch.
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Test Email Modal */}
+      {showTestModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Send Test Email</h3>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="test-email">Test Email Address</Label>
+                <Input
+                  id="test-email"
+                  type="email"
+                  placeholder="test@example.com"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleSendTest}
+                  disabled={loading || !testEmail.trim()}
+                  className="flex-1"
+                >
+                  {loading ? 'Sending...' : 'Send Test'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTestModal(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recipient Lists Modal */}
+      {showRecipientModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+            <h3 className="text-lg font-semibold mb-4">Manage Recipient Lists</h3>
+            
+            <div className="space-y-4">
+              {/* Save Current List */}
+              <div className="border rounded-lg p-4">
+                <h4 className="font-medium mb-2">Save Current Recipients</h4>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="List name"
+                    value={newListName}
+                    onChange={(e) => setNewListName(e.target.value)}
+                  />
+                  <Button onClick={handleSaveRecipientList} disabled={!newListName.trim()}>
+                    Save
+                  </Button>
+                </div>
+              </div>
+
+              {/* Load Existing Lists */}
+              <div>
+                <h4 className="font-medium mb-2">Load Existing Lists</h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {recipientLists.map(list => (
+                    <div key={list.id} className="flex items-center justify-between p-2 border rounded">
+                      <div>
+                        <div className="font-medium">{list.name}</div>
+                        <div className="text-sm text-gray-500">{list.recipients.length} recipients</div>
                       </div>
-
-                      {visibleAccounts.map((acc) => (
-                        <div key={acc.id} role="listitem" className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all ${selectedAccounts[acc.id] ? "bg-blue-50 border-blue-300 shadow-sm" : "bg-[#F4F7FA] border-gray-100"}`} onClick={() => toggleAccount(acc.id)}>
-                          <input aria-label={`select ${acc.email}`} checked={!!selectedAccounts[acc.id]} onChange={() => toggleAccount(acc.id)} type="checkbox" className="h-4 w-4 text-blue-600 focus:ring-blue-500" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <div className="truncate">
-                                <div className="text-sm font-semibold text-[#101828] truncate">{acc.name}</div>
-                                <div className="text-xs text-gray-500 truncate">{acc.email}</div>
-                              </div>
-                            </div>
-                            <div className="mt-2 flex items-center justify-between">
-                              <div className="text-xs text-gray-500">Quota: {acc.quota.used}/{acc.quota.total}</div>
-                              <AccountStatusPill status={acc.status} />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {visibleAccounts.length === 0 && <div className="text-sm text-center py-4 text-gray-500">No accounts match.</div>}
-                    </>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleLoadRecipientList(list)}
+                        >
+                          Load
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => deleteRecipientList(list.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {recipientLists.length === 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      No saved lists
+                    </div>
                   )}
                 </div>
               </div>
 
-              <div className="rounded-xl bg-white border p-4 shadow">
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-base font-semibold text-[#101828]">Recipients</h3>
-                    <span className="text-sm font-bold text-blue-700">{recipients.length}</span>
-                </div>
-                {/* Saved lists selector */}
-                <div className="flex items-center gap-2 mb-2">
-                  <select value={selectedListId} onChange={(e) => handleSelectRecipientList(e.target.value)} className="flex-1 rounded-md border px-2 py-2">
-                    <option value="">— Select saved list —</option>
-                    {recipientLists.map(list => (
-                      <option key={list.id} value={list.id}>{list.name} ({list.recipients.length})</option>
-                    ))}
-                  </select>
-                  <button onClick={handleSaveRecipients} className="px-3 py-2 rounded-md border text-blue-700 border-blue-600 hover:bg-blue-50">Save</button>
-                  <button onClick={handleDeleteRecipients} className="px-3 py-2 rounded-md border text-red-700 border-red-600 hover:bg-red-50">Delete</button>
-                </div>
-                <textarea 
-                    value={recipientsText}
-                    onChange={(e) => setRecipientsText(e.target.value)}
-                    placeholder="Paste one email per line..."
-                    className="w-full h-48 p-2 border rounded-md focus:ring-2 focus:ring-blue-300"
-                />
+              <div className="flex justify-end">
+                <Button onClick={() => setShowRecipientModal(false)}>
+                  Close
+                </Button>
               </div>
             </div>
-          </aside>
-
-          <main className="lg:col-span-6 space-y-4">
-            <div className="rounded-xl bg-white border p-6 shadow">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h2 className="text-xl font-bold text-[#101828]">Campaign Configuration</h2>
-                  <input placeholder="My awesome campaign" value={config.name} onChange={(e) => setCampaignConfig({ name: e.target.value })} className="mt-3 w-full rounded-md border px-3 py-2 focus:ring-2 focus:ring-blue-300" />
-                </div>
-                <div className="w-56 ml-4">
-                  <label className="text-sm text-gray-500">Template</label>
-                  <select value={config.templateslot ?? ""} onChange={(e) => handleLoadTemplate(e.target.value)} className="mt-2 w-full rounded-md border px-2 py-2">
-                    <option value="">— load template —</option>
-                    {Object.entries(templates).map(([id, tpl]) => (
-                      <option key={id} value={id}>{(tpl as any).name || id}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                 <div>
-                  <label className="text-sm text-gray-600">Workers</label>
-                  <input type="number" value={config.workers} onChange={(e) => setCampaignConfig({ workers: Number(e.target.value || 0) })} className="mt-2 rounded-md border px-3 py-2 w-full" />
-                </div>
-                <div>
-                  <label className="text-sm text-gray-600">Delay (ms)</label>
-                  <input type="number" value={config.delayMs} onChange={(e) => setCampaignConfig({ delayMs: Number(e.target.value || 0) })} className="mt-2 rounded-md border px-3 py-2 w-full" />
-                </div>
-                <div>
-                  <label className="text-sm text-gray-600">Daily Limit / Account</label>
-                  <input value={config.perAccountLimit} onChange={(e) => setCampaignConfig({ perAccountLimit: Number(e.target.value || 0) })} type="number" className="mt-2 rounded-md border px-3 py-2 w-full" />
-                </div>
-              </div>
-
-              {config.sendMode === 'scheduled' && (
-                <div className="mt-3 flex gap-2 items-center">
-                  <IconClock />
-                  <input aria-label="scheduled at" type="datetime-local" value={config.scheduledAt ?? ''} onChange={(e) => setCampaignConfig({ scheduledAt: e.target.value })} className="rounded-md border px-3 py-2" />
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl bg-white border p-6 shadow">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold">Email Composer</h3>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setVarsModalOpen(true)} className="text-sm text-blue-600">Personalization</button>
-                  <button onClick={() => {
-                    const name = prompt('Template name')?.trim();
-                    if (name) handleSaveTemplate(name);
-                  }} className="text-sm text-gray-500">Save as Template</button>
-                </div>
-              </div>
-              <input placeholder="Subject" value={config.subject} onChange={(e) => setCampaignConfig({ subject: e.target.value })} className="w-full rounded-md border px-3 py-2 mb-3" />
-              <div>
-                <label className="text-sm text-gray-600">Body (HTML)</label>
-                <div className="mt-2 border rounded-md min-h-[220px] p-3">
-                  <textarea value={config.bodyHtml} onChange={(e) => setCampaignConfig({ bodyHtml: e.target.value })} placeholder="Write or paste HTML here. Use variables like {firstName}." className="w-full min-h-[180px] bg-transparent focus:outline-none" />
-                </div>
-              </div>
-            </div>
-          </main>
-
-          <aside className="lg:col-span-3">
-            <div className="sticky top-20 space-y-4">
-              <div className="rounded-xl bg-white border p-4 shadow">
-                 <div className="text-sm text-gray-600 mb-3">Actions</div>
-                <div className="space-y-3">
-                  <button onClick={() => setTestModalOpen(true)} className="w-full rounded-md border border-blue-600 text-blue-600 py-2 hover:bg-blue-50 transition-colors">Send Test Email</button>
-                  <button onClick={handleLaunch} disabled={loadingLaunch || !config.name || !config.subject || recipients.length === 0 || selectedAccountsCount === 0} className={`w-full rounded-full py-3 font-bold text-white transition-all ${loadingLaunch ? 'bg-gradient-to-r from-blue-400 to-indigo-400 opacity-80 cursor-wait' : 'bg-gradient-to-r from-[#2563EB] to-[#1E3A8A] hover:opacity-90'} disabled:opacity-50 disabled:cursor-not-allowed`}>
-                    {loadingLaunch ? 'Launching...' : 'Launch Campaign'}
-                  </button>
-                </div>
-              </div>
-              
-              <div className="rounded-xl bg-white border p-4 shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm text-gray-500">Stats</div>
-                    <div className="text-lg font-bold text-[#101828]">{queuedCount} queued</div>
-                  </div>
-                  <div className="text-sm text-gray-500">Est: <span className="font-semibold text-purple-600">{estDuration}</span></div>
-                </div>
-                <div className="mt-4">
-                  <div className="text-sm text-gray-600">Preview</div>
-                  <div className="mt-2 border rounded p-3 bg-[#F4F7FA] min-h-[120px]">
-                    <div className="text-sm font-semibold">{config.subject || 'Subject preview'}</div>
-                    <div className="text-xs text-gray-600 mt-2 line-clamp-4">{stripHtml(config.bodyHtml) || 'Body preview...'}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-white border p-4 shadow">
-                <div className="text-sm text-gray-600 mb-2">Advanced Options</div>
-                <div className="flex flex-col gap-2 text-sm text-gray-700">
-                  <label className="inline-flex items-center"><input type="checkbox" checked={config.trackOpens} onChange={(e) => setCampaignConfig({ trackOpens: e.target.checked })} className="mr-2 h-4 w-4 text-blue-600"/>Track Opens</label>
-                  <label className="inline-flex items-center"><input type="checkbox" checked={config.trackClicks} onChange={(e) => setCampaignConfig({ trackClicks: e.target.checked })} className="mr-2 h-4 w-4 text-blue-600"/>Track Clicks</label>
-                  <label className="inline-flex items-center"><input type="checkbox" checked={config.addUnsubscribe} onChange={(e) => setCampaignConfig({ addUnsubscribe: e.target.checked })} className="mr-2 h-4 w-4 text-blue-600"/>Add Unsubscribe</label>
-                </div>
-              </div>
-            </div>
-          </aside>
+          </div>
         </div>
-
-        {varsModalOpen && <VariablesModal variables={config.variables} onClose={() => setVarsModalOpen(false)} onSave={(v) => setCampaignConfig({ variables: v })} />}
-        {testModalOpen && <TestModal onClose={() => setTestModalOpen(false)} onSend={(to) => handleSendTest(to)} subject={config.subject} body={config.bodyHtml} />}
-        <div className="fixed top-6 right-6 z-50">
-          {toast && <Toast message={toast.msg} type={toast.type} />}
-        </div>
-      </div>
+      )}
     </div>
   );
-}
-
-// ---------------------------
-// Sub components
-// ---------------------------
-function AccountStatusPill({ status }: { status: AccountStatus }) {
-    const statusMap = {
-        active: { text: "Active", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-        paused: { text: "Paused", className: "bg-amber-50 text-amber-700 border-amber-200" },
-        error: { text: "Error", className: "bg-red-50 text-red-700 border-red-200" },
-        disabled: { text: "Disabled", className: "bg-gray-50 text-gray-600 border-gray-200" },
-    };
-    const { text, className } = statusMap[status] || statusMap.disabled;
-    return (
-      <div className={`px-2 py-0.5 rounded text-xs font-medium border ${className}`}>{text}</div>
-    );
-}
-
-function VariablesModal({ variables, onClose, onSave }: { variables: Record<string, string>; onClose: () => void; onSave: (v: Record<string, string>) => void }) {
-  const [local, setLocal] = useState<[string, string][]>(() => Object.entries(variables));
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/30 backdrop-blur-sm" onMouseDown={onClose}>
-      <div className="relative bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl" onMouseDown={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Personalization Variables</h3>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-3 py-1 rounded bg-gray-100">Close</button>
-            <button onClick={() => { onSave(Object.fromEntries(local)); onClose(); }} className="px-3 py-1 rounded bg-blue-600 text-white">Save</button>
-          </div>
-        </div>
-        <div className="space-y-3">
-          <div className="text-sm text-gray-500">Use variables like <code className="bg-gray-100 px-1 rounded">{`{firstName}`}</code> in subject/body.</div>
-          <div className="space-y-2 max-h-60 overflow-auto pr-2">
-            {local.map(([k, v], idx) => (
-              <div key={idx} className="flex gap-2">
-                <input value={k} onChange={(e) => setLocal((s) => s.map((x, i) => i === idx ? [e.target.value, x[1]] : x))} className="w-1/3 rounded border px-2 py-1" placeholder="Variable Name"/>
-                <input value={v} onChange={(e) => setLocal((s) => s.map((x, i) => i === idx ? [x[0], e.target.value] : x))} className="flex-1 rounded border px-2 py-1" placeholder="Test Value"/>
-                <button onClick={() => setLocal((s) => s.filter((_, i) => i !== idx))} className="px-3 rounded bg-red-50 text-red-600">Delete</button>
-              </div>
-            ))}
-          </div>
-          <div>
-            <button onClick={() => setLocal((s) => [...s, ["", ""]])} className="px-3 py-2 rounded bg-green-50 text-green-700">+ Add</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TestModal({ onClose, onSend, subject, body }: { onClose: () => void; onSend: (to: string) => Promise<void>; subject: string; body: string; }) {
-  const [to, setTo] = useState("");
-  const [log, setLog] = useState<string[]>([]);
-  const [sending, setSending] = useState(false);
-  const refBottom = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => { refBottom.current?.scrollIntoView({ behavior: 'smooth' }); }, [log]);
-
-  async function handle() {
-    if (!to) return;
-    setLog([]);
-    setSending(true);
-    setLog((s) => [...s, `[INFO] Sending test to ${to}`]);
-    try {
-      await onSend(to);
-      setLog((s) => [...s, `[SUCCESS] Test email sent!`]);
-    } catch(e) {
-      setLog((s) => [...s, `[ERROR] Failed to send test.`]);
-    } finally {
-      setSending(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onMouseDown={onClose}>
-      <div className="relative z-10 w-full max-w-xl bg-white rounded-xl p-6 shadow-xl" onMouseDown={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Send Test Email</h3>
-          <button onClick={onClose} className="px-3 py-1 rounded bg-gray-100">Close</button>
-        </div>
-        <div className="space-y-3">
-          <input placeholder="recipient@example.com" value={to} onChange={(e) => setTo(e.target.value)} className="w-full rounded border px-3 py-2" />
-          <div className="border rounded p-2 bg-gray-50 text-sm">
-            <p><strong>Subject:</strong> {subject || '(not set)'}</p>
-            <p className="mt-1"><strong>Body:</strong> {stripHtml(body).substring(0, 100) || '(not set)'}...</p>
-          </div>
-          <button onClick={handle} disabled={sending || !to} className={`w-full py-2 rounded font-semibold text-white ${sending ? 'bg-blue-500 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'} disabled:bg-gray-400`}>{sending ? 'Sending...' : 'Send Test'}</button>
-
-          {log.length > 0 && <div>
-            <div className="text-sm text-gray-600 mb-2">Logs</div>
-            <div className="bg-[#F4F7FA] p-3 rounded h-40 overflow-auto font-mono text-sm border">
-              {log.map((l, i) => (<div key={i} className={l.startsWith('[ERROR]') ? 'text-red-600' : l.startsWith('[SUCCESS]') ? 'text-emerald-600' : 'text-gray-700'}>{l}</div>))}
-              <div ref={refBottom} />
-            </div>
-          </div>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------
-// Helpers
-// ---------------------------
-
-function estimateDuration({ queued, workers, delayMs }: { queued: number; workers: number; delayMs: number }) {
-  if (!queued || queued <= 0 || !workers || workers <=0) return '~0m';
-  const perWorker = Math.max(1, Math.ceil(queued / workers));
-  const approxMs = perWorker * delayMs;
-  const minutes = Math.ceil((approxMs / 1000) / 60);
-  if (minutes < 1) return "<1m";
-  return `~${minutes}m`;
-}
-
-function stripHtml(html = '') {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  return doc.body.textContent || "";
-}
-
-function loadTemplates(): Record<string, CampaignConfig> {
-  try {
-    if(typeof window === 'undefined') return {};
-    const raw = localStorage.getItem('send_templates_v1');
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-}
-
-function saveTemplates(data: Record<string, CampaignConfig>) {
-  try { 
-    if(typeof window === 'undefined') return;
-    localStorage.setItem('send_templates_v1', JSON.stringify(data)); 
-  } catch {}
 }
