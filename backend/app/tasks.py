@@ -56,7 +56,7 @@ def send_campaign_emails(self, campaign_id: int):
             raise Exception(f"Campaign {campaign_id} not found")
         
         # Update campaign status
-        campaign.status = CampaignStatus.RUNNING
+        campaign.status = CampaignStatus.SENDING
         campaign.started_at = datetime.utcnow()
         campaign.celery_task_id = self.request.id
         db.commit()
@@ -171,7 +171,7 @@ def send_campaign_emails(self, campaign_id: int):
         
         # Mark campaign as completed
         db.refresh(campaign)
-        if campaign.status == CampaignStatus.RUNNING:
+        if campaign.status == CampaignStatus.SENDING:
             campaign.status = CampaignStatus.COMPLETED
             campaign.completed_at = datetime.utcnow()
             db.commit()

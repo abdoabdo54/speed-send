@@ -23,7 +23,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
     total_users = db.query(WorkspaceUser).count()
     total_campaigns = db.query(Campaign).count()
     active_campaigns = db.query(Campaign).filter(
-        Campaign.status.in_([CampaignStatus.RUNNING, CampaignStatus.PAUSED, CampaignStatus.QUEUED])
+        Campaign.status.in_([CampaignStatus.SENDING, CampaignStatus.PAUSED, CampaignStatus.PREPARING])
     ).count()
     
     # Today's stats
