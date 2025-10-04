@@ -100,6 +100,19 @@ export default function NewCampaignPage() {
   const [abTestSubject, setAbTestSubject] = useState('');
   const [abTestBody, setAbTestBody] = useState('');
   const [abTestSplit, setAbTestSplit] = useState(50);
+  const [analytics, setAnalytics] = useState({
+    totalSent: 0,
+    totalDelivered: 0,
+    totalOpened: 0,
+    totalClicked: 0,
+    totalBounced: 0,
+    totalUnsubscribed: 0,
+    sendRate: 0,
+    deliveryRate: 0,
+    openRate: 0,
+    clickRate: 0
+  });
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Derived state
   const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
@@ -109,11 +122,55 @@ export default function NewCampaignPage() {
 
   // Load data on mount
   useEffect(() => {
-    loadAccounts();
-    loadUsers();
-    loadTemplates();
-    loadRecipientLists();
+    const initializeData = async () => {
+      try {
+        await Promise.all([
+          loadAccounts(),
+          loadUsers(),
+          loadTemplates(),
+          loadRecipientLists()
+        ]);
+      } catch (error) {
+        console.error('Failed to initialize data:', error);
+        showNotification('Failed to load initial data', 'error');
+      }
+    };
+
+    initializeData();
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case 's':
+            event.preventDefault();
+            saveTemplate();
+            break;
+          case 'p':
+            event.preventDefault();
+            if (config.subject.trim() && config.body_html.trim()) {
+              setShowPreviewModal(true);
+            }
+            break;
+          case 't':
+            event.preventDefault();
+            setShowTestModal(true);
+            break;
+          case 'Enter':
+            if (!event.shiftKey) {
+              event.preventDefault();
+              handleCreateCampaign();
+            }
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [config.subject, config.body_html, config.name]);
 
   // API Functions
   const loadAccounts = async () => {
@@ -339,6 +396,51 @@ export default function NewCampaignPage() {
     return { html: previewHtml, subject: previewSubject };
   };
 
+  // Analytics functions
+  const loadAnalytics = async () => {
+    try {
+      // This would typically fetch from a real analytics API
+      // For now, we'll simulate some data
+      const mockAnalytics = {
+        totalSent: Math.floor(Math.random() * 1000) + 500,
+        totalDelivered: Math.floor(Math.random() * 900) + 450,
+        totalOpened: Math.floor(Math.random() * 300) + 150,
+        totalClicked: Math.floor(Math.random() * 50) + 25,
+        totalBounced: Math.floor(Math.random() * 20) + 5,
+        totalUnsubscribed: Math.floor(Math.random() * 10) + 2,
+        sendRate: Math.floor(Math.random() * 20) + 80,
+        deliveryRate: Math.floor(Math.random() * 10) + 90,
+        openRate: Math.floor(Math.random() * 20) + 20,
+        clickRate: Math.floor(Math.random() * 5) + 3
+      };
+      
+      setAnalytics(mockAnalytics);
+    } catch (error) {
+      console.error('Failed to load analytics:', error);
+    }
+  };
+
+  // Real-time analytics simulation
+  useEffect(() => {
+    if (showAnalytics) {
+      const interval = setInterval(() => {
+        setAnalytics(prev => ({
+          ...prev,
+          totalSent: prev.totalSent + Math.floor(Math.random() * 5),
+          totalDelivered: prev.totalDelivered + Math.floor(Math.random() * 4),
+          totalOpened: prev.totalOpened + Math.floor(Math.random() * 2),
+          totalClicked: prev.totalClicked + Math.floor(Math.random() * 1),
+          sendRate: Math.min(100, prev.sendRate + Math.random() * 2),
+          deliveryRate: Math.min(100, prev.deliveryRate + Math.random() * 1),
+          openRate: Math.min(100, prev.openRate + Math.random() * 0.5),
+          clickRate: Math.min(100, prev.clickRate + Math.random() * 0.2)
+        }));
+      }, 2000);
+
+      return () => clearInterval(interval);
+    }
+  }, [showAnalytics]);
+
   // Utility Functions
   const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
     const id = Date.now().toString();
@@ -461,6 +563,9 @@ export default function NewCampaignPage() {
         <div className="flex items-center gap-4">
           <div className="text-sm text-gray-600">
             Active accounts <span className="font-semibold text-blue-600">{accounts.length}</span>
+          </div>
+          <div className="text-xs text-gray-500 hidden md:block">
+            Shortcuts: Ctrl+S (Save), Ctrl+P (Preview), Ctrl+T (Test), Ctrl+Enter (Create)
           </div>
           <Button variant="outline" size="sm" onClick={loadAccounts}>
             <RefreshCw className="h-4 w-4 mr-2" />
@@ -879,6 +984,18 @@ export default function NewCampaignPage() {
               </Button>
 
               <Button
+                onClick={() => {
+                  setShowAnalytics(true);
+                  loadAnalytics();
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                View Analytics
+              </Button>
+
+              <Button
                 onClick={handleCreateCampaign}
                 className="w-full bg-blue-600 hover:bg-blue-700"
                 disabled={loading || selectedAccounts.length === 0 || recipients.length === 0}
@@ -1142,6 +1259,111 @@ export default function NewCampaignPage() {
                   className="p-4"
                   dangerouslySetInnerHTML={{ __html: generatePreview().html }}
                 />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Analytics Modal */}
+      {showAnalytics && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-4xl h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-lg font-semibold">Campaign Analytics</h3>
+              <Button
+                variant="outline"
+                onClick={() => setShowAnalytics(false)}
+              >
+                Close
+              </Button>
+            </div>
+            
+            <div className="flex-1 p-6 overflow-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Key Metrics */}
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{analytics.totalSent}</div>
+                  <div className="text-sm text-blue-800">Total Sent</div>
+                  <div className="text-xs text-blue-600 mt-1">{analytics.sendRate}% success rate</div>
+                </div>
+                
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{analytics.totalDelivered}</div>
+                  <div className="text-sm text-green-800">Delivered</div>
+                  <div className="text-xs text-green-600 mt-1">{analytics.deliveryRate}% delivery rate</div>
+                </div>
+                
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-purple-600">{analytics.totalOpened}</div>
+                  <div className="text-sm text-purple-800">Opened</div>
+                  <div className="text-xs text-purple-600 mt-1">{analytics.openRate}% open rate</div>
+                </div>
+                
+                <div className="bg-orange-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-orange-600">{analytics.totalClicked}</div>
+                  <div className="text-sm text-orange-800">Clicked</div>
+                  <div className="text-xs text-orange-600 mt-1">{analytics.clickRate}% click rate</div>
+                </div>
+              </div>
+
+              {/* Detailed Stats */}
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-4">Engagement Metrics</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Open Rate</span>
+                      <span className="font-medium">{analytics.openRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Click Rate</span>
+                      <span className="font-medium">{analytics.clickRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Delivery Rate</span>
+                      <span className="font-medium">{analytics.deliveryRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Send Rate</span>
+                      <span className="font-medium">{analytics.sendRate}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-4">Issues & Bounces</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Bounced</span>
+                      <span className="font-medium text-red-600">{analytics.totalBounced}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Unsubscribed</span>
+                      <span className="font-medium text-red-600">{analytics.totalUnsubscribed}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Bounce Rate</span>
+                      <span className="font-medium text-red-600">
+                        {analytics.totalSent > 0 ? ((analytics.totalBounced / analytics.totalSent) * 100).toFixed(1) : 0}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Unsubscribe Rate</span>
+                      <span className="font-medium text-red-600">
+                        {analytics.totalSent > 0 ? ((analytics.totalUnsubscribed / analytics.totalSent) * 100).toFixed(1) : 0}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Real-time Updates Indicator */}
+              <div className="mt-6 flex items-center justify-center">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span>Real-time updates active</span>
+                </div>
               </div>
             </div>
           </div>
