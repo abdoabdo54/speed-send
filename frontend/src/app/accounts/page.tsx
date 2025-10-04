@@ -73,18 +73,18 @@ export default function AccountsPage() {
       
       const accountId = response.data.id;
       
-      // Ask for admin email to sync users
-      const adminEmail = prompt(
+      // Use the same admin email for sync
+      const syncAdminEmail = prompt(
         '✅ Service account added!\n\n' +
         'Enter an admin email from your workspace to sync users:\n' +
         '(Example: admin@yourdomain.com)\n\n' +
         'This email must have admin privileges in Google Workspace.'
       );
       
-      if (adminEmail && adminEmail.includes('@')) {
+      if (syncAdminEmail && syncAdminEmail.includes('@')) {
         try {
-          console.log('Syncing users with admin email:', adminEmail);
-          const syncResponse = await serviceAccountsApi.sync(accountId, adminEmail);
+          console.log('Syncing users with admin email:', syncAdminEmail);
+          const syncResponse = await serviceAccountsApi.sync(accountId, syncAdminEmail);
           console.log('Sync response:', syncResponse.data);
           alert(
             `✅ Successfully synced ${syncResponse.data.user_count || 0} users!\n\n` +
