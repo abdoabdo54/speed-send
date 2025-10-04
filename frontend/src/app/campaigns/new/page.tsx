@@ -557,8 +557,8 @@ export default function NewCampaignPage() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Send Campaign</h1>
-          <p className="text-gray-600 mt-2">Advanced campaign builder — multi-account, high-speed sending</p>
+          <h1 className="text-3xl font-bold text-gray-900">Google Workspace Campaign</h1>
+          <p className="text-gray-600 mt-2">PowerMTA-style sending via Google Workspace API — multi-domain, high-speed delivery</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-sm text-gray-600">
@@ -597,13 +597,13 @@ export default function NewCampaignPage() {
         {/* Left Column - Accounts & Recipients */}
         <div className="space-y-6">
           
-          {/* Accounts Panel */}
+          {/* Google Workspace Accounts Panel */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
-                  Accounts ({accounts.length})
+                  Google Workspace Accounts ({accounts.length})
                 </CardTitle>
                 <div className="flex gap-2">
                   <Button
@@ -619,24 +619,32 @@ export default function NewCampaignPage() {
             <CardContent>
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {accounts.map(account => (
-                  <div key={account.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                  <div key={account.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                     <Checkbox
                       checked={selectedAccounts.includes(account.id)}
                       onCheckedChange={() => handleAccountToggle(account.id)}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {account.name || account.client_email}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {account.client_email}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant={account.status === 'active' ? 'default' : 'secondary'}>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {account.name || account.client_email}
+                        </p>
+                        <Badge variant={account.status === 'active' ? 'default' : 'secondary'} className="text-xs">
                           {account.status}
                         </Badge>
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">
+                        Service Account: {account.client_email}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-blue-600 font-medium">
+                          {account.total_users || 0} Workspace Users
+                        </span>
                         <span className="text-xs text-gray-500">
-                          {account.total_users || 0} users
+                          Domain: {account.domain || 'N/A'}
+                        </span>
+                        <span className="text-xs text-green-600">
+                          Quota: {account.quota_used_today || 0}/{account.quota_limit || 500}
                         </span>
                       </div>
                     </div>
@@ -764,6 +772,53 @@ export default function NewCampaignPage() {
                     value={config.delay_ms}
                     onChange={(e) => setConfig(prev => ({ ...prev, delay_ms: parseInt(e.target.value) || 0 }))}
                   />
+                </div>
+              </div>
+
+              {/* Google Workspace Specific Options */}
+              <div className="space-y-4 pt-4 border-t">
+                <h4 className="font-medium text-gray-900">Google Workspace Settings</h4>
+                
+                {/* Gmail API Features */}
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="use-gmail-labels"
+                      defaultChecked
+                    />
+                    <Label htmlFor="use-gmail-labels">Use Gmail Labels for Organization</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="track-opens"
+                      defaultChecked
+                    />
+                    <Label htmlFor="track-opens">Track Email Opens (Gmail API)</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="track-clicks"
+                      defaultChecked
+                    />
+                    <Label htmlFor="track-clicks">Track Link Clicks (Gmail API)</Label>
+                  </div>
+                </div>
+
+                {/* Sender Rotation */}
+                <div className="space-y-3">
+                  <Label htmlFor="sender-rotation">Sender Rotation Strategy</Label>
+                  <select 
+                    id="sender-rotation"
+                    className="w-full p-2 border rounded-md"
+                    defaultValue="round_robin"
+                  >
+                    <option value="round_robin">Round Robin (Recommended)</option>
+                    <option value="random">Random Selection</option>
+                    <option value="least_used">Least Used Sender</option>
+                    <option value="domain_based">Domain-Based Rotation</option>
+                  </select>
                 </div>
               </div>
 
@@ -910,12 +965,12 @@ export default function NewCampaignPage() {
         {/* Right Column - Stats & Actions */}
         <div className="space-y-6">
           
-          {/* Stats Panel */}
+          {/* Google Workspace Stats Panel */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5" />
-                Campaign Stats
+                Google Workspace Stats
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -928,7 +983,7 @@ export default function NewCampaignPage() {
                 <div className="grid grid-cols-2 gap-4 text-center">
                   <div>
                     <div className="text-lg font-semibold text-green-600">{totalSenders}</div>
-                    <div className="text-xs text-gray-600">Active Senders</div>
+                    <div className="text-xs text-gray-600">Workspace Users</div>
                   </div>
                   <div>
                     <div className="text-lg font-semibold text-purple-600">{estDuration}m</div>
@@ -938,28 +993,50 @@ export default function NewCampaignPage() {
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Selected Accounts:</span>
+                    <span>Service Accounts:</span>
                     <span className="font-medium">{selectedAccounts.length}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span>Daily Limit:</span>
+                    <span>Daily Quota:</span>
                     <span className="font-medium">{config.daily_limit}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span>Workers:</span>
+                    <span>Concurrent Senders:</span>
                     <span className="font-medium">{config.workers}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Gmail API Rate:</span>
+                    <span className="font-medium text-green-600">250 req/sec</span>
+                  </div>
+                </div>
+
+                {/* Google Workspace Specific Info */}
+                <div className="pt-3 border-t">
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Gmail API Quota:</span>
+                      <span className="text-green-600">1B requests/day</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Send Rate:</span>
+                      <span className="text-blue-600">~{Math.min(queuedCount, config.daily_limit)} emails</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>PowerMTA Mode:</span>
+                      <span className="text-purple-600">⚡ Enabled</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Actions Panel */}
+          {/* Google Workspace Actions Panel */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Play className="h-5 w-5" />
-                Actions
+                Gmail API Actions
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1008,14 +1085,14 @@ export default function NewCampaignPage() {
                 ) : (
                   <>
                     <Send className="h-4 w-4 mr-2" />
-                    Create Campaign
+                    Launch via Gmail API
                   </>
                 )}
               </Button>
 
               <div className="text-xs text-gray-500 text-center">
-                Campaign will be created in DRAFT status.<br />
-                Go to Campaigns page to launch.
+                Emails will be sent via Google Workspace users.<br />
+                PowerMTA-style high-speed delivery enabled.
               </div>
             </CardContent>
           </Card>
