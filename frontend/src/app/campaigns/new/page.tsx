@@ -336,11 +336,21 @@ export default function NewCampaignPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Send Campaign</h1>
-        <p className="text-gray-600 mt-2">Advanced campaign builder — multi-account, high-speed sending</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Send Campaign</h1>
+          <p className="text-gray-600 mt-2">Advanced campaign builder — multi-account, high-speed sending</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-gray-600">
+            Active accounts <span className="font-semibold text-blue-600">{accounts.length}</span>
+          </div>
+          <Button variant="outline" size="sm">
+            Account Settings
+          </Button>
+        </div>
       </div>
 
       {/* Notifications */}
@@ -361,7 +371,7 @@ export default function NewCampaignPage() {
       ))}
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         
         {/* Left Column - Accounts & Recipients */}
         <div className="space-y-6">
@@ -471,7 +481,7 @@ export default function NewCampaignPage() {
         </div>
 
         {/* Middle Column - Campaign Configuration */}
-        <div className="space-y-6">
+        <div className="xl:col-span-2 space-y-6">
           
           {/* Campaign Settings */}
           <Card>
@@ -512,7 +522,7 @@ export default function NewCampaignPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="daily-limit">Daily Limit</Label>
                   <Input
@@ -531,16 +541,15 @@ export default function NewCampaignPage() {
                     onChange={(e) => setConfig(prev => ({ ...prev, workers: parseInt(e.target.value) || 1 }))}
                   />
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="delay">Delay (ms)</Label>
-                <Input
-                  id="delay"
-                  type="number"
-                  value={config.delay_ms}
-                  onChange={(e) => setConfig(prev => ({ ...prev, delay_ms: parseInt(e.target.value) || 0 }))}
-                />
+                <div>
+                  <Label htmlFor="delay">Delay (ms)</Label>
+                  <Input
+                    id="delay"
+                    type="number"
+                    value={config.delay_ms}
+                    onChange={(e) => setConfig(prev => ({ ...prev, delay_ms: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
