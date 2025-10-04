@@ -21,7 +21,8 @@ function getApiUrl(): string {
     hostname,
     protocol,
     detectedApiUrl: apiUrl,
-    windowOrigin: window.location.origin
+    windowOrigin: window.location.origin,
+    fullUrl: window.location.href
   });
   
   return apiUrl;
