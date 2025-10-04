@@ -26,7 +26,8 @@ import {
   Eye,
   Smartphone,
   Tablet,
-  Monitor
+  Monitor,
+  AlertCircle
 } from 'lucide-react';
 
 // API Configuration
