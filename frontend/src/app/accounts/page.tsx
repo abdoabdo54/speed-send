@@ -374,7 +374,7 @@ export default function AccountsPage() {
                 <div className="text-center py-4 text-gray-500">
                   No accounts available
                 </div>
-              )}
+              )
             )}
           </div>
         </div>

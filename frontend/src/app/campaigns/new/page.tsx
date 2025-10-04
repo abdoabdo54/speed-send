@@ -262,7 +262,7 @@ export default function NewCampaignPage() {
     }
   };
 
-  const totalSenders = accounts.reduce((sum, acc) => sum + (acc.total_users || 0), 0);
+  const totalSenders = accounts && Array.isArray(accounts) ? accounts.reduce((sum, acc) => sum + (acc.total_users || 0), 0) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -460,7 +460,8 @@ export default function NewCampaignPage() {
                   <div className="text-center py-4 text-gray-500">
                     No users available
                   </div>
-                )}
+                )
+              )}
             </div>
 
             <div className="mt-4 p-3 bg-blue-50 rounded">
