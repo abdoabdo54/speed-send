@@ -33,9 +33,10 @@ export default function CampaignsPage() {
   const loadCampaigns = async () => {
     try {
       const response = await campaignsApi.list();
-      setCampaigns(response.data);
+      setCampaigns(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to load campaigns:', error);
+      setCampaigns([]);
     } finally {
       setLoading(false);
     }
@@ -276,7 +277,7 @@ export default function CampaignsPage() {
                 </CardContent>
               </Card>
             ) : (
-              campaigns.map((campaign) => {
+              campaigns && Array.isArray(campaigns) ? campaigns.map((campaign) => {
                 const progress = campaign.total_recipients > 0
                   ? ((campaign.sent_count + campaign.failed_count) / campaign.total_recipients) * 100
                   : 0;
@@ -414,7 +415,11 @@ export default function CampaignsPage() {
                     </CardContent>
                   </Card>
                 );
-              })
+              }) : (
+                <div className="text-center py-4 text-gray-500">
+                  No campaigns available
+                </div>
+              )
             )}
           </div>
         </div>
