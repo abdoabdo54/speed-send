@@ -22,7 +22,11 @@ import {
   Upload,
   TestTube,
   Save,
-  Loader2
+  Loader2,
+  Eye,
+  Smartphone,
+  Tablet,
+  Monitor
 } from 'lucide-react';
 
 // API Configuration
@@ -87,6 +91,15 @@ export default function NewCampaignPage() {
   const [templates, setTemplates] = useState<Array<{id: string, name: string, subject: string, body: string, createdAt: string}>>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showVariablesModal, setShowVariablesModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile' | 'tablet'>('desktop');
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
+  const [enableScheduling, setEnableScheduling] = useState(false);
+  const [enableABTesting, setEnableABTesting] = useState(false);
+  const [abTestSubject, setAbTestSubject] = useState('');
+  const [abTestBody, setAbTestBody] = useState('');
+  const [abTestSplit, setAbTestSplit] = useState(50);
 
   // Derived state
   const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
@@ -265,6 +278,67 @@ export default function NewCampaignPage() {
     }
   };
 
+  // Enhanced validation
+  const validateForm = () => {
+    const errors: string[] = [];
+
+    if (!config.name.trim()) {
+      errors.push('Campaign name is required');
+    }
+
+    if (!config.subject.trim()) {
+      errors.push('Email subject is required');
+    }
+
+    if (!config.body_html.trim()) {
+      errors.push('Email body is required');
+    }
+
+    if (selectedAccounts.length === 0) {
+      errors.push('Please select at least one account');
+    }
+
+    if (recipients.length === 0) {
+      errors.push('Please add at least one recipient');
+    }
+
+    if (config.daily_limit <= 0) {
+      errors.push('Daily limit must be greater than 0');
+    }
+
+    if (config.workers <= 0) {
+      errors.push('Workers must be greater than 0');
+    }
+
+    if (config.delay_ms < 0) {
+      errors.push('Delay cannot be negative');
+    }
+
+    return errors;
+  };
+
+  // Preview functionality
+  const generatePreview = () => {
+    const sampleData = {
+      name: 'John Doe',
+      email: 'john@example.com',
+      company: 'Example Corp',
+      date: new Date().toLocaleDateString()
+    };
+
+    let previewHtml = config.body_html;
+    let previewSubject = config.subject;
+
+    // Replace variables in preview
+    Object.entries(sampleData).forEach(([key, value]) => {
+      const regex = new RegExp(`{{${key}}}`, 'g');
+      previewHtml = previewHtml.replace(regex, value);
+      previewSubject = previewSubject.replace(regex, value);
+    });
+
+    return { html: previewHtml, subject: previewSubject };
+  };
+
   // Utility Functions
   const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
     const id = Date.now().toString();
@@ -340,28 +414,10 @@ export default function NewCampaignPage() {
   };
 
   const handleCreateCampaign = async () => {
-    if (!config.name.trim()) {
-      showNotification('Please enter a campaign name', 'error');
-      return;
-    }
-
-    if (!config.subject.trim()) {
-      showNotification('Please enter a subject', 'error');
-      return;
-    }
-
-    if (!config.body_html.trim()) {
-      showNotification('Please enter email content', 'error');
-      return;
-    }
-
-    if (selectedAccounts.length === 0) {
-      showNotification('Please select at least one account', 'error');
-      return;
-    }
-
-    if (recipients.length === 0) {
-      showNotification('Please add at least one recipient', 'error');
+    // Enhanced validation
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      showNotification(validationErrors.join(', '), 'error');
       return;
     }
 
@@ -605,6 +661,93 @@ export default function NewCampaignPage() {
                   />
                 </div>
               </div>
+
+              {/* Advanced Options */}
+              <div className="space-y-4 pt-4 border-t">
+                <h4 className="font-medium text-gray-900">Advanced Options</h4>
+                
+                {/* Scheduling */}
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="enable-scheduling"
+                      checked={enableScheduling}
+                      onCheckedChange={setEnableScheduling}
+                    />
+                    <Label htmlFor="enable-scheduling">Schedule Campaign</Label>
+                  </div>
+                  
+                  {enableScheduling && (
+                    <div className="grid grid-cols-2 gap-4 ml-6">
+                      <div>
+                        <Label htmlFor="schedule-date">Date</Label>
+                        <Input
+                          id="schedule-date"
+                          type="date"
+                          value={scheduleDate}
+                          onChange={(e) => setScheduleDate(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="schedule-time">Time</Label>
+                        <Input
+                          id="schedule-time"
+                          type="time"
+                          value={scheduleTime}
+                          onChange={(e) => setScheduleTime(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* A/B Testing */}
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="enable-ab-testing"
+                      checked={enableABTesting}
+                      onCheckedChange={setEnableABTesting}
+                    />
+                    <Label htmlFor="enable-ab-testing">A/B Testing</Label>
+                  </div>
+                  
+                  {enableABTesting && (
+                    <div className="space-y-3 ml-6">
+                      <div>
+                        <Label htmlFor="ab-test-split">Test Split (%)</Label>
+                        <Input
+                          id="ab-test-split"
+                          type="number"
+                          min="10"
+                          max="90"
+                          value={abTestSplit}
+                          onChange={(e) => setAbTestSplit(parseInt(e.target.value) || 50)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="ab-test-subject">Alternative Subject</Label>
+                        <Input
+                          id="ab-test-subject"
+                          placeholder="Alternative subject line"
+                          value={abTestSubject}
+                          onChange={(e) => setAbTestSubject(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="ab-test-body">Alternative Body</Label>
+                        <Textarea
+                          id="ab-test-body"
+                          placeholder="Alternative email body"
+                          value={abTestBody}
+                          onChange={(e) => setAbTestBody(e.target.value)}
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -723,6 +866,16 @@ export default function NewCampaignPage() {
               >
                 <TestTube className="h-4 w-4 mr-2" />
                 Send Test Email
+              </Button>
+
+              <Button
+                onClick={() => setShowPreviewModal(true)}
+                variant="outline"
+                className="w-full"
+                disabled={!config.subject.trim() || !config.body_html.trim()}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Preview Email
               </Button>
 
               <Button
@@ -929,6 +1082,66 @@ export default function NewCampaignPage() {
                 <Button onClick={() => setShowVariablesModal(false)}>
                   Close
                 </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-6xl h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-lg font-semibold">Email Preview</h3>
+              <div className="flex items-center gap-2">
+                <div className="flex bg-gray-100 rounded-lg p-1">
+                  <Button
+                    size="sm"
+                    variant={previewMode === 'desktop' ? 'default' : 'ghost'}
+                    onClick={() => setPreviewMode('desktop')}
+                  >
+                    <Monitor className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={previewMode === 'tablet' ? 'default' : 'ghost'}
+                    onClick={() => setPreviewMode('tablet')}
+                  >
+                    <Tablet className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={previewMode === 'mobile' ? 'default' : 'ghost'}
+                    onClick={() => setPreviewMode('mobile')}
+                  >
+                    <Smartphone className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPreviewModal(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+            
+            <div className="flex-1 p-6 overflow-auto">
+              <div className={`mx-auto bg-white border rounded-lg shadow-lg ${
+                previewMode === 'desktop' ? 'max-w-4xl' :
+                previewMode === 'tablet' ? 'max-w-2xl' :
+                'max-w-sm'
+              }`}>
+                <div className="p-4 border-b bg-gray-50">
+                  <div className="text-sm text-gray-600 mb-1">From: {config.from_name} &lt;{selectedAccounts.length > 0 ? users.find(u => selectedAccounts.includes(u.service_account_id))?.email || 'sender@example.com' : 'sender@example.com'}&gt;</div>
+                  <div className="text-sm text-gray-600 mb-1">To: john@example.com</div>
+                  <div className="font-medium">{generatePreview().subject}</div>
+                </div>
+                <div 
+                  className="p-4"
+                  dangerouslySetInnerHTML={{ __html: generatePreview().html }}
+                />
               </div>
             </div>
           </div>
