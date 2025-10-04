@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { getRecipientLists, saveRecipientList, deleteRecipientList, type RecipientList } from '@/lib/recipients';
+import { getRecipientLists, saveRecipientList, deleteRecipientList, type RecipientList } from '../../../lib/recipients';
 
 /**
  * Advanced Send Page for bulk-email SaaS
