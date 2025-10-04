@@ -24,8 +24,15 @@ async def lifespan(app: FastAPI):
     """
     # Startup: Create database tables
     logger.info("🚀 Starting Gmail Bulk Sender SaaS...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("✅ Database tables created/verified")
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables created/verified")
+    except Exception as e:
+        if "already exists" in str(e) or "duplicate key" in str(e):
+            logger.warning("⚠️ Some database objects already exist, continuing...")
+        else:
+            logger.error(f"❌ Database initialization failed: {e}")
+            raise
     logger.info(f"🌐 Environment: {settings.ENVIRONMENT}")
     logger.info(f"📊 PowerMTA Mode: ENABLED (100 worker concurrency)")
     
