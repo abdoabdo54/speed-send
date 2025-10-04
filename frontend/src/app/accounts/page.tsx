@@ -67,24 +67,17 @@ export default function AccountsPage() {
       const response = await serviceAccountsApi.create({
         name: uploadData.name,
         json_content: uploadData.json,
-        admin_email: adminEmail || undefined,
+        admin_email: adminEmail,
       });
       console.log('Upload successful:', response.data);
       
       const accountId = response.data.id;
       
       // Use the same admin email for sync
-      const syncAdminEmail = prompt(
-        '✅ Service account added!\n\n' +
-        'Enter an admin email from your workspace to sync users:\n' +
-        '(Example: admin@yourdomain.com)\n\n' +
-        'This email must have admin privileges in Google Workspace.'
-      );
-      
-      if (syncAdminEmail && syncAdminEmail.includes('@')) {
+      if (adminEmail && adminEmail.includes('@')) {
         try {
-          console.log('Syncing users with admin email:', syncAdminEmail);
-          const syncResponse = await serviceAccountsApi.sync(accountId, syncAdminEmail);
+          console.log('Syncing users with admin email:', adminEmail);
+          const syncResponse = await serviceAccountsApi.sync(accountId, adminEmail);
           console.log('Sync response:', syncResponse.data);
           alert(
             `✅ Successfully synced ${syncResponse.data.user_count || 0} users!\n\n` +

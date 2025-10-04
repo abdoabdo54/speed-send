@@ -17,17 +17,12 @@ import {
   Settings, 
   Mail, 
   Play, 
-  Pause, 
   RefreshCw, 
   CheckCircle, 
-  XCircle, 
-  AlertCircle,
   Upload,
-  Download,
-  Trash2,
-  Copy,
-  Eye,
-  TestTube
+  TestTube,
+  Save,
+  Loader2
 } from 'lucide-react';
 
 // API Configuration
@@ -63,13 +58,6 @@ interface CampaignConfig {
   delay_ms: number;
 }
 
-interface RecipientList {
-  id: string;
-  name: string;
-  recipients: string[];
-  createdAt: string;
-}
-
 export default function NewCampaignPage() {
   const router = useRouter();
   
@@ -90,24 +78,19 @@ export default function NewCampaignPage() {
     delay_ms: 200
   });
   const [testEmail, setTestEmail] = useState('');
-  const [recipientLists, setRecipientLists] = useState<RecipientList[]>([]);
-  const [selectedRecipientListId, setSelectedRecipientListId] = useState<string | null>(null);
-  const [newListName, setNewListName] = useState('');
-  const [showTestModal, setShowTestModal] = useState(false);
-  const [showRecipientModal, setShowRecipientModal] = useState(false);
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
+  const [showTestModal, setShowTestModal] = useState(false);
 
   // Derived state
   const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
   const totalSenders = users.filter(u => selectedAccounts.includes(u.service_account_id)).length;
   const queuedCount = recipients.length;
-  const estDuration = Math.ceil(queuedCount / (config.workers * 10)); // Rough estimate
+  const estDuration = Math.ceil(queuedCount / (config.workers * 10));
 
   // Load data on mount
   useEffect(() => {
     loadAccounts();
     loadUsers();
-    loadRecipientLists();
   }, []);
 
   // API Functions
@@ -132,48 +115,6 @@ export default function NewCampaignPage() {
       console.error('Failed to load users:', error);
       setUsers([]);
       showNotification('Failed to load users', 'error');
-    }
-  };
-
-  const loadRecipientLists = () => {
-    try {
-      const lists = JSON.parse(localStorage.getItem('recipient_lists') || '[]');
-      setRecipientLists(lists);
-    } catch (error) {
-      console.error('Failed to load recipient lists:', error);
-      setRecipientLists([]);
-    }
-  };
-
-  const saveRecipientList = (list: RecipientList) => {
-    try {
-      const lists = [...recipientLists];
-      const existingIndex = lists.findIndex(l => l.id === list.id);
-      
-      if (existingIndex > -1) {
-        lists[existingIndex] = list;
-      } else {
-        lists.push(list);
-      }
-      
-      localStorage.setItem('recipient_lists', JSON.stringify(lists));
-      setRecipientLists(lists);
-      showNotification('Recipient list saved', 'success');
-    } catch (error) {
-      console.error('Failed to save recipient list:', error);
-      showNotification('Failed to save recipient list', 'error');
-    }
-  };
-
-  const deleteRecipientList = (id: string) => {
-    try {
-      const lists = recipientLists.filter(l => l.id !== id);
-      localStorage.setItem('recipient_lists', JSON.stringify(lists));
-      setRecipientLists(lists);
-      showNotification('Recipient list deleted', 'success');
-    } catch (error) {
-      console.error('Failed to delete recipient list:', error);
-      showNotification('Failed to delete recipient list', 'error');
     }
   };
 
@@ -306,35 +247,6 @@ export default function NewCampaignPage() {
     }
   };
 
-  const handleSaveRecipientList = () => {
-    if (!newListName.trim()) {
-      showNotification('Please enter a name for the recipient list', 'error');
-      return;
-    }
-
-    if (recipients.length === 0) {
-      showNotification('Recipient list is empty', 'error');
-      return;
-    }
-
-    const newList: RecipientList = {
-      id: `list_${Date.now()}`,
-      name: newListName.trim(),
-      recipients: recipients,
-      createdAt: new Date().toISOString()
-    };
-
-    saveRecipientList(newList);
-    setNewListName('');
-    setShowRecipientModal(false);
-  };
-
-  const handleLoadRecipientList = (list: RecipientList) => {
-    setRecipientsText(list.recipients.join('\n'));
-    setSelectedRecipientListId(list.id);
-    showNotification(`Recipient list "${list.name}" loaded`, 'info');
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       {/* Header */}
@@ -347,8 +259,9 @@ export default function NewCampaignPage() {
           <div className="text-sm text-gray-600">
             Active accounts <span className="font-semibold text-blue-600">{accounts.length}</span>
           </div>
-          <Button variant="outline" size="sm">
-            Account Settings
+          <Button variant="outline" size="sm" onClick={loadAccounts}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
           </Button>
         </div>
       </div>
@@ -371,7 +284,7 @@ export default function NewCampaignPage() {
       ))}
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
         
         {/* Left Column - Accounts & Recipients */}
         <div className="space-y-6">
@@ -391,13 +304,6 @@ export default function NewCampaignPage() {
                     onClick={handleSelectAllAccounts}
                   >
                     {selectedAccounts.length === accounts.length ? 'Deselect All' : 'Select All'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={loadAccounts}
-                  >
-                    <RefreshCw className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -440,20 +346,10 @@ export default function NewCampaignPage() {
           {/* Recipients Panel */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5" />
-                  Recipients ({recipients.length})
-                </CardTitle>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowRecipientModal(true)}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Manage Lists
-                </Button>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Recipients ({recipients.length})
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -491,25 +387,26 @@ export default function NewCampaignPage() {
                 Campaign Configuration
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="campaign-name">Campaign Name</Label>
-                <Input
-                  id="campaign-name"
-                  placeholder="Enter campaign name"
-                  value={config.name}
-                  onChange={(e) => setConfig(prev => ({ ...prev, name: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="from-name">From Name</Label>
-                <Input
-                  id="from-name"
-                  placeholder="Enter sender name"
-                  value={config.from_name}
-                  onChange={(e) => setConfig(prev => ({ ...prev, from_name: e.target.value }))}
-                />
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="campaign-name">Campaign Name</Label>
+                  <Input
+                    id="campaign-name"
+                    placeholder="Enter campaign name"
+                    value={config.name}
+                    onChange={(e) => setConfig(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="from-name">From Name</Label>
+                  <Input
+                    id="from-name"
+                    placeholder="Enter sender name"
+                    value={config.from_name}
+                    onChange={(e) => setConfig(prev => ({ ...prev, from_name: e.target.value }))}
+                  />
+                </div>
               </div>
 
               <div>
@@ -650,8 +547,17 @@ export default function NewCampaignPage() {
                 className="w-full bg-blue-600 hover:bg-blue-700"
                 disabled={loading || selectedAccounts.length === 0 || recipients.length === 0}
               >
-                <Send className="h-4 w-4 mr-2" />
-                {loading ? 'Creating...' : 'Create Campaign'}
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Create Campaign
+                  </>
+                )}
               </Button>
 
               <div className="text-xs text-gray-500 text-center">
@@ -685,81 +591,20 @@ export default function NewCampaignPage() {
                   disabled={loading || !testEmail.trim()}
                   className="flex-1"
                 >
-                  {loading ? 'Sending...' : 'Send Test'}
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Test'
+                  )}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => setShowTestModal(false)}
                 >
                   Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recipient Lists Modal */}
-      {showRecipientModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
-            <h3 className="text-lg font-semibold mb-4">Manage Recipient Lists</h3>
-            
-            <div className="space-y-4">
-              {/* Save Current List */}
-              <div className="border rounded-lg p-4">
-                <h4 className="font-medium mb-2">Save Current Recipients</h4>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="List name"
-                    value={newListName}
-                    onChange={(e) => setNewListName(e.target.value)}
-                  />
-                  <Button onClick={handleSaveRecipientList} disabled={!newListName.trim()}>
-                    Save
-                  </Button>
-                </div>
-              </div>
-
-              {/* Load Existing Lists */}
-              <div>
-                <h4 className="font-medium mb-2">Load Existing Lists</h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {recipientLists.map(list => (
-                    <div key={list.id} className="flex items-center justify-between p-2 border rounded">
-                      <div>
-                        <div className="font-medium">{list.name}</div>
-                        <div className="text-sm text-gray-500">{list.recipients.length} recipients</div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleLoadRecipientList(list)}
-                        >
-                          Load
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => deleteRecipientList(list.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {recipientLists.length === 0 && (
-                    <div className="text-center py-4 text-gray-500">
-                      No saved lists
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={() => setShowRecipientModal(false)}>
-                  Close
                 </Button>
               </div>
             </div>
