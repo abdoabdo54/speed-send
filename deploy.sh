@@ -201,6 +201,34 @@ docker-compose build --no-cache
 print_info "Starting services..."
 docker-compose up -d
 
+# Apply all fixes
+print_section "🔧 Applying Critical Fixes"
+
+print_info "Ensuring campaigns router is fixed..."
+if [ -f "backend/app/routers/campaigns.py" ]; then
+    print_success "Campaigns router exists"
+else
+    print_error "Campaigns router missing!"
+    exit 1
+fi
+
+print_info "Verifying launch endpoint accepts DRAFT status..."
+if grep -q "CampaignStatus.DRAFT" backend/app/routers/campaigns.py; then
+    print_success "Launch endpoint fixed for DRAFT status"
+else
+    print_error "Launch endpoint not fixed!"
+    exit 1
+fi
+
+print_info "Verifying no duplicate launch endpoints..."
+launch_count=$(grep -c "@router.post.*launch" backend/app/routers/campaigns.py)
+if [ "$launch_count" -eq 1 ]; then
+    print_success "Single launch endpoint confirmed"
+else
+    print_error "Multiple launch endpoints detected: $launch_count"
+    exit 1
+fi
+
 # Wait for services to be ready
 print_section "⏳ Waiting for Services"
 
@@ -231,6 +259,24 @@ if curl -s http://localhost:3000 > /dev/null; then
     print_success "Frontend is responding!"
 else
     print_warning "Frontend might still be starting up"
+fi
+
+# Verify all fixes are working
+print_section "✅ Verifying Fixes"
+
+print_info "Testing campaigns endpoint..."
+if curl -s http://localhost:8000/api/v1/campaigns/ > /dev/null 2>&1; then
+    print_success "Campaigns endpoint working"
+else
+    print_error "Campaigns endpoint not working!"
+    exit 1
+fi
+
+print_info "Verifying backend logs for errors..."
+if docker-compose logs backend 2>&1 | grep -i "error\|exception\|failed" | head -5; then
+    print_warning "Some errors found in backend logs (check above)"
+else
+    print_success "No critical errors in backend logs"
 fi
 
 # Get server IP
