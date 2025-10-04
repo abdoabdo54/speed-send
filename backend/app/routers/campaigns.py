@@ -285,10 +285,10 @@ async def launch_campaign(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     
-    if campaign.status != CampaignStatus.READY:
+    if campaign.status != CampaignStatus.DRAFT:
         raise HTTPException(
             status_code=400,
-            detail="Can only launch campaigns in READY status. Please prepare the campaign first."
+            detail=f"Campaign must be in DRAFT status to launch. Current status: {campaign.status}"
         )
     
     # Update status to sending
