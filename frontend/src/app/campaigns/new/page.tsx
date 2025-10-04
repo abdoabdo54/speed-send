@@ -80,6 +80,13 @@ export default function NewCampaignPage() {
   const [testEmail, setTestEmail] = useState('');
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
   const [showTestModal, setShowTestModal] = useState(false);
+  const [recipientLists, setRecipientLists] = useState<Array<{id: string, name: string, recipients: string[], createdAt: string}>>([]);
+  const [selectedRecipientListId, setSelectedRecipientListId] = useState<string | null>(null);
+  const [newListName, setNewListName] = useState('');
+  const [showRecipientModal, setShowRecipientModal] = useState(false);
+  const [templates, setTemplates] = useState<Array<{id: string, name: string, subject: string, body: string, createdAt: string}>>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showVariablesModal, setShowVariablesModal] = useState(false);
 
   // Derived state
   const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
@@ -91,6 +98,8 @@ export default function NewCampaignPage() {
   useEffect(() => {
     loadAccounts();
     loadUsers();
+    loadTemplates();
+    loadRecipientLists();
   }, []);
 
   // API Functions
@@ -115,6 +124,144 @@ export default function NewCampaignPage() {
       console.error('Failed to load users:', error);
       setUsers([]);
       showNotification('Failed to load users', 'error');
+    }
+  };
+
+  const loadTemplates = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        const savedTemplates = localStorage.getItem('email_templates');
+        if (savedTemplates) {
+          setTemplates(JSON.parse(savedTemplates));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load templates:', error);
+      setTemplates([]);
+    }
+  };
+
+  const loadRecipientLists = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        const savedLists = localStorage.getItem('recipient_lists');
+        if (savedLists) {
+          setRecipientLists(JSON.parse(savedLists));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load recipient lists:', error);
+      setRecipientLists([]);
+    }
+  };
+
+  const saveTemplate = () => {
+    if (!config.name.trim() || !config.subject.trim() || !config.body_html.trim()) {
+      showNotification('Please fill in all required fields before saving template', 'error');
+      return;
+    }
+
+    const templateName = prompt('Enter template name:');
+    if (!templateName) return;
+
+    try {
+      const newTemplate = {
+        id: `template_${Date.now()}`,
+        name: templateName,
+        subject: config.subject,
+        body: config.body_html,
+        createdAt: new Date().toISOString()
+      };
+
+      const updatedTemplates = [...templates, newTemplate];
+      setTemplates(updatedTemplates);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('email_templates', JSON.stringify(updatedTemplates));
+      }
+      
+      showNotification('Template saved successfully', 'success');
+    } catch (error) {
+      console.error('Failed to save template:', error);
+      showNotification('Failed to save template', 'error');
+    }
+  };
+
+  const loadTemplate = (template: any) => {
+    setConfig(prev => ({
+      ...prev,
+      subject: template.subject,
+      body_html: template.body
+    }));
+    showNotification(`Template "${template.name}" loaded`, 'info');
+    setShowTemplateModal(false);
+  };
+
+  const deleteTemplate = (templateId: string) => {
+    if (confirm('Are you sure you want to delete this template?')) {
+      const updatedTemplates = templates.filter(t => t.id !== templateId);
+      setTemplates(updatedTemplates);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('email_templates', JSON.stringify(updatedTemplates));
+      }
+      
+      showNotification('Template deleted', 'success');
+    }
+  };
+
+  const saveRecipientList = () => {
+    if (!newListName.trim()) {
+      showNotification('Please enter a name for the recipient list', 'error');
+      return;
+    }
+
+    if (recipients.length === 0) {
+      showNotification('Recipient list is empty', 'error');
+      return;
+    }
+
+    try {
+      const newList = {
+        id: `list_${Date.now()}`,
+        name: newListName.trim(),
+        recipients: recipients,
+        createdAt: new Date().toISOString()
+      };
+
+      const updatedLists = [...recipientLists, newList];
+      setRecipientLists(updatedLists);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('recipient_lists', JSON.stringify(updatedLists));
+      }
+      
+      showNotification('Recipient list saved successfully', 'success');
+      setNewListName('');
+      setShowRecipientModal(false);
+    } catch (error) {
+      console.error('Failed to save recipient list:', error);
+      showNotification('Failed to save recipient list', 'error');
+    }
+  };
+
+  const loadRecipientList = (list: any) => {
+    setRecipientsText(list.recipients.join('\n'));
+    setSelectedRecipientListId(list.id);
+    showNotification(`Recipient list "${list.name}" loaded`, 'info');
+    setShowRecipientModal(false);
+  };
+
+  const deleteRecipientList = (listId: string) => {
+    if (confirm('Are you sure you want to delete this recipient list?')) {
+      const updatedLists = recipientLists.filter(l => l.id !== listId);
+      setRecipientLists(updatedLists);
+      
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('recipient_lists', JSON.stringify(updatedLists));
+      }
+      
+      showNotification('Recipient list deleted', 'success');
     }
   };
 
@@ -346,10 +493,20 @@ export default function NewCampaignPage() {
           {/* Recipients Panel */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Recipients ({recipients.length})
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Recipients ({recipients.length})
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowRecipientModal(true)}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Manage Lists
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -454,10 +611,36 @@ export default function NewCampaignPage() {
           {/* Email Composer */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Email Composer
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Email Composer
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowVariablesModal(true)}
+                  >
+                    Manage Variables
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={saveTemplate}
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Template
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowTemplateModal(true)}
+                  >
+                    Load Template
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -605,6 +788,146 @@ export default function NewCampaignPage() {
                   onClick={() => setShowTestModal(false)}
                 >
                   Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Template Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+            <h3 className="text-lg font-semibold mb-4">Load Template</h3>
+            <div className="space-y-4">
+              <div className="max-h-64 overflow-y-auto">
+                {templates.map(template => (
+                  <div key={template.id} className="flex items-center justify-between p-3 border rounded mb-2">
+                    <div>
+                      <div className="font-medium">{template.name}</div>
+                      <div className="text-sm text-gray-500">{template.subject}</div>
+                      <div className="text-xs text-gray-400">{new Date(template.createdAt).toLocaleDateString()}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => loadTemplate(template)}
+                      >
+                        Load
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteTemplate(template.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {templates.length === 0 && (
+                  <div className="text-center py-4 text-gray-500">
+                    No templates saved yet
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={() => setShowTemplateModal(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recipient Lists Modal */}
+      {showRecipientModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+            <h3 className="text-lg font-semibold mb-4">Manage Recipient Lists</h3>
+            
+            <div className="space-y-4">
+              {/* Save Current List */}
+              <div className="border rounded-lg p-4">
+                <h4 className="font-medium mb-2">Save Current Recipients</h4>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="List name"
+                    value={newListName}
+                    onChange={(e) => setNewListName(e.target.value)}
+                  />
+                  <Button onClick={saveRecipientList} disabled={!newListName.trim()}>
+                    Save
+                  </Button>
+                </div>
+              </div>
+
+              {/* Load Existing Lists */}
+              <div>
+                <h4 className="font-medium mb-2">Load Existing Lists</h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {recipientLists.map(list => (
+                    <div key={list.id} className="flex items-center justify-between p-2 border rounded">
+                      <div>
+                        <div className="font-medium">{list.name}</div>
+                        <div className="text-sm text-gray-500">{list.recipients.length} recipients</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => loadRecipientList(list)}
+                        >
+                          Load
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => deleteRecipientList(list.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {recipientLists.length === 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      No saved lists
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={() => setShowRecipientModal(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Variables Modal */}
+      {showVariablesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Email Variables</h3>
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">Available variables you can use in your email:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><code>{'{{name}}'}</code> - Recipient's name</li>
+                  <li><code>{'{{email}}'}</code> - Recipient's email</li>
+                  <li><code>{'{{company}}'}</code> - Company name</li>
+                  <li><code>{'{{date}}'}</code> - Current date</li>
+                </ul>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={() => setShowVariablesModal(false)}>
+                  Close
                 </Button>
               </div>
             </div>
