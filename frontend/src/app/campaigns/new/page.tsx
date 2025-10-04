@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { getRecipientLists, saveRecipientList, deleteRecipientList, type RecipientList } from '@/lib/recipients';
 
 /**
  * Advanced Send Page for bulk-email SaaS
@@ -168,6 +169,8 @@ export default function NewCampaignPage() {
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [varsModalOpen, setVarsModalOpen] = useState(false);
   const [templates, setTemplates] = useState<Record<string, CampaignConfig>>(loadTemplates());
+  const [recipientLists, setRecipientLists] = useState<RecipientList[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string>("");
 
   useEffect(() => {
     (async () => {
@@ -181,6 +184,8 @@ export default function NewCampaignPage() {
         console.error('Failed to load accounts:', error);
         notice('Failed to load accounts. Please check backend connection.', 'error');
       }
+      // Load saved recipient lists from localStorage
+      setRecipientLists(getRecipientLists());
     })();
   }, []);
 
@@ -306,6 +311,43 @@ export default function NewCampaignPage() {
     setTimeout(() => setToast(null), 4000);
   }
 
+  // Recipient list helpers
+  function refreshRecipientLists() {
+    setRecipientLists(getRecipientLists());
+  }
+
+  function handleSelectRecipientList(id: string) {
+    setSelectedListId(id);
+    const list = recipientLists.find(l => l.id === id);
+    if (list) {
+      setRecipientsText(list.recipients.join('\n'));
+      notice(`Loaded list: ${list.name}`, 'info');
+    }
+  }
+
+  function handleSaveRecipients() {
+    const cleaned = recipients;
+    if (cleaned.length === 0) {
+      return notice('No recipients to save', 'error');
+    }
+    const name = prompt('Save recipient list as:')?.trim();
+    if (!name) return;
+    saveRecipientList(name, cleaned);
+    refreshRecipientLists();
+    notice('Recipient list saved', 'success');
+  }
+
+  function handleDeleteRecipients() {
+    if (!selectedListId) return notice('Select a saved list first', 'error');
+    const list = recipientLists.find(l => l.id === selectedListId);
+    if (!list) return;
+    if (!confirm(`Delete recipient list: ${list.name}?`)) return;
+    deleteRecipientList(selectedListId);
+    refreshRecipientLists();
+    setSelectedListId("");
+    notice('Recipient list deleted', 'success');
+  }
+
   return (
     <div className="min-h-screen bg-[#F7FAFC] p-6 sm:p-10">
       <div className="max-w-[1200px] mx-auto">
@@ -380,6 +422,17 @@ export default function NewCampaignPage() {
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-base font-semibold text-[#101828]">Recipients</h3>
                     <span className="text-sm font-bold text-blue-700">{recipients.length}</span>
+                </div>
+                {/* Saved lists selector */}
+                <div className="flex items-center gap-2 mb-2">
+                  <select value={selectedListId} onChange={(e) => handleSelectRecipientList(e.target.value)} className="flex-1 rounded-md border px-2 py-2">
+                    <option value="">— Select saved list —</option>
+                    {recipientLists.map(list => (
+                      <option key={list.id} value={list.id}>{list.name} ({list.recipients.length})</option>
+                    ))}
+                  </select>
+                  <button onClick={handleSaveRecipients} className="px-3 py-2 rounded-md border text-blue-700 border-blue-600 hover:bg-blue-50">Save</button>
+                  <button onClick={handleDeleteRecipients} className="px-3 py-2 rounded-md border text-red-700 border-red-600 hover:bg-red-50">Delete</button>
                 </div>
                 <textarea 
                     value={recipientsText}
