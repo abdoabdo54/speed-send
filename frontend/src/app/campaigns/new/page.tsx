@@ -39,6 +39,7 @@ interface Account {
   id: number;
   name: string;
   client_email: string;
+  domain: string;
   status: string;
   total_users: number;
   quota_used_today: number;
