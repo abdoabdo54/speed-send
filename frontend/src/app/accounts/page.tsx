@@ -67,7 +67,7 @@ export default function AccountsPage() {
       const response = await serviceAccountsApi.create({
         name: uploadData.name,
         json_content: uploadData.json,
-        admin_email: adminEmail,
+        admin_email: adminEmail || undefined,
       });
       console.log('Upload successful:', response.data);
       
