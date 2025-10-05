@@ -118,6 +118,14 @@ async def create_campaign(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create campaign: {str(e)}")
 
+# Accept POST without trailing slash to avoid client redirect issues
+@router.post("", response_model=CampaignResponse)
+async def create_campaign_no_trailing_slash(
+    campaign: CampaignCreate,
+    db: Session = Depends(get_db)
+):
+    return await create_campaign(campaign, db)  # type: ignore
+
 @router.post("/{campaign_id}/launch")
 async def launch_campaign(
     campaign_id: int,
@@ -286,6 +294,142 @@ async def delete_campaign(
     db.commit()
     
     return {"message": "Campaign deleted successfully"}
+
+# --- New lifecycle endpoints expected by frontend ---
+
+@router.post("/{campaign_id}/prepare/")
+async def prepare_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Move campaign from DRAFT to READY by precomputing sender assignments and
+    creating email log skeletons. This makes the later launch extremely fast.
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    if campaign.status not in [CampaignStatus.DRAFT, CampaignStatus.FAILED]:
+        raise HTTPException(status_code=400, detail=f"Can only prepare DRAFT/FAILED campaigns. Current: {campaign.status}")
+
+    # Build sender pool
+    sender_accounts = campaign.sender_accounts
+    if not sender_accounts:
+        raise HTTPException(status_code=400, detail="No sender accounts configured")
+
+    # Pre-create logs if they do not exist
+    existing_logs = db.query(EmailLog).filter(EmailLog.campaign_id == campaign.id).count()
+    if existing_logs == 0:
+        # Materialize sender pool from active users
+        pool_users = db.query(WorkspaceUser).filter(
+            WorkspaceUser.service_account_id.in_([sa.id for sa in sender_accounts]),
+            WorkspaceUser.is_active == True,
+        ).all()
+        if not pool_users:
+            raise HTTPException(status_code=400, detail="No active users available for sending")
+
+        from itertools import cycle
+        round_robin = cycle(pool_users)
+
+        for recipient in campaign.recipients:
+            user = next(round_robin)
+            db.add(EmailLog(
+                campaign_id=campaign.id,
+                recipient_email=recipient.get('email'),
+                recipient_name=recipient.get('variables', {}).get('name', ''),
+                sender_email=user.email,
+                service_account_id=user.service_account_id,
+                subject=campaign.subject,
+                status=EmailStatus.PENDING,
+            ))
+        db.commit()
+
+    campaign.status = CampaignStatus.READY
+    campaign.prepared_at = datetime.utcnow()
+    db.commit()
+
+    return {"message": "Campaign prepared", "status": campaign.status}
+
+
+@router.post("/{campaign_id}/control/")
+async def control_campaign(
+    campaign_id: int,
+    control: CampaignControl,
+    db: Session = Depends(get_db)
+):
+    """
+    Pause/Resume/Cancel a running campaign.
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    action = (control.action or "").lower()
+    if action == "pause":
+        if campaign.status != CampaignStatus.SENDING:
+            raise HTTPException(status_code=400, detail="Can only pause SENDING campaigns")
+        campaign.status = CampaignStatus.PAUSED
+        campaign.paused_at = datetime.utcnow()
+    elif action == "resume":
+        if campaign.status != CampaignStatus.PAUSED:
+            raise HTTPException(status_code=400, detail="Can only resume PAUSED campaigns")
+        campaign.status = CampaignStatus.SENDING
+    elif action in ["cancel", "abort", "stop"]:
+        if campaign.status not in [CampaignStatus.SENDING, CampaignStatus.PREPARING, CampaignStatus.PAUSED]:
+            raise HTTPException(status_code=400, detail="Only active campaigns can be cancelled")
+        campaign.status = CampaignStatus.FAILED
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported action")
+
+    db.commit()
+    return {"message": f"Action '{action}' applied", "status": campaign.status}
+
+
+@router.post("/{campaign_id}/duplicate/")
+async def duplicate_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new campaign by cloning fields and associations from an existing one.
+    """
+    source = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    clone = Campaign(
+        name=f"{source.name} (copy)",
+        subject=source.subject,
+        body_html=source.body_html,
+        body_plain=source.body_plain,
+        from_name=source.from_name,
+        from_email=source.from_email,
+        reply_to=source.reply_to,
+        return_path=source.return_path,
+        recipients=list(source.recipients or []),
+        total_recipients=source.total_recipients,
+        pending_count=source.total_recipients,
+        sender_rotation=source.sender_rotation,
+        use_ip_pool=source.use_ip_pool,
+        ip_pool=list(source.ip_pool or []),
+        custom_headers=dict(source.custom_headers or {}),
+        attachments=list(source.attachments or []),
+        rate_limit=source.rate_limit,
+        concurrency=source.concurrency,
+        is_test=False,
+        status=CampaignStatus.DRAFT,
+    )
+    db.add(clone)
+    db.flush()
+
+    # Clone sender associations
+    for assoc in source.sender_accounts:
+        db.add(CampaignSender(campaign_id=clone.id, service_account_id=assoc.id))
+
+    db.commit()
+    db.refresh(clone)
+    return clone
 
 @router.get("/{campaign_id}/logs", response_model=List[EmailLogResponse])
 async def get_campaign_logs(

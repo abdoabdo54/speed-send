@@ -1283,7 +1283,7 @@ export default function NewCampaignPage() {
                 ) : (
                   <>
                     <Send className="h-4 w-4 mr-2" />
-                    Launch via Gmail API
+                    Create Campaign
                   </>
                 )}
               </Button>
