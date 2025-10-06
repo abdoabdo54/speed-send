@@ -44,10 +44,33 @@ export default function CampaignsPage() {
 
   const handlePrepare = async (campaignId: number) => {
     try {
-      await campaignsApi.prepare(campaignId);
-      loadCampaigns();
+      const response = await campaignsApi.prepare(campaignId);
+      alert(`✅ Preparation started!\nTask ID: ${response.data.task_id}\n\nThe campaign is being prepared in the background.`);
+      
+      // Poll for status update
+      const pollInterval = setInterval(async () => {
+        await loadCampaigns();
+        const camp = campaigns.find((c: any) => c.id === campaignId);
+        if (camp && camp.status === 'ready') {
+          clearInterval(pollInterval);
+          alert('🎉 Campaign is READY! You can now Resume to send instantly.');
+        }
+      }, 2000);
+      
+      // Clear after 60 seconds
+      setTimeout(() => clearInterval(pollInterval), 60000);
     } catch (error: any) {
       alert('Failed to prepare: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  const handleResume = async (campaignId: number) => {
+    try {
+      const response = await campaignsApi.control(campaignId, 'resume');
+      alert(`⚡ Campaign resumed!\n\nAll emails are being sent instantly from the pre-generated queue.`);
+      loadCampaigns();
+    } catch (error: any) {
+      alert('Failed to resume: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -305,11 +328,18 @@ export default function CampaignsPage() {
                             <>
                               <Button
                                 size="sm"
+                                onClick={() => handlePrepare(campaign.id)}
+                                className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
+                              >
+                                🎯 Prepare
+                              </Button>
+                              <Button
+                                size="sm"
                                 onClick={() => handleLaunch(campaign.id)}
                                 className="bg-gradient-to-r from-green-600 to-emerald-600 text-white"
                               >
                                 <Play className="mr-2 h-4 w-4" />
-                                🚀 Launch
+                                Quick Send
                               </Button>
                               <Button
                                 size="sm"
@@ -345,6 +375,49 @@ export default function CampaignsPage() {
                                 onClick={() => handlePrepare(campaign.id)}
                               >
                                 Re-Prepare
+                              </Button>
+                            </>
+                          )}
+                          
+                          {campaign.status === 'ready' && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleResume(campaign.id)}
+                                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white animate-pulse"
+                              >
+                                ⚡ Resume (Instant)
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDuplicate(campaign.id)}
+                              >
+                                <Copy className="mr-2 h-4 w-4" />
+                                Duplicate
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDelete(campaign.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                          
+                          {campaign.status === 'preparing' && (
+                            <>
+                              <Button size="sm" disabled className="bg-blue-400 text-white">
+                                🔄 Preparing...
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled
+                              >
+                                Please wait
                               </Button>
                             </>
                           )}

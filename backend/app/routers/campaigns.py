@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 import logging
+import asyncio
+import json
 
 from app.database import get_db
 from app.models import (
@@ -15,6 +17,7 @@ from app.schemas import (
 )
 from app.tasks import send_campaign_emails
 from fastapi import Response, Request
+from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/campaigns")
 
@@ -311,8 +314,8 @@ async def prepare_campaign(
     db: Session = Depends(get_db)
 ):
     """
-    Move campaign from DRAFT to READY by precomputing sender assignments and
-    creating email log skeletons. This makes the later launch extremely fast.
+    V2: Prepare campaign by pre-generating all tasks to Redis
+    This makes resume instant - everything is ready to send immediately.
     """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
@@ -321,47 +324,23 @@ async def prepare_campaign(
     if campaign.status not in [CampaignStatus.DRAFT, CampaignStatus.FAILED]:
         raise HTTPException(status_code=400, detail=f"Can only prepare DRAFT/FAILED campaigns. Current: {campaign.status}")
 
-    # Build sender pool
-    sender_accounts = campaign.sender_accounts
-    if not sender_accounts:
-        raise HTTPException(status_code=400, detail="No sender accounts configured")
-
-    # Pre-create logs if they do not exist
-    existing_logs = db.query(EmailLog).filter(EmailLog.campaign_id == campaign.id).count()
-    if existing_logs == 0:
-        # Materialize sender pool from active users
-        pool_users = db.query(WorkspaceUser).filter(
-            WorkspaceUser.service_account_id.in_([sa.id for sa in sender_accounts]),
-            WorkspaceUser.is_active == True,
-        ).all()
-        if not pool_users:
-            raise HTTPException(status_code=400, detail="No active users available for sending")
-
-        from itertools import cycle
-        round_robin = cycle(pool_users)
-
-        for recipient in campaign.recipients:
-            user = next(round_robin)
-            db.add(EmailLog(
-                campaign_id=campaign.id,
-                recipient_email=recipient.get('email'),
-                recipient_name=recipient.get('variables', {}).get('name', ''),
-                sender_email=user.email,
-                service_account_id=user.service_account_id,
-                subject=campaign.subject,
-                status=EmailStatus.PENDING,
-            ))
-        db.commit()
-
-    campaign.status = CampaignStatus.READY
-    campaign.prepared_at = datetime.utcnow()
-    # Reset counters
-    campaign.pending_count = campaign.total_recipients
-    campaign.sent_count = 0
-    campaign.failed_count = 0
-    db.commit()
-
-    return {"message": "Campaign prepared", "status": campaign.status}
+    logger.info(f"🎯 Preparing campaign {campaign_id} - triggering V2 prepare task")
+    
+    # Import V2 task
+    from app.tasks_v2 import prepare_campaign_redis
+    
+    try:
+        # Trigger async preparation
+        async_result = prepare_campaign_redis.delay(campaign_id)
+        
+        return {
+            "message": "Campaign preparation started",
+            "task_id": str(async_result.id),
+            "status": "preparing"
+        }
+    except Exception as e:
+        logger.error(f"Failed to start preparation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start preparation: {str(e)}")
 
 
 @router.post("/{campaign_id}/control/")
@@ -404,23 +383,35 @@ async def resume_campaign(
     db: Session = Depends(get_db)
 ):
     """
-    Trigger high-concurrency send via Celery for a prepared campaign.
+    V2: Instantly resume prepared campaign from Redis
+    All tasks are pre-generated, so this is INSTANT dispatch.
     """
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    if campaign.status not in [CampaignStatus.READY, CampaignStatus.PAUSED, CampaignStatus.DRAFT]:
-        raise HTTPException(status_code=400, detail=f"Campaign must be READY/PAUSED/DRAFT to resume. Current: {campaign.status}")
+    
+    if campaign.status not in [CampaignStatus.READY, CampaignStatus.PAUSED]:
+        raise HTTPException(status_code=400, detail=f"Campaign must be READY or PAUSED. Current: {campaign.status}")
 
-    # Ensure logs exist; preparation may have created them already
-    # Move to SENDING/ACTIVE and dispatch celery fanout
-    logger.info(f"▶️ Resuming campaign {campaign_id}")
+    logger.info(f"⚡ V2 Resume: Campaign {campaign_id} - instant dispatch")
+    
+    # Import V2 task
+    from app.tasks_v2 import resume_campaign_instant
+    
     try:
-        async_result = send_campaign_emails.delay(campaign_id)
+        # Trigger instant resume
+        async_result = resume_campaign_instant.delay(campaign_id)
+        
         campaign.status = CampaignStatus.SENDING
         campaign.celery_task_id = str(async_result.id)
+        campaign.started_at = datetime.utcnow()
         db.commit()
-        return {"message": "Resume triggered", "task_id": campaign.celery_task_id}
+        
+        return {
+            "message": "Campaign resumed - instant dispatch",
+            "task_id": campaign.celery_task_id,
+            "status": "sending"
+        }
     except Exception as e:
         logger.error(f"Resume failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to resume: {str(e)}")
@@ -530,3 +521,114 @@ async def get_campaign_logs(
     
     logs = query.order_by(EmailLog.created_at.desc()).offset(skip).limit(limit).all()
     return logs
+
+
+@router.get("/{campaign_id}/stream/")
+async def stream_campaign_progress(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    SSE endpoint for real-time campaign progress updates
+    Streams campaign status and per-account progress every 1 second
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    async def event_stream():
+        """Generator for SSE events"""
+        import redis
+        redis_client = redis.from_url("redis://redis:6379/0", decode_responses=True)
+        
+        while True:
+            try:
+                # Get fresh campaign data
+                fresh_db = next(get_db())
+                campaign = fresh_db.query(Campaign).filter(Campaign.id == campaign_id).first()
+                
+                if not campaign:
+                    break
+                
+                # Get Redis progress if available
+                from app.tasks_v2 import get_campaign_progress_key
+                progress_key = get_campaign_progress_key(campaign_id)
+                redis_progress = redis_client.hgetall(progress_key)
+                
+                # Get DB stats
+                total = campaign.total_recipients or 0
+                sent = fresh_db.query(EmailLog).filter(
+                    EmailLog.campaign_id == campaign_id,
+                    EmailLog.status == EmailStatus.SENT
+                ).count()
+                failed = fresh_db.query(EmailLog).filter(
+                    EmailLog.campaign_id == campaign_id,
+                    EmailLog.status == EmailStatus.FAILED
+                ).count()
+                pending = fresh_db.query(EmailLog).filter(
+                    EmailLog.campaign_id == campaign_id,
+                    EmailLog.status.in_([EmailStatus.PENDING, EmailStatus.SENDING])
+                ).count()
+                
+                # Per-account progress
+                from sqlalchemy import func
+                account_stats = fresh_db.query(
+                    ServiceAccount.name,
+                    EmailLog.status,
+                    func.count(EmailLog.id).label('count')
+                ).join(
+                    EmailLog, EmailLog.service_account_id == ServiceAccount.id
+                ).filter(
+                    EmailLog.campaign_id == campaign_id
+                ).group_by(
+                    ServiceAccount.name, EmailLog.status
+                ).all()
+                
+                accounts = {}
+                for account_name, status, count in account_stats:
+                    if account_name not in accounts:
+                        accounts[account_name] = {'sent': 0, 'failed': 0, 'pending': 0}
+                    if status == EmailStatus.SENT:
+                        accounts[account_name]['sent'] = count
+                    elif status == EmailStatus.FAILED:
+                        accounts[account_name]['failed'] = count
+                    elif status in [EmailStatus.PENDING, EmailStatus.SENDING]:
+                        accounts[account_name]['pending'] = count
+                
+                # Build SSE message
+                data = {
+                    'campaign_id': campaign_id,
+                    'status': campaign.status.value,
+                    'total': total,
+                    'sent': sent,
+                    'failed': failed,
+                    'pending': pending,
+                    'started_at': campaign.started_at.isoformat() if campaign.started_at else None,
+                    'completed_at': campaign.completed_at.isoformat() if campaign.completed_at else None,
+                    'accounts': accounts,
+                    'redis_progress': redis_progress
+                }
+                
+                yield f"data: {json.dumps(data)}\n\n"
+                
+                # Stop streaming if campaign is done
+                if campaign.status in [CampaignStatus.COMPLETED, CampaignStatus.FAILED]:
+                    break
+                
+                fresh_db.close()
+                await asyncio.sleep(1)  # Update every 1 second
+                
+            except Exception as e:
+                logger.error(f"SSE stream error: {e}")
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                break
+    
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )

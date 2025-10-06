@@ -6,7 +6,7 @@ celery_app = Celery(
     'gmail_saas',
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=['app.tasks', 'app.tasks_powermta']
+    include=['app.tasks', 'app.tasks_powermta', 'app.tasks_v2']
 )
 
 # Configure Celery for PowerMTA-style performance
