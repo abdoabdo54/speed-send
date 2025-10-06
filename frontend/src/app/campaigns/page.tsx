@@ -23,10 +23,11 @@ export default function CampaignsPage() {
   const router = useRouter();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [preparingIds, setPreparingIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadCampaigns();
-    const interval = setInterval(loadCampaigns, 5000); // Refresh every 5 seconds
+    const interval = setInterval(loadCampaigns, 2000); // Refresh every 2 seconds for faster status updates
     return () => clearInterval(interval);
   }, []);
 
@@ -44,30 +45,80 @@ export default function CampaignsPage() {
 
   const handlePrepare = async (campaignId: number) => {
     try {
+      setPreparingIds(prev => new Set(prev).add(campaignId));
       const response = await campaignsApi.prepare(campaignId);
-      alert(`✅ Preparation started!\nTask ID: ${response.data.task_id}\n\nThe campaign is being prepared in the background.`);
       
-      // Poll for status update
+      alert(`✅ V2 Preparation Started!\n\nPre-generating all email tasks to Redis for instant send...\n\nTask ID: ${response.data.task_id}`);
+      
+      // Poll for status update with visual feedback
       const pollInterval = setInterval(async () => {
         await loadCampaigns();
         const camp = campaigns.find((c: any) => c.id === campaignId);
         if (camp && camp.status === 'ready') {
           clearInterval(pollInterval);
-          alert('🎉 Campaign is READY! You can now Resume to send instantly.');
+          setPreparingIds(prev => {
+            const updated = new Set(prev);
+            updated.delete(campaignId);
+            return updated;
+          });
+          alert('🎉 Campaign is READY!\n\nAll emails are pre-generated in Redis.\nClick "⚡ Resume" to send 15,000 emails in < 10 seconds!');
+        } else if (camp && camp.status === 'failed') {
+          clearInterval(pollInterval);
+          setPreparingIds(prev => {
+            const updated = new Set(prev);
+            updated.delete(campaignId);
+            return updated;
+          });
+          alert('❌ Preparation failed. Check backend logs.');
         }
       }, 2000);
       
-      // Clear after 60 seconds
-      setTimeout(() => clearInterval(pollInterval), 60000);
+      // Clear after 2 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setPreparingIds(prev => {
+          const updated = new Set(prev);
+          updated.delete(campaignId);
+          return updated;
+        });
+      }, 120000);
     } catch (error: any) {
+      setPreparingIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(campaignId);
+        return updated;
+      });
       alert('Failed to prepare: ' + (error.response?.data?.detail || error.message));
     }
   };
 
   const handleResume = async (campaignId: number) => {
     try {
+      // Get campaign to show stats
+      const campaign = campaigns.find((c: any) => c.id === campaignId);
+      const totalEmails = campaign?.total_recipients || 0;
+      
+      const confirmed = window.confirm(
+        `⚡ V2 PowerMTA INSTANT RESUME\n\n` +
+        `This will send ${totalEmails.toLocaleString()} emails instantly from the pre-generated Redis queue.\n\n` +
+        `Expected time: < 10 seconds for 15,000 emails\n\n` +
+        `Continue?`
+      );
+      
+      if (!confirmed) return;
+      
+      const startTime = Date.now();
       const response = await campaignsApi.control(campaignId, 'resume');
-      alert(`⚡ Campaign resumed!\n\nAll emails are being sent instantly from the pre-generated queue.`);
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+      
+      alert(
+        `✅ V2 RESUME TRIGGERED!\n\n` +
+        `Dispatch time: ${elapsed}s\n` +
+        `Task ID: ${response.data.task_id || 'N/A'}\n\n` +
+        `All ${totalEmails.toLocaleString()} emails are being sent in parallel NOW.\n\n` +
+        `Watch the live dashboard for real-time progress!`
+      );
+      
       loadCampaigns();
     } catch (error: any) {
       alert('Failed to resume: ' + (error.response?.data?.detail || error.message));
@@ -279,6 +330,33 @@ export default function CampaignsPage() {
       
       <div className="flex-1 overflow-auto">
         <div className="p-8">
+          {/* V2 PowerMTA Info Banner */}
+          <div className="mb-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 rounded-lg shadow-lg">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⚡</span>
+              <div className="flex-1">
+                <h3 className="font-bold text-lg mb-1">V2 PowerMTA Engine Active</h3>
+                <p className="text-sm opacity-90 mb-2">
+                  Send 15,000 emails in &lt;10 seconds using the V2 workflow: <strong>Prepare → Resume</strong>
+                </p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="bg-white/20 p-2 rounded">
+                    <strong>1️⃣ Prepare:</strong> Pre-renders emails to Redis
+                  </div>
+                  <div className="bg-white/20 p-2 rounded">
+                    <strong>2️⃣ Resume:</strong> Instant parallel send (all at once)
+                  </div>
+                  <div className="bg-white/20 p-2 rounded">
+                    <strong>📊 Live:</strong> Real-time SSE dashboard updates
+                  </div>
+                </div>
+                <p className="text-xs opacity-75 mt-2">
+                  💡 <strong>Legacy Send</strong> is slower (sequential) - use <strong>V2 Prepare→Resume</strong> for PowerMTA speed
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold">Campaigns</h1>
@@ -329,17 +407,28 @@ export default function CampaignsPage() {
                               <Button
                                 size="sm"
                                 onClick={() => handlePrepare(campaign.id)}
-                                className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
+                                disabled={preparingIds.has(campaign.id)}
+                                className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white relative"
                               >
-                                🎯 Prepare
+                                {preparingIds.has(campaign.id) ? (
+                                  <>
+                                    <span className="animate-spin mr-2">🔄</span>
+                                    Preparing...
+                                  </>
+                                ) : (
+                                  <>
+                                    🎯 Prepare (V2)
+                                  </>
+                                )}
                               </Button>
                               <Button
                                 size="sm"
                                 onClick={() => handleLaunch(campaign.id)}
-                                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white"
+                                className="bg-gradient-to-r from-gray-500 to-gray-600 text-white text-xs"
+                                title="Legacy sequential send - slower than V2"
                               >
                                 <Play className="mr-2 h-4 w-4" />
-                                Quick Send
+                                Legacy Send
                               </Button>
                               <Button
                                 size="sm"
@@ -384,9 +473,13 @@ export default function CampaignsPage() {
                               <Button
                                 size="sm"
                                 onClick={() => handleResume(campaign.id)}
-                                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white animate-pulse"
+                                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white animate-pulse relative"
                               >
-                                ⚡ Resume (Instant)
+                                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                                </span>
+                                ⚡ Resume (Instant Send)
                               </Button>
                               <Button
                                 size="sm"
@@ -409,15 +502,21 @@ export default function CampaignsPage() {
                           
                           {campaign.status === 'preparing' && (
                             <>
-                              <Button size="sm" disabled className="bg-blue-400 text-white">
-                                🔄 Preparing...
+                              <Button size="sm" disabled className="bg-blue-400 text-white relative">
+                                <span className="animate-spin mr-2">⚙️</span>
+                                V2 Preparing...
+                                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                                </span>
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 disabled
+                                className="text-xs text-muted-foreground"
                               >
-                                Please wait
+                                Pre-rendering to Redis...
                               </Button>
                             </>
                           )}
