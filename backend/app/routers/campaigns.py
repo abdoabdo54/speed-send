@@ -235,6 +235,7 @@ async def launch_campaign(
                     subject=campaign.subject,
                     body_html=campaign.body_html,
                     body_plain=campaign.body_plain,
+                    from_name=campaign.from_name,
                     custom_headers=campaign.custom_headers,
                     attachments=campaign.attachments
                 )
@@ -354,6 +355,10 @@ async def prepare_campaign(
 
     campaign.status = CampaignStatus.READY
     campaign.prepared_at = datetime.utcnow()
+    # Reset counters
+    campaign.pending_count = campaign.total_recipients
+    campaign.sent_count = 0
+    campaign.failed_count = 0
     db.commit()
 
     return {"message": "Campaign prepared", "status": campaign.status}

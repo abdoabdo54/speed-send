@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -26,13 +27,15 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = React.useState(false);
 
   return (
-    <div className="flex h-screen w-64 flex-col border-r bg-card">
-      <div className="flex h-16 items-center border-b px-6">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-          Speed-Send
+    <div className={cn("flex h-screen flex-col border-r bg-card transition-all", collapsed ? "w-16" : "w-64") }>
+      <div className="flex h-16 items-center border-b px-3 justify-between">
+        <h1 className={cn("font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent", collapsed ? "text-sm" : "text-xl") }>
+          {collapsed ? 'SS' : 'Speed-Send'}
         </h1>
+        <button onClick={() => setCollapsed(!collapsed)} className="text-muted-foreground text-xs">{collapsed ? '›' : '‹'}</button>
       </div>
       
       <nav className="flex-1 space-y-1 px-3 py-4">
@@ -50,19 +53,19 @@ export function Sidebar() {
               )}
             >
               <item.icon className="h-5 w-5" />
-              {item.name}
+              {!collapsed && item.name}
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t p-4">
-        <p className="text-xs text-muted-foreground">
-          Speed-Send v2.0 Pro
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          PowerMTA Mode ⚡
-        </p>
+      <div className="border-t p-2">
+        {!collapsed && (
+          <>
+            <p className="text-xs text-muted-foreground">Speed-Send v2.0 Pro</p>
+            <p className="text-xs text-muted-foreground mt-1">PowerMTA Mode ⚡</p>
+          </>
+        )}
       </div>
     </div>
   );

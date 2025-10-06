@@ -655,7 +655,9 @@ export default function NewCampaignPage() {
 
       const url = `${API_URL}/api/v1/campaigns/`;
       appendLog(`POST ${url} (recipients=${payload.recipients.length}, senders=${payload.sender_account_ids.length})`);
-      const response = await axios.post(url, payload);
+      const response = await axios.post(url, payload, {
+        headers: { 'Content-Type': 'application/json' }
+      });
       appendLog(`POST ${url} -> ${response.status} id=${response.data?.id}`);
       
       showNotification(`Campaign created successfully! ID: ${response.data.id}`, 'success');

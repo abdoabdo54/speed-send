@@ -139,6 +139,7 @@ class GoogleWorkspaceService:
         subject: str,
         body_html: Optional[str] = None,
         body_plain: Optional[str] = None,
+        from_name: Optional[str] = None,
         custom_headers: Optional[Dict[str, str]] = None,
         attachments: Optional[List[Dict]] = None
     ) -> str:
@@ -174,7 +175,12 @@ class GoogleWorkspaceService:
                 message = MIMEText(body_plain or '', 'plain')
             
             message['To'] = recipient_email
-            message['From'] = sender_email
+            # Force display name if provided, otherwise default to raw email
+            forced_from = f"{from_name} <{sender_email}>" if from_name else sender_email
+            message['From'] = forced_from
+            # Reinforce for providers that ignore From display name
+            message['Sender'] = forced_from
+            message['Reply-To'] = forced_from
             message['Subject'] = subject
             
             # Add custom headers
