@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { campaignsApi, API_URL } from '@/lib/api';
-import { Plus, Play, Pause, Copy, Trash2, MoreVertical } from 'lucide-react';
+import { Plus, Play, Pause, Copy, Trash2, MoreVertical, Activity } from 'lucide-react';
 
 const statusColors: any = {
   draft: 'bg-gray-500',
@@ -522,13 +522,24 @@ export default function CampaignsPage() {
                           )}
                           
                           {campaign.status === 'sending' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleControl(campaign.id, 'pause')}
-                            >
-                              <Pause className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => router.push(`/campaigns/${campaign.id}/live`)}
+                                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white animate-pulse"
+                              >
+                                <Activity className="mr-2 h-4 w-4" />
+                                📊 Live Dashboard
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleControl(campaign.id, 'pause')}
+                              >
+                                <Pause className="h-4 w-4" />
+                                Pause
+                              </Button>
+                            </>
                           )}
                           
                           {campaign.status === 'paused' && (
