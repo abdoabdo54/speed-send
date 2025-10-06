@@ -48,6 +48,7 @@ async def get_campaign(
         raise HTTPException(status_code=404, detail="Campaign not found")
     return campaign
 
+@router.post("", response_model=CampaignResponse)
 @router.post("/", response_model=CampaignResponse)
 async def create_campaign(
     campaign: CampaignCreate,
@@ -118,13 +119,6 @@ async def create_campaign(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create campaign: {str(e)}")
 
-# Accept POST without trailing slash to avoid client redirect issues
-@router.post("", response_model=CampaignResponse)
-async def create_campaign_no_trailing_slash(
-    campaign: CampaignCreate,
-    db: Session = Depends(get_db)
-):
-    return await create_campaign(campaign, db)  # type: ignore
 
 @router.post("/{campaign_id}/launch")
 async def launch_campaign(

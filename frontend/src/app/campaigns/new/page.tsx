@@ -71,6 +71,7 @@ export default function NewCampaignPage() {
   
   // State
   const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
@@ -119,6 +120,18 @@ export default function NewCampaignPage() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  // Debug logging helpers
+  const appendLog = (line: string) => {
+    const ts = new Date().toISOString();
+    setLogs(prev => [...prev.slice(-499), `[${ts}] ${line}`]);
+  };
+  const appendErrorLog = (context: string, error: any) => {
+    const status = error?.response?.status;
+    const detail = error?.response?.data?.detail ?? JSON.stringify(error?.response?.data ?? {});
+    const url = error?.config?.url ?? '';
+    appendLog(`${context} -> ERROR status=${status || 'n/a'} url=${url} detail=${detail}`);
+  };
 
   // Derived state
   const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
@@ -640,12 +653,16 @@ export default function NewCampaignPage() {
         concurrency: config.workers
       };
 
-      const response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
+      const url = `${API_URL}/api/v1/campaigns/`;
+      appendLog(`POST ${url} (recipients=${payload.recipients.length}, senders=${payload.sender_account_ids.length})`);
+      const response = await axios.post(url, payload);
+      appendLog(`POST ${url} -> ${response.status} id=${response.data?.id}`);
       
       showNotification(`Campaign created successfully! ID: ${response.data.id}`, 'success');
       router.push('/campaigns');
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to create campaign';
+      appendErrorLog('Create campaign', error);
       showNotification(`Campaign creation failed: ${errorMsg}`, 'error');
     } finally {
       setLoading(false);
@@ -852,6 +869,28 @@ export default function NewCampaignPage() {
                       </div>
                     )}
                   </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Debug Log Panel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">Debug Log</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-between mb-2">
+                <div className="text-xs text-muted-foreground">Backend: {API_URL}</div>
+                <Button size="sm" variant="outline" onClick={() => setLogs([])}>Clear</Button>
+              </div>
+              <div className="h-48 overflow-auto rounded border bg-black text-green-300 text-xs p-2 font-mono">
+                {logs.length === 0 ? (
+                  <div className="text-gray-400">No logs yet. Create a campaign to see request details here.</div>
+                ) : (
+                  logs.map((line, idx) => (
+                    <div key={idx}>{line}</div>
+                  ))
                 )}
               </div>
             </CardContent>
