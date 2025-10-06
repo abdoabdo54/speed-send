@@ -685,7 +685,7 @@ export default function NewCampaignPage() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Google Workspace Campaign</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Google Workspace Campaign <span className="ml-2 text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 align-middle">v2.1 UI</span></h1>
           <p className="text-gray-600 mt-2">PowerMTA-style sending via Google Workspace API — multi-domain, high-speed delivery</p>
         </div>
         <div className="flex items-center gap-4">
