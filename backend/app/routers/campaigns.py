@@ -398,6 +398,75 @@ async def control_campaign(
     return {"message": f"Action '{action}' applied", "status": campaign.status}
 
 
+@router.post("/{campaign_id}/resume/")
+async def resume_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger high-concurrency send via Celery for a prepared campaign.
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    if campaign.status not in [CampaignStatus.READY, CampaignStatus.PAUSED, CampaignStatus.DRAFT]:
+        raise HTTPException(status_code=400, detail=f"Campaign must be READY/PAUSED/DRAFT to resume. Current: {campaign.status}")
+
+    # Ensure logs exist; preparation may have created them already
+    # Move to SENDING/ACTIVE and dispatch celery fanout
+    logger.info(f"▶️ Resuming campaign {campaign_id}")
+    try:
+        async_result = send_campaign_emails.delay(campaign_id)
+        campaign.status = CampaignStatus.SENDING
+        campaign.celery_task_id = str(async_result.id)
+        db.commit()
+        return {"message": "Resume triggered", "task_id": campaign.celery_task_id}
+    except Exception as e:
+        logger.error(f"Resume failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to resume: {str(e)}")
+
+
+@router.post("/{campaign_id}/pause/")
+async def pause_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    if campaign.status not in [CampaignStatus.SENDING, CampaignStatus.PAUSED]:
+        raise HTTPException(status_code=400, detail="Only active campaigns can be paused")
+    campaign.status = CampaignStatus.PAUSED
+    db.commit()
+    return {"message": "Campaign paused", "status": campaign.status}
+
+
+@router.get("/{campaign_id}/status/")
+async def campaign_status(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    from app.models import EmailLog, EmailStatus
+    total = campaign.total_recipients or 0
+    sent = db.query(EmailLog).filter(EmailLog.campaign_id == campaign_id, EmailLog.status == EmailStatus.SENT).count()
+    failed = db.query(EmailLog).filter(EmailLog.campaign_id == campaign_id, EmailLog.status == EmailStatus.FAILED).count()
+    pending = db.query(EmailLog).filter(EmailLog.campaign_id == campaign_id, EmailLog.status.in_([EmailStatus.PENDING, EmailStatus.SENDING, EmailStatus.RETRY])).count()
+
+    return {
+        "id": campaign.id,
+        "status": campaign.status,
+        "total": total,
+        "sent": sent,
+        "failed": failed,
+        "pending": pending,
+        "started_at": campaign.started_at,
+        "completed_at": campaign.completed_at,
+    }
+
 @router.post("/{campaign_id}/duplicate/")
 async def duplicate_campaign(
     campaign_id: int,
