@@ -796,9 +796,30 @@ export default function NewCampaignPage() {
       {/* Main Content */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
         
-        {/* Left Column - Accounts & Recipients */}
+        {/* Left Column - Logs first, then Accounts/Users/Recipients */}
         <div className="space-y-6">
-          
+          {/* Debug Log Panel */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">Debug Log</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-between mb-2">
+                <div className="text-xs text-muted-foreground">Backend: {API_URL}</div>
+                <Button size="sm" variant="outline" onClick={() => setLogs([])}>Clear</Button>
+              </div>
+              <div className="h-48 overflow-auto rounded border bg-black text-green-300 text-xs p-2 font-mono">
+                {logs.length === 0 ? (
+                  <div className="text-gray-400">No logs yet. Create a campaign to see request details here.</div>
+                ) : (
+                  logs.map((line, idx) => (
+                    <div key={idx}>{line}</div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Google Workspace Accounts Panel */}
           <Card>
             <CardHeader>
