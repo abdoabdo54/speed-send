@@ -14,6 +14,7 @@ from app.schemas import (
     CampaignControl, EmailLogResponse
 )
 from app.tasks import send_campaign_emails
+from fastapi import Response
 
 router = APIRouter(prefix="/campaigns")
 
@@ -118,6 +119,10 @@ async def create_campaign(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create campaign: {str(e)}")
 
+
+@router.options("/{campaign_id}/launch/")
+async def launch_campaign_options(campaign_id: int):
+    return Response(status_code=200)
 
 @router.post("/{campaign_id}/launch/")
 async def launch_campaign(

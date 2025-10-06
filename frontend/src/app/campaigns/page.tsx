@@ -6,7 +6,6 @@ import { Sidebar } from '@/components/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import axios from 'axios';
 import { campaignsApi, API_URL } from '@/lib/api';
 import { Plus, Play, Pause, Copy, Trash2, MoreVertical } from 'lucide-react';
 
@@ -93,7 +92,7 @@ export default function CampaignsPage() {
       log('📤 SENDING LAUNCH REQUEST...', 'yellow');
       const url = `${API_URL}/api/v1/campaigns/${campaignId}/launch/`;
       log(`Request URL: ${url}`, 'cyan');
-      const response = await axios.post(url);
+      const response = await campaignsApi.launch(campaignId);
       
       log('✅ LAUNCH RESPONSE RECEIVED', 'green');
       log(`Full Response: ${JSON.stringify(response, null, 2)}`, 'white');
@@ -118,6 +117,7 @@ export default function CampaignsPage() {
       log(`Error Type: ${error.name}`, 'red');
       log(`Error Message: ${error.message}`, 'red');
       log(`Error Code: ${error.code}`, 'red');
+      log(`Online: ${navigator.onLine}`, 'red');
       log(`Response Status: ${error?.response?.status}`, 'red');
       log(`Response Data: ${JSON.stringify(error?.response?.data, null, 2)}`, 'red');
       log(`Full Error: ${JSON.stringify(error, null, 2)}`, 'red');
