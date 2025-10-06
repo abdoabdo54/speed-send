@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Button } from '@/components/ui/button';
@@ -120,6 +120,11 @@ export default function NewCampaignPage() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  // Derived collections
+  const selectedUsers = useMemo(() => {
+    return users.filter(u => selectedAccounts.includes(u.service_account_id));
+  }, [users, selectedAccounts]);
 
   // Debug logging helpers
   const appendLog = (line: string) => {
@@ -873,6 +878,38 @@ export default function NewCampaignPage() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Users of Selected Accounts */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-indigo-600" />
+                  Users of Selected Accounts ({selectedUsers.length})
+                </CardTitle>
+                <div className="text-xs text-muted-foreground">
+                  Total loaded: {users.length}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {selectedUsers.length === 0 ? (
+                <div className="text-sm text-gray-500">Select one or more accounts to see their users.</div>
+              ) : (
+                <div className="max-h-48 overflow-auto divide-y rounded border">
+                  {selectedUsers.slice(0, 200).map(u => (
+                    <div key={`${u.service_account_id}-${u.email}`} className="px-3 py-2 text-sm flex items-center justify-between">
+                      <span className="truncate">{u.email}</span>
+                      <span className={"text-xs " + (u.is_active ? 'text-green-600' : 'text-red-600')}>{u.is_active ? 'active' : 'inactive'}</span>
+                    </div>
+                  ))}
+                  {selectedUsers.length > 200 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">+{selectedUsers.length - 200} more...</div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
