@@ -108,7 +108,8 @@ export default function CampaignsPage() {
       if (!confirmed) return;
       
       const startTime = Date.now();
-      const response = await campaignsApi.control(campaignId, 'resume');
+      // CRITICAL FIX: Use /resume/ endpoint, NOT /control/
+      const response = await campaignsApi.resume(campaignId);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
       
       alert(

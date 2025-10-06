@@ -106,6 +106,7 @@ export const campaignsApi = {
   update: (id: number, data: any) => api.patch(`/campaigns/${id}/`, data),
   delete: (id: number) => api.delete(`/campaigns/${id}/`),
   prepare: (id: number) => api.post(`/campaigns/${id}/prepare/`),
+  resume: (id: number) => api.post(`/campaigns/${id}/resume/`),  // V2 instant resume
   launch: (id: number) => api.post(`/campaigns/${id}/launch/`),
   control: (id: number, action: string) => api.post(`/campaigns/${id}/control/`, { action }),
   duplicate: (id: number) => api.post(`/campaigns/${id}/duplicate/`),
