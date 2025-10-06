@@ -15,7 +15,7 @@ from app.schemas import (
 )
 from app.tasks import send_campaign_emails
 
-router = APIRouter()
+router = APIRouter(prefix="/campaigns")
 
 @router.get("/", response_model=List[CampaignResponse])
 async def list_campaigns(
@@ -35,7 +35,7 @@ async def list_campaigns(
     campaigns = query.order_by(Campaign.created_at.desc()).offset(skip).limit(limit).all()
     return campaigns
 
-@router.get("/{campaign_id}", response_model=CampaignResponse)
+@router.get("/{campaign_id}/", response_model=CampaignResponse)
 async def get_campaign(
     campaign_id: int,
     db: Session = Depends(get_db)
@@ -48,7 +48,6 @@ async def get_campaign(
         raise HTTPException(status_code=404, detail="Campaign not found")
     return campaign
 
-@router.post("", response_model=CampaignResponse)
 @router.post("/", response_model=CampaignResponse)
 async def create_campaign(
     campaign: CampaignCreate,
@@ -120,7 +119,7 @@ async def create_campaign(
         raise HTTPException(status_code=500, detail=f"Failed to create campaign: {str(e)}")
 
 
-@router.post("/{campaign_id}/launch")
+@router.post("/{campaign_id}/launch/")
 async def launch_campaign(
     campaign_id: int,
     db: Session = Depends(get_db)
@@ -265,7 +264,7 @@ async def launch_campaign(
         logger.error(f"❌ Launch failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to launch campaign: {str(e)}")
 
-@router.delete("/{campaign_id}")
+@router.delete("/{campaign_id}/")
 async def delete_campaign(
     campaign_id: int,
     db: Session = Depends(get_db)
@@ -425,7 +424,7 @@ async def duplicate_campaign(
     db.refresh(clone)
     return clone
 
-@router.get("/{campaign_id}/logs", response_model=List[EmailLogResponse])
+@router.get("/{campaign_id}/logs/", response_model=List[EmailLogResponse])
 async def get_campaign_logs(
     campaign_id: int,
     status: Optional[EmailStatus] = None,
