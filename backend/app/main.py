@@ -60,8 +60,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Configure CORS - Allow all origins in production for now
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,
+    allow_origin_regex=".*",  # echo any origin
+    allow_credentials=False,   # avoid '*' + credentials incompatibility
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],

@@ -14,9 +14,12 @@ from app.schemas import (
     CampaignControl, EmailLogResponse
 )
 from app.tasks import send_campaign_emails
-from fastapi import Response
+from fastapi import Response, Request
 
 router = APIRouter(prefix="/campaigns")
+
+# Module logger
+logger = logging.getLogger(__name__)
 
 @router.get("/", response_model=List[CampaignResponse])
 async def list_campaigns(
@@ -121,8 +124,14 @@ async def create_campaign(
 
 
 @router.options("/{campaign_id}/launch/")
-async def launch_campaign_options(campaign_id: int):
-    return Response(status_code=200)
+async def launch_campaign_options(campaign_id: int, request: Request):
+    # Explicit CORS preflight OK
+    return Response(status_code=200, headers={
+        "Access-Control-Allow-Origin": request.headers.get("Origin", "*"),
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": request.headers.get("Access-Control-Request-Headers", "*"),
+        "Vary": "Origin",
+    })
 
 @router.post("/{campaign_id}/launch/")
 async def launch_campaign(
