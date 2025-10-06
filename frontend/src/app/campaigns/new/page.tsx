@@ -793,10 +793,10 @@ export default function NewCampaignPage() {
         </Alert>
       ))}
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+      {/* Main Content - 3 columns: Left (Debug+Accounts), Center (Config+Composer+Recipients), Right (Stats+Actions) */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         
-        {/* Left Column - Logs first, then Accounts/Users/Recipients */}
+        {/* LEFT COLUMN: Debug Log + Google Accounts + Users */}
         <div className="space-y-6">
           {/* Debug Log Panel */}
           <Card>
@@ -934,51 +934,10 @@ export default function NewCampaignPage() {
             </CardContent>
           </Card>
 
-          {/* Recipients Panel */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5" />
-                  Recipients ({recipients.length})
-                </CardTitle>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowRecipientModal(true)}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Manage Lists
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="recipients">Email Addresses (one per line)</Label>
-                  <Textarea
-                    id="recipients"
-                    placeholder="recipient1@example.com&#10;recipient2@example.com&#10;recipient3@example.com"
-                    value={recipientsText}
-                    onChange={(e) => setRecipientsText(e.target.value)}
-                    rows={8}
-                    className="mt-1"
-                  />
-                </div>
-                
-                {recipients.length > 0 && (
-                  <div className="text-sm text-gray-600">
-                    <p>Valid recipients: {recipients.length}</p>
-                    <p>Invalid entries: {recipientsText.split('\n').length - recipients.length}</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Middle Column - Campaign Configuration */}
-        <div className="xl:col-span-2 space-y-6">
+        {/* CENTER COLUMN: Campaign Config + Email Composer + Recipients */}
+        <div className="space-y-6">
           
           {/* Campaign Settings */}
           <Card>
@@ -1235,9 +1194,51 @@ export default function NewCampaignPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Recipients Panel (moved to center column per sketch) */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Recipients ({recipients.length})
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowRecipientModal(true)}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Manage Lists
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="recipients">Email Addresses (one per line)</Label>
+                  <Textarea
+                    id="recipients"
+                    placeholder="recipient1@example.com&#10;recipient2@example.com&#10;recipient3@example.com"
+                    value={recipientsText}
+                    onChange={(e) => setRecipientsText(e.target.value)}
+                    rows={8}
+                    className="mt-1"
+                  />
+                </div>
+                
+                {recipients.length > 0 && (
+                  <div className="text-sm text-gray-600">
+                    <p>Valid recipients: {recipients.length}</p>
+                    <p>Invalid entries: {recipientsText.split('\n').length - recipients.length}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Right Column - Stats & Actions */}
+        {/* RIGHT COLUMN: Stats & Actions */}
         <div className="space-y-6">
           
           {/* Google Workspace Stats Panel */}
