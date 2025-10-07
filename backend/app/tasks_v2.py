@@ -351,7 +351,11 @@ def resume_campaign_instant(campaign_id: int):
             total_emails = actual_sent + actual_failed
             if total_emails > 0:
                 success_rate = actual_sent / total_emails
-                if success_rate >= 0.8:  # 80% success rate threshold
+                # If no emails failed, campaign is successful regardless of success rate
+                if actual_failed == 0:
+                    campaign.status = CampaignStatus.COMPLETED
+                    logger.info(f"[{request_id}] ✅ Campaign completed successfully: {actual_sent}/{total_emails} sent (100% success - no failures)")
+                elif success_rate >= 0.5:  # 50% success rate threshold for campaigns with some failures
                     campaign.status = CampaignStatus.COMPLETED
                     logger.info(f"[{request_id}] ✅ Campaign completed successfully: {actual_sent}/{total_emails} sent ({success_rate:.1%})")
                 else:
