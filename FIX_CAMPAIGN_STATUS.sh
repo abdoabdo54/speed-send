@@ -11,7 +11,7 @@ git pull origin main
 
 # Run the campaign status fix script
 echo "🔍 Running campaign status fix..."
-docker-compose exec backend python fix_campaign_status.py
+docker-compose exec backend python /app/fix_campaign_status.py
 
 echo "✅ Campaign status fix completed!"
 echo "🎯 Check your campaigns page - FAILED campaigns with 0 failed emails should now show COMPLETED"
