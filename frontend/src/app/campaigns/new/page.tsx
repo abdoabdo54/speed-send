@@ -90,10 +90,12 @@ export default function NewCampaignPage() {
   const [testEmail, setTestEmail] = useState('');
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
   const [showTestModal, setShowTestModal] = useState(false);
-  const [recipientLists, setRecipientLists] = useState<Array<{id: string, name: string, recipients: string[], createdAt: string}>>([]);
+  const [recipientLists, setRecipientLists] = useState<Array<{id: string, name: string, recipients: string[], createdAt: string, geo?: string, type?: string}>>([]);
   const [selectedRecipientListId, setSelectedRecipientListId] = useState<string | null>(null);
   const [newListName, setNewListName] = useState('');
   const [inlineListName, setInlineListName] = useState('');
+  const [inlineGeo, setInlineGeo] = useState('');
+  const [inlineType, setInlineType] = useState('custom');
   const [showRecipientModal, setShowRecipientModal] = useState(false);
   const [templates, setTemplates] = useState<Array<{id: string, name: string, subject: string, body: string, createdAt: string}>>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -481,14 +483,16 @@ export default function NewCampaignPage() {
       let updatedLists;
       if (existingByName) {
         // Update existing list under the same name
-        const updated = { ...existingByName, recipients: recipients };
+        const updated = { ...existingByName, recipients: recipients, geo: inlineGeo, type: inlineType };
         updatedLists = recipientLists.map(l => l.id === existingByName.id ? updated : l);
       } else {
         const newList = {
           id: `list_${Date.now()}`,
           name: trimmedName,
           recipients: recipients,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          geo: inlineGeo,
+          type: inlineType
         };
         updatedLists = [...recipientLists, newList];
         setSelectedRecipientListId(newList.id);
@@ -1321,6 +1325,24 @@ export default function NewCampaignPage() {
                   >
                     Save List
                   </Button>
+                </div>
+                {/* Optional metadata */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div>
+                    <Label htmlFor="inline-geo">Geo (optional)</Label>
+                    <Input id="inline-geo" placeholder="e.g. US, EU, Worldwide" value={inlineGeo} onChange={(e)=>setInlineGeo(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="inline-type">Type</Label>
+                    <select id="inline-type" className="w-full p-2 border rounded-md" value={inlineType} onChange={(e)=>setInlineType(e.target.value)}>
+                      <option value="custom">Custom</option>
+                      <option value="openers">Openers</option>
+                      <option value="clickers">Clickers</option>
+                      <option value="leaders">Leads</option>
+                      <option value="unsubscribers">Unsubscribers</option>
+                      <option value="delivery">Delivery</option>
+                    </select>
+                  </div>
                 </div>
                 {/* Quick Load Saved Lists */}
                 {recipientLists.length > 0 && (
