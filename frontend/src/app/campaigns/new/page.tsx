@@ -68,6 +68,7 @@ interface CampaignConfig {
 
 export default function NewCampaignPage() {
   const router = useRouter();
+  const [editingId, setEditingId] = useState<number | null>(null);
   
   // State
   const [loading, setLoading] = useState(false);
@@ -193,6 +194,37 @@ export default function NewCampaignPage() {
             loadTemplates(),
             loadRecipientLists()
           ]);
+
+          // If an id query param exists, load campaign for editing
+          try {
+            const url = new URL(window.location.href);
+            const idParam = url.searchParams.get('id');
+            if (idParam) {
+              const cid = parseInt(idParam);
+              if (!isNaN(cid)) {
+                setEditingId(cid);
+                const res = await axios.get(`${API_URL}/api/v1/campaigns/${cid}/`);
+                const c = res.data || {};
+                setConfig(prev => ({
+                  ...prev,
+                  name: c.name || '',
+                  subject: c.subject || '',
+                  body_html: c.body_html || '',
+                  body_plain: c.body_plain || '',
+                  from_name: c.from_name || prev.from_name,
+                }));
+                if (Array.isArray(c.recipients)) {
+                  setRecipientsText(c.recipients.map((r: any) => r.email).join('\n'));
+                }
+                if (Array.isArray(c.sender_accounts)) {
+                  setSelectedAccounts(c.sender_accounts.map((a: any) => a.id).filter(Boolean));
+                }
+                appendLog(`✏️ Loaded campaign ${cid} for editing`);
+              }
+            }
+          } catch (e) {
+            console.warn('Edit preload failed:', e);
+          }
         } else {
           showNotification('Backend server is not available. Please check server status.', 'error');
         }
@@ -658,16 +690,22 @@ export default function NewCampaignPage() {
         rate_limit: config.daily_limit,
         concurrency: config.workers
       };
-
-      const url = `${API_URL}/api/v1/campaigns/`;
-      appendLog(`POST ${url} (recipients=${payload.recipients.length}, senders=${payload.sender_account_ids.length})`);
-      const response = await axios.post(url, payload, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-      appendLog(`POST ${url} -> ${response.status} id=${response.data?.id}`);
-      
-      showNotification(`Campaign created successfully! ID: ${response.data.id}`, 'success');
-      router.push('/campaigns');
+      if (editingId) {
+        const url = `${API_URL}/api/v1/campaigns/${editingId}/`;
+        appendLog(`PATCH ${url}`);
+        await axios.patch(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        showNotification(`Campaign updated successfully! ID: ${editingId}`, 'success');
+        router.push('/campaigns');
+      } else {
+        const url = `${API_URL}/api/v1/campaigns/`;
+        appendLog(`POST ${url} (recipients=${payload.recipients.length}, senders=${payload.sender_account_ids.length})`);
+        const response = await axios.post(url, payload, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        appendLog(`POST ${url} -> ${response.status} id=${response.data?.id}`);
+        showNotification(`Campaign created successfully! ID: ${response.data.id}`, 'success');
+        router.push('/campaigns');
+      }
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to create campaign';
       appendErrorLog('Create campaign', error);

@@ -442,7 +442,7 @@ export default function CampaignsPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => router.push(`/campaigns/${campaign.id}/edit`) }
+                                onClick={() => router.push(`/campaigns/new?id=${campaign.id}`) }
                               >
                                 Edit
                               </Button>
