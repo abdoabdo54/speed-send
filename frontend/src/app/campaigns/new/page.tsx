@@ -93,6 +93,7 @@ export default function NewCampaignPage() {
   const [recipientLists, setRecipientLists] = useState<Array<{id: string, name: string, recipients: string[], createdAt: string}>>([]);
   const [selectedRecipientListId, setSelectedRecipientListId] = useState<string | null>(null);
   const [newListName, setNewListName] = useState('');
+  const [inlineListName, setInlineListName] = useState('');
   const [showRecipientModal, setShowRecipientModal] = useState(false);
   const [templates, setTemplates] = useState<Array<{id: string, name: string, subject: string, body: string, createdAt: string}>>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -248,8 +249,18 @@ export default function NewCampaignPage() {
   useEffect(() => {
     if (showRecipientModal) {
       loadRecipientLists();
+      // Prefill list name from campaign name when opening the modal
+      const defaultName = (config.name && config.name.trim()) ? config.name.trim() : `List ${new Date().toLocaleDateString()}`;
+      setNewListName(defaultName);
     }
-  }, [showRecipientModal]);
+  }, [showRecipientModal, config.name]);
+
+  // Keep inline list name tracked to campaign name by default
+  useEffect(() => {
+    if (!inlineListName) {
+      setInlineListName(config.name || '');
+    }
+  }, [config.name]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -389,6 +400,19 @@ export default function NewCampaignPage() {
     }
   };
 
+  // Keep lists in sync if they change in other tabs/windows
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === 'recipient_lists') {
+        loadRecipientLists();
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handler);
+      return () => window.removeEventListener('storage', handler);
+    }
+  }, []);
+
   const saveTemplate = () => {
     if (!config.name.trim() || !config.subject.trim() || !config.body_html.trim()) {
       showNotification('Please fill in all required fields before saving template', 'error');
@@ -444,29 +468,37 @@ export default function NewCampaignPage() {
     }
   };
 
-  const saveRecipientList = () => {
-    if (!newListName.trim()) {
+  const saveRecipientList = (overrideName?: string) => {
+    const effectiveName = (overrideName ?? newListName).trim();
+    if (!effectiveName) {
       showNotification('Please enter a name for the recipient list', 'error');
       return;
     }
 
     try {
-      const newList = {
-        id: `list_${Date.now()}`,
-        name: newListName.trim(),
-        recipients: recipients,
-        createdAt: new Date().toISOString()
-      };
+      const trimmedName = effectiveName;
+      const existingByName = recipientLists.find(l => l.name === trimmedName);
+      let updatedLists;
+      if (existingByName) {
+        // Update existing list under the same name
+        const updated = { ...existingByName, recipients: recipients };
+        updatedLists = recipientLists.map(l => l.id === existingByName.id ? updated : l);
+      } else {
+        const newList = {
+          id: `list_${Date.now()}`,
+          name: trimmedName,
+          recipients: recipients,
+          createdAt: new Date().toISOString()
+        };
+        updatedLists = [...recipientLists, newList];
+        setSelectedRecipientListId(newList.id);
+      }
 
-      const updatedLists = [...recipientLists, newList];
       setRecipientLists(updatedLists);
-      
       if (typeof window !== 'undefined') {
         localStorage.setItem('recipient_lists', JSON.stringify(updatedLists));
       }
-      
-      showNotification('Recipient list saved successfully', 'success');
-      setNewListName('');
+      showNotification(`Recipient list "${trimmedName}" saved`, 'success');
       setShowRecipientModal(false);
     } catch (error) {
       console.error('Failed to save recipient list:', error);
@@ -1272,6 +1304,51 @@ export default function NewCampaignPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
+                {/* Inline List Name and Quick Save */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="inline-list-name">List Name</Label>
+                    <Input
+                      id="inline-list-name"
+                      placeholder="Enter list name"
+                      value={inlineListName}
+                      onChange={(e)=>setInlineListName(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    onClick={() => saveRecipientList(inlineListName)}
+                    disabled={!inlineListName.trim()}
+                  >
+                    Save List
+                  </Button>
+                </div>
+                {/* Quick Load Saved Lists */}
+                {recipientLists.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="p-2 border rounded-md w-full"
+                      value={selectedRecipientListId || ''}
+                      onChange={(e) => {
+                        const id = e.target.value || null;
+                        setSelectedRecipientListId(id);
+                        const list = recipientLists.find(l => l.id === id);
+                        if (list) setRecipientsText(list.recipients.join('\n'));
+                      }}
+                    >
+                      <option value="">Load saved list…</option>
+                      {recipientLists.map(list => (
+                        <option key={list.id} value={list.id}>{list.name} ({list.recipients.length})</option>
+                      ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={loadRecipientLists}
+                    >
+                      Refresh
+                    </Button>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="recipients">Email Addresses (one per line)</Label>
                   <Textarea
@@ -1571,6 +1648,18 @@ export default function NewCampaignPage() {
                           onClick={() => deleteRecipientList(list.id)}
                         >
                           Delete
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            // Append list into current recipients textarea (dedupe)
+                            const existing = new Set(recipientsText.split('\n').map(s=>s.trim()).filter(Boolean));
+                            list.recipients.forEach(r=>existing.add(r));
+                            setRecipientsText(Array.from(existing).join('\n'));
+                            setShowRecipientModal(false);
+                          }}
+                        >
+                          Add to Editor
                         </Button>
                       </div>
                     </div>
