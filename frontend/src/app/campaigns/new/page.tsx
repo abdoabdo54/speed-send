@@ -1615,7 +1615,7 @@ export default function NewCampaignPage() {
                     value={newListName}
                     onChange={(e) => setNewListName(e.target.value)}
                   />
-                  <Button onClick={saveRecipientList} disabled={!newListName.trim()}>
+                  <Button onClick={() => saveRecipientList()} disabled={!newListName.trim()}>
                     Save
                   </Button>
                 </div>
