@@ -616,7 +616,8 @@ export default function NewCampaignPage() {
     try {
       const response = await axios.post(`${API_URL}/api/v1/test-email/`, {
         recipient_email: testEmail,
-        subject: `[TEST] ${config.subject}`,
+        // Use exact subject and from_name – no prefixes or random text
+        subject: config.subject,
         body_html: config.body_html,
         body_plain: stripHtml(config.body_html),
         from_name: config.from_name,

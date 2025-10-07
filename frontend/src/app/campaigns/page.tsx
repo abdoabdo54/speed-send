@@ -441,10 +441,18 @@ export default function CampaignsPage() {
                               </Button>
                               <Button
                                 size="sm"
+                                variant="outline"
+                                onClick={() => router.push(`/campaigns/${campaign.id}/edit`) }
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
                                 variant="destructive"
                                 onClick={() => handleDelete(campaign.id)}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
                               </Button>
                             </>
                           )}
