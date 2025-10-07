@@ -244,6 +244,13 @@ export default function NewCampaignPage() {
     initializeData();
   }, []);
 
+  // Refresh lists whenever the Manage Lists modal opens
+  useEffect(() => {
+    if (showRecipientModal) {
+      loadRecipientLists();
+    }
+  }, [showRecipientModal]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -440,11 +447,6 @@ export default function NewCampaignPage() {
   const saveRecipientList = () => {
     if (!newListName.trim()) {
       showNotification('Please enter a name for the recipient list', 'error');
-      return;
-    }
-
-    if (recipients.length === 0) {
-      showNotification('Recipient list is empty', 'error');
       return;
     }
 
@@ -1540,6 +1542,9 @@ export default function NewCampaignPage() {
                     Save
                   </Button>
                 </div>
+                <div className="text-xs text-muted-foreground mt-2">
+                  Tip: You can save an empty list and fill it later.
+                </div>
               </div>
 
               {/* Load Existing Lists */}
@@ -1570,11 +1575,11 @@ export default function NewCampaignPage() {
                       </div>
                     </div>
                   ))}
-                  {recipientLists.length === 0 && (
-                    <div className="text-center py-4 text-gray-500">
-                      No saved lists
-                    </div>
-                  )}
+                {recipientLists.length === 0 && (
+                  <div className="text-center py-4 text-gray-500">
+                    No saved lists
+                  </div>
+                )}
                 </div>
               </div>
 
