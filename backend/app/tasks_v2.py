@@ -141,8 +141,15 @@ def prepare_campaign_redis(campaign_id: int):
         redis_key = get_campaign_redis_key(campaign_id)
         redis_client.delete(redis_key)  # Clear any old tasks
         
+        # Check if test_after is configured
+        test_after_enabled = campaign.test_after_email and campaign.test_after_count > 0
+        if test_after_enabled:
+            logger.info(f"[{request_id}] 🧪 Test After enabled: {campaign.test_after_count} emails -> {campaign.test_after_email}")
+        
         # Group tasks by sender
         sender_batches = {}
+        task_counter = 0  # Track position for test_after
+        
         for email_log in email_logs:
             sender_email = email_log.sender_email
             
@@ -182,6 +189,24 @@ def prepare_campaign_redis(campaign_id: int):
             }
             
             sender_batches[sender_email]['tasks'].append(task)
+            task_counter += 1
+            
+            # Add test_after email if needed
+            if test_after_enabled and task_counter % campaign.test_after_count == 0:
+                test_task = {
+                    'email_log_id': None,  # Special test task
+                    'recipient_email': campaign.test_after_email,
+                    'subject': f"[TEST AFTER {task_counter}] {final_subject}",
+                    'body_html': f"<p><strong>Test After Email #{task_counter}</strong></p><p>This is a test email sent after {task_counter} campaign emails.</p>{final_body_html}",
+                    'body_plain': f"Test After Email #{task_counter}\n\nThis is a test email sent after {task_counter} campaign emails.\n\n{final_body_plain}",
+                    'from_name': campaign.from_name,
+                    'custom_headers': campaign.custom_headers,
+                    'attachments': campaign.attachments,
+                    'is_test_after': True,
+                    'test_after_count': task_counter
+                }
+                sender_batches[sender_email]['tasks'].append(test_task)
+                logger.info(f"[{request_id}] 🧪 Added test_after email at position {task_counter}")
         
         # Push batches to Redis
         task_count = 0
@@ -202,7 +227,10 @@ def prepare_campaign_redis(campaign_id: int):
             'total': task_count,
             'sent': 0,
             'failed': 0,
-            'pending': task_count
+            'pending': task_count,
+            'test_after_enabled': '1' if test_after_enabled else '0',
+            'test_after_email': campaign.test_after_email or '',
+            'test_after_count': campaign.test_after_count or 0
         })
         redis_client.expire(progress_key, 86400)  # 24 hour expiry
         
@@ -378,13 +406,25 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
                 })
         
         elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] ✅ Sender {sender_email}: {len(tasks)} tasks in {elapsed:.2f}s ({len(tasks)/elapsed:.1f}/sec)")
+        test_after_info = f", {test_after_sent} test_after" if test_after_sent > 0 else ""
+        logger.info(f"[{request_id}] ✅ Sender {sender_email}: {len(tasks)} tasks in {elapsed:.2f}s ({len(tasks)/elapsed:.1f}/sec){test_after_info}")
         
         # Batch DB update
         sent = 0
         failed = 0
+        test_after_sent = 0
         
         for result in results:
+            # Handle test_after emails (no email_log_id)
+            if result['email_log_id'] is None:
+                if result['success']:
+                    test_after_sent += 1
+                    logger.info(f"[{request_id}] 🧪 Test After email sent successfully to {result.get('recipient_email', 'unknown')}")
+                else:
+                    logger.warning(f"[{request_id}] 🧪 Test After email failed: {result['error']}")
+                continue
+            
+            # Handle regular campaign emails
             email_log = db.query(EmailLog).filter(EmailLog.id == result['email_log_id']).first()
             if email_log:
                 if result['success']:
