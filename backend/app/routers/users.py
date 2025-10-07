@@ -35,6 +35,17 @@ async def list_workspace_users(
             query = query.filter(WorkspaceUser.is_active == is_active)
             logger.info(f"🔍 Filtering by is_active: {is_active}")
         
+        # Exclude admin-like accounts from listing (senders must be normal users)
+        from sqlalchemy import not_, func
+        admin_locals = [
+            'admin', 'administrator', 'postmaster', 'abuse', 'support'
+        ]
+        conditions = [
+            not_(func.lower(WorkspaceUser.email).like(f"{local}@%")) for local in admin_locals
+        ]
+        for cond in conditions:
+            query = query.filter(cond)
+        
         users = query.offset(skip).limit(limit).all()
         logger.info(f"✅ Found {len(users)} workspace users")
         

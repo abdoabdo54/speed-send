@@ -211,9 +211,13 @@ async def sync_account_users(
         users = google_service.fetch_workspace_users(admin_email)
         logger.info(f"✅ Fetched {len(users)} users from Google")
         
-        # Update database
+        # Update database (exclude admin-like addresses from being stored if desired for sends)
         synced_count = 0
         for user_data in users:
+            # Skip admin-like addresses from being used as senders
+            local_part = (user_data['email'] or '').split('@')[0].lower()
+            if local_part in {'admin', 'administrator', 'postmaster', 'abuse', 'support'}:
+                continue
             existing_user = db.query(WorkspaceUser).filter(
                 WorkspaceUser.service_account_id == account_id,
                 WorkspaceUser.email == user_data['email']
