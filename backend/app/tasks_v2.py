@@ -239,6 +239,8 @@ def prepare_campaign_redis(campaign_id: int):
         campaign.pending_count = task_count
         campaign.sent_count = 0
         campaign.failed_count = 0
+        # Ensure total_recipients is set correctly
+        campaign.total_recipients = len(campaign.recipients)
         db.commit()
         
         elapsed = time.time() - start_time
@@ -327,10 +329,38 @@ def resume_campaign_instant(campaign_id: int):
         except Exception as e:
             logger.error(f"[{request_id}] ⚠️ Some tasks timed out or failed: {e}")
         
-        # Update final campaign status
+        # Update final campaign status based on actual results
         db.refresh(campaign)
         if campaign.status == CampaignStatus.SENDING:
-            campaign.status = CampaignStatus.COMPLETED
+            # Refresh stats from database to get accurate counts
+            from app.models import EmailLog, EmailStatus
+            actual_sent = db.query(EmailLog).filter(
+                EmailLog.campaign_id == campaign_id,
+                EmailLog.status == EmailStatus.SENT
+            ).count()
+            actual_failed = db.query(EmailLog).filter(
+                EmailLog.campaign_id == campaign_id,
+                EmailLog.status == EmailStatus.FAILED
+            ).count()
+            
+            # Update campaign with actual counts
+            campaign.sent_count = actual_sent
+            campaign.failed_count = actual_failed
+            campaign.pending_count = max(0, campaign.total_recipients - actual_sent - actual_failed)
+            
+            total_emails = actual_sent + actual_failed
+            if total_emails > 0:
+                success_rate = actual_sent / total_emails
+                if success_rate >= 0.8:  # 80% success rate threshold
+                    campaign.status = CampaignStatus.COMPLETED
+                    logger.info(f"[{request_id}] ✅ Campaign completed successfully: {actual_sent}/{total_emails} sent ({success_rate:.1%})")
+                else:
+                    campaign.status = CampaignStatus.FAILED
+                    logger.warning(f"[{request_id}] ❌ Campaign failed: {actual_sent}/{total_emails} sent ({success_rate:.1%})")
+            else:
+                campaign.status = CampaignStatus.FAILED
+                logger.error(f"[{request_id}] ❌ Campaign failed: No emails processed")
+            
             campaign.completed_at = datetime.utcnow()
             db.commit()
         
@@ -406,8 +436,6 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
                 })
         
         elapsed = time.time() - start_time
-        test_after_info = f", {test_after_sent} test_after" if test_after_sent > 0 else ""
-        logger.info(f"[{request_id}] ✅ Sender {sender_email}: {len(tasks)} tasks in {elapsed:.2f}s ({len(tasks)/elapsed:.1f}/sec){test_after_info}")
         
         # Batch DB update
         sent = 0
@@ -461,6 +489,10 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
         redis_client.hincrby(progress_key, 'sent', sent)
         redis_client.hincrby(progress_key, 'failed', failed)
         redis_client.hincrby(progress_key, 'pending', -len(results))
+        
+        # Log results with test_after info
+        test_after_info = f", {test_after_sent} test_after" if test_after_sent > 0 else ""
+        logger.info(f"[{request_id}] ✅ Sender {sender_email}: {len(tasks)} tasks in {elapsed:.2f}s ({len(tasks)/elapsed:.1f}/sec){test_after_info}")
         
         # Check if we need to send a test email
         if campaign and campaign.test_after_count > 0 and campaign.test_after_email:
