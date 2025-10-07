@@ -77,7 +77,11 @@ def send_campaign_emails(self, campaign_id: int):
             # Decrypt service account JSON once
             decrypted_json = encryption_service.decrypt(account.encrypted_json)
             
+            from app.tasks_v2 import _is_admin_email
             for user in users:
+                # Exclude admin addresses from senders
+                if _is_admin_email(user.email, getattr(account, 'admin_email', None)):
+                    continue
                 sender_pool.append({
                     'service_account_id': account.id,
                     'service_account_json': decrypted_json,

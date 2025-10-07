@@ -175,7 +175,10 @@ async def launch_campaign(
             # Decrypt service account JSON
             decrypted_json = encryption_service.decrypt(account.encrypted_json)
             
+            from app.tasks_v2 import _is_admin_email
             for user in users:
+                if _is_admin_email(user.email, getattr(account, 'admin_email', None)):
+                    continue
                 sender_pool.append({
                     'service_account_id': account.id,
                     'service_account_json': decrypted_json,

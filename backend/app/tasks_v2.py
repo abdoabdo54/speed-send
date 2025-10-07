@@ -33,6 +33,22 @@ def get_campaign_progress_key(campaign_id: int) -> str:
     return f"campaign:{campaign_id}:progress"
 
 
+def _is_admin_email(user_email: str, service_account_admin_email: str | None) -> bool:
+    """Heuristic to exclude admin addresses from sender pool without schema change.
+    Excludes:
+    - Exact match with configured ServiceAccount.admin_email
+    - Common admin aliases: admin@, administrator@, postmaster@
+    - Google default addresses: abuse@, support@
+    """
+    if not user_email:
+        return False
+    email_lower = user_email.strip().lower()
+    if service_account_admin_email and email_lower == service_account_admin_email.strip().lower():
+        return True
+    local_part = email_lower.split("@")[0]
+    return local_part in {"admin", "administrator", "postmaster", "abuse", "support"}
+
+
 @celery_app.task(name='app.tasks_v2.prepare_campaign_redis')
 def prepare_campaign_redis(campaign_id: int):
     """
@@ -75,6 +91,9 @@ def prepare_campaign_redis(campaign_id: int):
             decrypted_json = encryption_service.decrypt(account.encrypted_json)
             
             for user in users:
+                # Skip admin addresses (must not be used as senders)
+                if _is_admin_email(user.email, getattr(account, 'admin_email', None)):
+                    continue
                 sender_pool.append({
                     'service_account_id': account.id,
                     'service_account_json': decrypted_json,
