@@ -296,6 +296,31 @@ def send_single_email(
         
         db.commit()
         
+        # Check if we need to send a test email
+        if campaign and campaign.test_after_count > 0 and campaign.test_after_email:
+            if campaign.sent_count > 0 and campaign.sent_count % campaign.test_after_count == 0:
+                try:
+                    logger.info(f"🧪 Sending test email after {campaign.sent_count} emails sent")
+                    
+                    # Send test email using the same campaign content
+                    test_subject = f"[TEST AFTER {campaign.sent_count}] {campaign.subject}"
+                    test_body_html = campaign.body_html or ""
+                    test_body_plain = campaign.body_plain or ""
+                    
+                    message_id = google_service.send_email(
+                        sender_email=sender_email,
+                        recipient_email=campaign.test_after_email,
+                        subject=test_subject,
+                        body_html=test_body_html,
+                        body_plain=test_body_plain,
+                        from_name=campaign.from_name
+                    )
+                    
+                    logger.info(f"✅ Test email sent successfully: {message_id}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ Failed to send test email: {e}")
+        
         logger.info(f"Email sent: {recipient_email} via {sender_email}")
         
     except Exception as e:

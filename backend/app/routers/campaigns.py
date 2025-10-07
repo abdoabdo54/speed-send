@@ -94,6 +94,8 @@ async def create_campaign(
             concurrency=campaign.concurrency,
             is_test=campaign.is_test,
             test_recipients=campaign.test_recipients,
+            test_after_email=campaign.test_after_email,
+            test_after_count=campaign.test_after_count,
             status=CampaignStatus.DRAFT
         )
         

@@ -64,6 +64,8 @@ interface CampaignConfig {
   daily_limit: number;
   workers: number;
   delay_ms: number;
+  test_after_email: string;
+  test_after_count: number;
 }
 
 export default function NewCampaignPage() {
@@ -85,7 +87,9 @@ export default function NewCampaignPage() {
     from_name: 'Campaign',
     daily_limit: 2000,
     workers: 6,
-    delay_ms: 200
+    delay_ms: 200,
+    test_after_email: '',
+    test_after_count: 0
   });
   const [testEmail, setTestEmail] = useState('');
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
@@ -746,7 +750,9 @@ export default function NewCampaignPage() {
         custom_headers: {},
         attachments: [],
         rate_limit: config.daily_limit,
-        concurrency: config.workers
+        concurrency: config.workers,
+        test_after_email: config.test_after_email,
+        test_after_count: config.test_after_count
       };
       if (editingId) {
         const url = `${API_URL}/api/v1/campaigns/${editingId}/`;
@@ -1035,6 +1041,61 @@ export default function NewCampaignPage() {
                   {filteredSelectedUsers.length > 300 && (
                     <div className="px-3 py-2 text-xs text-muted-foreground">+{filteredSelectedUsers.length - 300} more...</div>
                   )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Test After Feature */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-orange-600" />
+                Test After Feature
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Send a test email after every X number of emails are sent during the campaign.
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="test-after-email">Test Email Address</Label>
+                  <Input
+                    id="test-after-email"
+                    type="email"
+                    placeholder="test@example.com"
+                    value={config.test_after_email}
+                    onChange={(e) => setConfig(prev => ({ ...prev, test_after_email: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="test-after-count">Send Test After Every X Emails</Label>
+                  <Input
+                    id="test-after-count"
+                    type="number"
+                    min="0"
+                    placeholder="0 = disabled"
+                    value={config.test_after_count}
+                    onChange={(e) => setConfig(prev => ({ ...prev, test_after_count: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
+              </div>
+              
+              {config.test_after_count > 0 && config.test_after_email && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <div className="text-sm text-blue-800">
+                    <strong>Active:</strong> Test email will be sent to <code>{config.test_after_email}</code> after every <strong>{config.test_after_count}</strong> emails are sent.
+                  </div>
+                </div>
+              )}
+              
+              {config.test_after_count === 0 && (
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                  <div className="text-sm text-gray-600">
+                    Test After feature is disabled. Set a count above 0 to enable.
+                  </div>
                 </div>
               )}
             </CardContent>

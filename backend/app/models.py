@@ -128,6 +128,10 @@ class Campaign(Base):
     is_test = Column(Boolean, default=False)
     test_recipients = Column(JSON)
     
+    # Test After feature
+    test_after_email = Column(String(255))  # Email to send test to
+    test_after_count = Column(Integer, default=0)  # Send test after every X emails (0 = disabled)
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

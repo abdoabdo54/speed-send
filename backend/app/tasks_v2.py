@@ -422,6 +422,34 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
         redis_client.hincrby(progress_key, 'failed', failed)
         redis_client.hincrby(progress_key, 'pending', -len(results))
         
+        # Check if we need to send a test email
+        if campaign and campaign.test_after_count > 0 and campaign.test_after_email:
+            total_sent = redis_client.hget(progress_key, 'sent') or '0'
+            total_sent = int(total_sent)
+            
+            if total_sent > 0 and total_sent % campaign.test_after_count == 0:
+                try:
+                    logger.info(f"[{request_id}] 🧪 Sending test email after {total_sent} emails sent")
+                    
+                    # Send test email using the same campaign content
+                    test_subject = f"[TEST AFTER {total_sent}] {campaign.subject}"
+                    test_body_html = campaign.body_html or ""
+                    test_body_plain = campaign.body_plain or ""
+                    
+                    message_id = google_service.send_email(
+                        sender_email=sender_email,
+                        recipient_email=campaign.test_after_email,
+                        subject=test_subject,
+                        body_html=test_body_html,
+                        body_plain=test_body_plain,
+                        from_name=campaign.from_name
+                    )
+                    
+                    logger.info(f"[{request_id}] ✅ Test email sent successfully: {message_id}")
+                    
+                except Exception as e:
+                    logger.error(f"[{request_id}] ❌ Failed to send test email: {e}")
+        
         logger.info(f"[{request_id}] 📊 Sender {sender_email}: {sent} sent, {failed} failed")
         
     except Exception as e:

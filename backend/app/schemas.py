@@ -74,6 +74,8 @@ class CampaignCreate(BaseModel):
     concurrency: int = 5
     is_test: bool = False
     test_recipients: Optional[List[str]] = []
+    test_after_email: Optional[str] = None
+    test_after_count: int = 0
 
 
 class CampaignUpdate(BaseModel):
