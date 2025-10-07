@@ -121,6 +121,13 @@ export default function NewCampaignPage() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [userSearch, setUserSearch] = useState('');
+  const filteredSelectedUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    const base = users.filter(u => selectedAccounts.includes(u.service_account_id));
+    if (!q) return base;
+    return base.filter(u => u.email.toLowerCase().includes(q));
+  }, [users, selectedAccounts, userSearch]);
 
   // Derived collections
   const selectedUsers = useMemo(() => {
@@ -947,7 +954,7 @@ export default function NewCampaignPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-indigo-600" />
-                  Users of Selected Accounts ({selectedUsers.length})
+                  Users of Selected Accounts ({filteredSelectedUsers.length})
                 </CardTitle>
                 <div className="text-xs text-muted-foreground">
                   Total loaded: {users.length}
@@ -959,14 +966,23 @@ export default function NewCampaignPage() {
                 <div className="text-sm text-gray-500">Select one or more accounts to see their users.</div>
               ) : (
                 <div className="max-h-48 overflow-auto divide-y rounded border">
-                  {selectedUsers.slice(0, 200).map(u => (
+                  {/* Search */}
+                  <div className="p-2 sticky top-0 bg-white flex items-center gap-2">
+                    <Input
+                      placeholder="Search users by email..."
+                      value={userSearch}
+                      onChange={(e)=>setUserSearch(e.target.value)}
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{filteredSelectedUsers.length} found</span>
+                  </div>
+                  {filteredSelectedUsers.slice(0, 300).map(u => (
                     <div key={`${u.service_account_id}-${u.email}`} className="px-3 py-2 text-sm flex items-center justify-between">
                       <span className="truncate">{u.email}</span>
                       <span className={"text-xs " + (u.is_active ? 'text-green-600' : 'text-red-600')}>{u.is_active ? 'active' : 'inactive'}</span>
                     </div>
                   ))}
-                  {selectedUsers.length > 200 && (
-                    <div className="px-3 py-2 text-xs text-muted-foreground">+{selectedUsers.length - 200} more...</div>
+                  {filteredSelectedUsers.length > 300 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">+{filteredSelectedUsers.length - 300} more...</div>
                   )}
                 </div>
               )}
