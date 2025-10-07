@@ -128,6 +128,66 @@ async def create_campaign(
         raise HTTPException(status_code=500, detail=f"Failed to create campaign: {str(e)}")
 
 
+@router.patch("/{campaign_id}/", response_model=CampaignResponse)
+async def update_campaign(
+    campaign_id: int,
+    campaign_update: CampaignUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update an existing campaign
+    """
+    try:
+        # Get existing campaign
+        campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        # Update fields if provided
+        if campaign_update.name is not None:
+            campaign.name = campaign_update.name
+        if campaign_update.subject is not None:
+            campaign.subject = campaign_update.subject
+        if campaign_update.body_html is not None:
+            campaign.body_html = campaign_update.body_html
+        if campaign_update.body_plain is not None:
+            campaign.body_plain = campaign_update.body_plain
+        if campaign_update.recipients is not None:
+            campaign.recipients = [r.dict() for r in campaign_update.recipients]
+            campaign.total_recipients = len(campaign_update.recipients)
+        if campaign_update.sender_account_ids is not None:
+            # Remove existing associations
+            db.query(CampaignSender).filter(CampaignSender.campaign_id == campaign_id).delete()
+            # Add new associations
+            for account_id in campaign_update.sender_account_ids:
+                association = CampaignSender(
+                    campaign_id=campaign_id,
+                    service_account_id=account_id
+                )
+                db.add(association)
+        if campaign_update.rate_limit is not None:
+            campaign.rate_limit = campaign_update.rate_limit
+        if campaign_update.concurrency is not None:
+            campaign.concurrency = campaign_update.concurrency
+        if campaign_update.test_after_email is not None:
+            campaign.test_after_email = campaign_update.test_after_email
+        if campaign_update.test_after_count is not None:
+            campaign.test_after_count = campaign_update.test_after_count
+        
+        campaign.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(campaign)
+        
+        logger.info(f"Campaign {campaign_id} updated successfully")
+        return campaign
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update campaign: {str(e)}")
+
+
 @router.options("/{campaign_id}/launch/")
 async def launch_campaign_options(campaign_id: int, request: Request):
     # Explicit CORS preflight OK

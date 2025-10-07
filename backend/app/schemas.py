@@ -87,6 +87,8 @@ class CampaignUpdate(BaseModel):
     sender_account_ids: Optional[List[int]] = None
     rate_limit: Optional[int] = None
     concurrency: Optional[int] = None
+    test_after_email: Optional[str] = None
+    test_after_count: Optional[int] = None
 
 
 class CampaignResponse(BaseModel):
