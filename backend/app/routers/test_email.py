@@ -87,6 +87,7 @@ async def send_test_email(
                 subject=request.subject,
                 body_html=request.body_html,
                 body_plain=request.body_plain,
+                from_name=request.from_name,
                 custom_headers={},
                 attachments=[]
             )
