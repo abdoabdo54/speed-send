@@ -298,6 +298,7 @@ def send_single_email(
         
         # Check if we need to send a test email
         if campaign and campaign.test_after_count > 0 and campaign.test_after_email:
+            logger.info(f"🧪 Test After Check: sent_count={campaign.sent_count}, test_after_count={campaign.test_after_count}, test_after_email={campaign.test_after_email}")
             if campaign.sent_count > 0 and campaign.sent_count % campaign.test_after_count == 0:
                 try:
                     logger.info(f"🧪 Sending test email after {campaign.sent_count} emails sent")
