@@ -1,291 +1,189 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Upload, 
-  Plus, 
-  Search, 
-  Download, 
-  Trash2, 
-  Tag,
-  Users,
-  FileSpreadsheet
-} from 'lucide-react';
+
+type DataList = {
+  id: string;
+  name: string;
+  geo?: string;
+  type?: string; // custom | openers | clickers | leaders | unsubscribers | delivery
+  recipients: string[];
+  createdAt: string;
+};
+
+const LIST_TYPES = ['custom','openers','clickers','leaders','unsubscribers','delivery'];
 
 export default function ContactsPage() {
-  const router = useRouter();
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showImport, setShowImport] = useState(false);
-  const [importText, setImportText] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [lists, setLists] = useState<DataList[]>([]);
+  const [editing, setEditing] = useState<DataList | null>(null);
+  const [name, setName] = useState('');
+  const [geo, setGeo] = useState('');
+  const [type, setType] = useState('custom');
+  const [emailsText, setEmailsText] = useState('');
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterGeo, setFilterGeo] = useState('');
 
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setImportText(text);
-    };
-    reader.readAsText(file);
+  const persist = (next: DataList[]) => {
+    setLists(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('recipient_lists', JSON.stringify(next));
+    }
   };
 
-  const handleImport = () => {
-    const lines = importText.split('\n').filter(line => line.trim());
-    const imported = lines.map((line, index) => {
-      const email = line.trim();
-      return {
-        id: Date.now() + index,
-        email,
-        name: email.split('@')[0],
-        tags: [],
-        added: new Date().toISOString()
-      };
-    });
-
-    setContacts([...contacts, ...imported]);
-    setImportText('');
-    setShowImport(false);
-  };
-
-  const handleAddManual = () => {
-    const email = prompt('Enter email address:');
-    if (!email) return;
-
-    setContacts([
-      ...contacts,
-      {
-        id: Date.now(),
-        email,
-        name: email.split('@')[0],
-        tags: [],
-        added: new Date().toISOString()
+  const load = () => {
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('recipient_lists');
+        persist(raw ? JSON.parse(raw) : []);
       }
-    ]);
+    } catch {
+      persist([]);
+    }
   };
 
-  const handleDelete = (id: number) => {
-    if (!confirm('Delete this contact?')) return;
-    setContacts(contacts.filter(c => c.id !== id));
+  useEffect(() => {
+    load();
+    const handler = (e: StorageEvent) => {
+      if (e.key === 'recipient_lists') load();
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    return lists
+      .filter(l => !search || l.name.toLowerCase().includes(search.toLowerCase()))
+      .filter(l => !filterType || (l.type || 'custom') === filterType)
+      .filter(l => !filterGeo || (l.geo || '').toLowerCase().includes(filterGeo.toLowerCase()));
+  }, [lists, search, filterType, filterGeo]);
+
+  const startNew = () => {
+    setEditing(null);
+    setName('');
+    setGeo('');
+    setType('custom');
+    setEmailsText('');
   };
 
-  const handleExport = () => {
-    const csv = contacts.map(c => c.email).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'contacts.csv';
-    a.click();
+  const startEdit = (list: DataList) => {
+    setEditing(list);
+    setName(list.name);
+    setGeo(list.geo || '');
+    setType(list.type || 'custom');
+    setEmailsText(list.recipients.join('\n'));
   };
 
-  const filteredContacts = contacts.filter(c =>
-    c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const save = () => {
+    if (!name.trim()) return;
+    const recipients = Array.from(new Set(
+      emailsText.split(/\n|,|\s+/).map(s => s.trim()).filter(s => s.includes('@'))
+    ));
+    const now = new Date().toISOString();
+    if (editing) {
+      const updated: DataList = { ...editing, name: name.trim(), geo: geo.trim() || undefined, type, recipients, createdAt: editing.createdAt };
+      persist(lists.map(l => (l.id === editing.id ? updated : l)));
+      setEditing(updated);
+    } else {
+      const created: DataList = { id: `list_${Date.now()}`, name: name.trim(), geo: geo.trim() || undefined, type, recipients, createdAt: now };
+      persist([created, ...lists]);
+      setEditing(created);
+    }
+  };
+
+  const remove = (id: string) => {
+    if (!confirm('Delete this list?')) return;
+    persist(lists.filter(l => l.id !== id));
+    if (editing?.id === id) startNew();
+  };
 
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-8">
-          {/* Header */}
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Contacts</h1>
-              <p className="text-muted-foreground">
-                Manage your recipient lists and segments
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setShowImport(!showImport)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Import CSV
-              </Button>
-              <Button variant="outline" onClick={handleExport} disabled={contacts.length === 0}>
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-              <Button onClick={handleAddManual}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Contact
-              </Button>
-            </div>
+      <div className="flex-1 overflow-auto p-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">Data Lists</h1>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={load}>Refresh</Button>
+            <Button onClick={startNew}>New List</Button>
           </div>
+        </div>
 
-          {/* Import Section */}
-          {showImport && (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Import Contacts</CardTitle>
-                <CardDescription>Upload CSV file or paste email addresses</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Editor */}
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>{editing ? `Edit: ${editing.name}` : 'Create New List'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label htmlFor="l-name">Name</Label>
+                <Input id="l-name" value={name} onChange={(e)=>setName(e.target.value)} placeholder="e.g., Elite Buyers US" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label htmlFor="csv-file">Upload CSV File</Label>
-                  <Input
-                    id="csv-file"
-                    type="file"
-                    accept=".csv,.txt"
-                    onChange={handleCSVUpload}
-                    className="mt-2"
-                  />
+                  <Label htmlFor="l-geo">Geo (optional)</Label>
+                  <Input id="l-geo" value={geo} onChange={(e)=>setGeo(e.target.value)} placeholder="US, EU, Worldwide" />
                 </div>
-
                 <div>
-                  <Label htmlFor="paste-emails">Or Paste Emails (one per line)</Label>
-                  <Textarea
-                    id="paste-emails"
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                    placeholder={'email1@example.com\nemail2@example.com\nemail3@example.com'}
-                    rows={8}
-                    className="font-mono text-sm mt-2"
-                  />
+                  <Label htmlFor="l-type">Type</Label>
+                  <select id="l-type" className="w-full p-2 border rounded-md" value={type} onChange={(e)=>setType(e.target.value)}>
+                    {LIST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </div>
-
-                <div className="flex gap-3">
-                  <Button onClick={handleImport} disabled={!importText.trim()}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Import {importText.split('\n').filter(l => l.trim()).length} Contacts
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowImport(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{contacts.length}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Segments</CardTitle>
-                <Tag className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground mt-1">Coming soon</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Lists</CardTitle>
-                <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">1</div>
-                <p className="text-xs text-muted-foreground mt-1">Main list</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Search */}
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search contacts..."
-                  className="pl-10"
-                />
+              </div>
+              <div>
+                <Label htmlFor="l-emails">Emails (one per line)</Label>
+                <Textarea id="l-emails" rows={12} value={emailsText} onChange={(e)=>setEmailsText(e.target.value)} placeholder={'email1@example.com\nemail2@example.com'} />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={save}>Save</Button>
+                {editing && <Button variant="outline" onClick={()=>remove(editing.id)}>Delete</Button>}
               </div>
             </CardContent>
           </Card>
 
-          {/* Contacts Table */}
-          <Card>
+          {/* Lists & Filters */}
+          <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>All Contacts ({filteredContacts.length})</CardTitle>
+              <CardTitle>Lists</CardTitle>
             </CardHeader>
-            <CardContent>
-              {filteredContacts.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium mb-2">No contacts yet</p>
-                  <p className="text-muted-foreground mb-4">
-                    Import contacts from CSV or add them manually
-                  </p>
-                  <Button onClick={() => setShowImport(true)}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Import Contacts
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-4 font-medium">Email</th>
-                        <th className="text-left p-4 font-medium">Name</th>
-                        <th className="text-left p-4 font-medium">Tags</th>
-                        <th className="text-left p-4 font-medium">Added</th>
-                        <th className="text-right p-4 font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredContacts.map((contact) => (
-                        <tr key={contact.id} className="border-b hover:bg-accent/50 transition-colors">
-                          <td className="p-4 font-mono text-sm">{contact.email}</td>
-                          <td className="p-4">{contact.name}</td>
-                          <td className="p-4">
-                            {contact.tags.length > 0 ? (
-                              <div className="flex gap-1">
-                                {contact.tags.map((tag: string, i: number) => (
-                                  <span
-                                    key={i}
-                                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">No tags</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-sm text-muted-foreground">
-                            {new Date(contact.added).toLocaleDateString()}
-                          </td>
-                          <td className="p-4 text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(contact.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <Input placeholder="Search by name..." value={search} onChange={(e)=>setSearch(e.target.value)} />
+                <select className="p-2 border rounded-md" value={filterType} onChange={(e)=>setFilterType(e.target.value)}>
+                  <option value="">All Types</option>
+                  {LIST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <Input placeholder="Geo filter (e.g., US)" value={filterGeo} onChange={(e)=>setFilterGeo(e.target.value)} />
+                <Button variant="outline" onClick={()=>{setSearch('');setFilterType('');setFilterGeo('');}}>Clear Filters</Button>
+              </div>
+              <div className="max-h-[60vh] overflow-auto divide-y border rounded">
+                {filtered.map(list => (
+                  <div key={list.id} className="p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{list.name}</div>
+                      <div className="text-xs text-muted-foreground truncate">{list.type || 'custom'} {list.geo ? `• ${list.geo}` : ''} • {list.recipients.length} recipients</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={()=>startEdit(list)}>Edit</Button>
+                      <Button size="sm" onClick={()=>{
+                        // Quick copy to clipboard
+                        navigator.clipboard.writeText(list.recipients.join('\n'));
+                      }}>Copy Emails</Button>
+                    </div>
+                  </div>
+                ))}
+                {filtered.length === 0 && (
+                  <div className="p-6 text-center text-sm text-muted-foreground">No lists yet. Create one on the left.</div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -293,4 +191,3 @@ export default function ContactsPage() {
     </div>
   );
 }
-

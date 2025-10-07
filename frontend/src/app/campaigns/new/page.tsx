@@ -96,6 +96,10 @@ export default function NewCampaignPage() {
   const [inlineListName, setInlineListName] = useState('');
   const [inlineGeo, setInlineGeo] = useState('');
   const [inlineType, setInlineType] = useState('custom');
+  const LIST_TYPES = ['custom','openers','clickers','leaders','unsubscribers','delivery'];
+  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
+  const [filterType, setFilterType] = useState<string>('');
+  const [filterGeo, setFilterGeo] = useState<string>('');
   const [showRecipientModal, setShowRecipientModal] = useState(false);
   const [templates, setTemplates] = useState<Array<{id: string, name: string, subject: string, body: string, createdAt: string}>>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -263,6 +267,15 @@ export default function NewCampaignPage() {
       setInlineListName(config.name || '');
     }
   }, [config.name]);
+
+  // Rebuild recipients from selected lists
+  useEffect(() => {
+    if (selectedListIds.length === 0) return;
+    const selected = recipientLists.filter(l => selectedListIds.includes(l.id));
+    const existing = new Set<string>();
+    selected.forEach(l => l.recipients.forEach(r => existing.add(r)));
+    setRecipientsText(Array.from(existing).join('\n'));
+  }, [selectedListIds]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1301,95 +1314,40 @@ export default function NewCampaignPage() {
                   variant="outline"
                   onClick={() => setShowRecipientModal(true)}
                 >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Manage Lists
+                  <Users className="h-4 w-4 mr-2" />
+                  Load Lists
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {/* Inline List Name and Quick Save */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
-                  <div className="md:col-span-2">
-                    <Label htmlFor="inline-list-name">List Name</Label>
-                    <Input
-                      id="inline-list-name"
-                      placeholder="Enter list name"
-                      value={inlineListName}
-                      onChange={(e)=>setInlineListName(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    onClick={() => saveRecipientList(inlineListName)}
-                    disabled={!inlineListName.trim()}
-                  >
-                    Save List
-                  </Button>
-                </div>
-                {/* Optional metadata */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div>
-                    <Label htmlFor="inline-geo">Geo (optional)</Label>
-                    <Input id="inline-geo" placeholder="e.g. US, EU, Worldwide" value={inlineGeo} onChange={(e)=>setInlineGeo(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label htmlFor="inline-type">Type</Label>
-                    <select id="inline-type" className="w-full p-2 border rounded-md" value={inlineType} onChange={(e)=>setInlineType(e.target.value)}>
-                      <option value="custom">Custom</option>
-                      <option value="openers">Openers</option>
-                      <option value="clickers">Clickers</option>
-                      <option value="leaders">Leads</option>
-                      <option value="unsubscribers">Unsubscribers</option>
-                      <option value="delivery">Delivery</option>
-                    </select>
-                  </div>
-                </div>
-                {/* Quick Load Saved Lists */}
-                {recipientLists.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <select
-                      className="p-2 border rounded-md w-full"
-                      value={selectedRecipientListId || ''}
-                      onChange={(e) => {
-                        const id = e.target.value || null;
-                        setSelectedRecipientListId(id);
-                        const list = recipientLists.find(l => l.id === id);
-                        if (list) setRecipientsText(list.recipients.join('\n'));
-                      }}
-                    >
-                      <option value="">Load saved list…</option>
-                      {recipientLists.map(list => (
-                        <option key={list.id} value={list.id}>{list.name} ({list.recipients.length})</option>
-                      ))}
-                    </select>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={loadRecipientLists}
-                    >
-                      Refresh
-                    </Button>
-                  </div>
-                )}
-                <div>
-                  <Label htmlFor="recipients">Email Addresses (one per line)</Label>
-                  <Textarea
-                    id="recipients"
-                    placeholder="recipient1@example.com&#10;recipient2@example.com&#10;recipient3@example.com"
-                    value={recipientsText}
-                    onChange={(e) => setRecipientsText(e.target.value)}
-                    rows={8}
-                    className="mt-1"
-                  />
-                </div>
-                
-                {recipients.length > 0 && (
-                  <div className="text-sm text-gray-600">
-                    <p>Valid recipients: {recipients.length}</p>
-                    <p>Invalid entries: {recipientsText.split('\n').length - recipients.length}</p>
-                  </div>
-                )}
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="recipients">Email Addresses (one per line)</Label>
+                <Textarea
+                  id="recipients"
+                  placeholder="recipient1@example.com&#10;recipient2@example.com&#10;recipient3@example.com"
+                  value={recipientsText}
+                  onChange={(e) => setRecipientsText(e.target.value)}
+                  rows={8}
+                  className="mt-1"
+                />
               </div>
+              
+              <div className="text-center">
+                <Button variant="outline" onClick={() => setShowRecipientModal(true)} className="w-full">
+                  <Users className="h-4 w-4 mr-2" />
+                  Load from Data Lists
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Create and manage lists in the Contacts page
+                </p>
+              </div>
+              
+              {recipients.length > 0 && (
+                <div className="text-sm text-gray-600">
+                  <p>Valid recipients: {recipients.length}</p>
+                  <p>Invalid entries: {recipientsText.split('\n').length - recipients.length}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
