@@ -92,6 +92,7 @@ export default function NewCampaignPage() {
     test_after_count: 0
   });
   const [testEmail, setTestEmail] = useState('');
+  const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
   const [showTestModal, setShowTestModal] = useState(false);
   const [recipientLists, setRecipientLists] = useState<Array<{id: string, name: string, recipients: string[], createdAt: string, geo?: string, type?: string}>>([]);
@@ -691,8 +692,8 @@ export default function NewCampaignPage() {
       return;
     }
 
-    if (selectedAccounts.length === 0) {
-      showNotification('Please select at least one account', 'error');
+    if (selectedTestUsers.length === 0) {
+      showNotification('Please select at least one user to send from', 'error');
       return;
     }
 
@@ -708,20 +709,35 @@ export default function NewCampaignPage() {
 
     setLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/v1/test-email/`, {
-        recipient_email: testEmail,
-        // Use exact subject and from_name – no prefixes or random text
-        subject: config.subject,
-        body_html: config.body_html,
-        body_plain: stripHtml(config.body_html),
-        from_name: config.from_name,
-        sender_account_id: selectedAccounts[0]
+      // Send test emails from all selected users
+      const testPromises = selectedTestUsers.map(async (userId) => {
+        const user = users.find(u => u.id === userId);
+        if (!user) return null;
+        
+        return axios.post(`${API_URL}/api/v1/test-email/`, {
+          recipient_email: testEmail,
+          subject: config.subject,
+          body_html: config.body_html,
+          body_plain: stripHtml(config.body_html),
+          from_name: config.from_name,
+          sender_account_id: user.service_account_id,
+          sender_user_id: userId
+        });
       });
 
-      showNotification(`Test email sent to ${testEmail}`, 'success');
+      const results = await Promise.allSettled(testPromises);
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      if (successful > 0) {
+        showNotification(`Test emails sent: ${successful} successful, ${failed} failed`, 'success');
+      } else {
+        showNotification('All test emails failed to send', 'error');
+      }
+      
       setShowTestModal(false);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.detail || error.message || 'Failed to send test email';
+      const errorMsg = error.response?.data?.detail || error.message || 'Failed to send test emails';
       showNotification(`Test failed: ${errorMsg}`, 'error');
     } finally {
       setLoading(false);
@@ -1553,7 +1569,7 @@ export default function NewCampaignPage() {
       {/* Test Email Modal */}
       {showTestModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Send Test Email</h3>
             <div className="space-y-4">
               <div>
@@ -1566,10 +1582,65 @@ export default function NewCampaignPage() {
                   onChange={(e) => setTestEmail(e.target.value)}
                 />
               </div>
+              
+              {/* User Selection */}
+              <div>
+                <Label>Select Users to Send From</Label>
+                <div className="mt-2 space-y-2">
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedTestUsers(selectedUsers.map(u => u.id))}
+                    >
+                      Select All ({selectedUsers.length})
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedTestUsers([])}
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                  
+                  <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
+                    {selectedUsers.map(user => (
+                      <label key={user.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedTestUsers.includes(user.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTestUsers(prev => [...prev, user.id]);
+                            } else {
+                              setSelectedTestUsers(prev => prev.filter(id => id !== user.id));
+                            }
+                          }}
+                        />
+                        <span className="truncate">{user.email}</span>
+                        <span className={`text-xs ${user.is_active ? 'text-green-600' : 'text-red-600'}`}>
+                          {user.is_active ? 'active' : 'inactive'}
+                        </span>
+                      </label>
+                    ))}
+                    {selectedUsers.length === 0 && (
+                      <div className="text-sm text-gray-500">No users available. Select accounts first.</div>
+                    )}
+                  </div>
+                  
+                  {selectedTestUsers.length > 0 && (
+                    <div className="text-sm text-blue-600">
+                      Selected {selectedTestUsers.length} user(s) for testing
+                    </div>
+                  )}
+                </div>
+              </div>
+              
               <div className="flex gap-2">
                 <Button
                   onClick={handleSendTest}
-                  disabled={loading || !testEmail.trim()}
+                  disabled={loading || !testEmail.trim() || selectedTestUsers.length === 0}
                   className="flex-1"
                 >
                   {loading ? (
@@ -1578,7 +1649,7 @@ export default function NewCampaignPage() {
                       Sending...
                     </>
                   ) : (
-                    'Send Test'
+                    `Send Test (${selectedTestUsers.length} users)`
                   )}
                 </Button>
                 <Button

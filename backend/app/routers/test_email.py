@@ -18,6 +18,7 @@ class TestEmailRequest(BaseModel):
     body_plain: str
     from_name: str
     sender_account_id: int
+    sender_user_id: Optional[int] = None
 
 @router.post("/")
 async def send_test_email(
@@ -47,18 +48,30 @@ async def send_test_email(
         
         logger.info(f"✅ Found service account: {service_account.client_email}")
         
-        # Get first active user from this account
-        logger.info("🔍 Looking up active users...")
-        user = db.query(WorkspaceUser).filter(
-            WorkspaceUser.service_account_id == request.sender_account_id,
-            WorkspaceUser.is_active == True
-        ).first()
+        # Get specific user if provided, otherwise get first active user
+        if request.sender_user_id:
+            logger.info(f"🔍 Looking up specific user: {request.sender_user_id}")
+            user = db.query(WorkspaceUser).filter(
+                WorkspaceUser.id == request.sender_user_id,
+                WorkspaceUser.service_account_id == request.sender_account_id,
+                WorkspaceUser.is_active == True
+            ).first()
+            
+            if not user:
+                logger.error(f"❌ Specific user not found or inactive: {request.sender_user_id}")
+                raise HTTPException(status_code=404, detail="Specified user not found or inactive")
+        else:
+            logger.info("🔍 Looking up first active user...")
+            user = db.query(WorkspaceUser).filter(
+                WorkspaceUser.service_account_id == request.sender_account_id,
+                WorkspaceUser.is_active == True
+            ).first()
+            
+            if not user:
+                logger.error(f"❌ No active users found for account: {request.sender_account_id}")
+                raise HTTPException(status_code=404, detail="No active users found in this account. Please sync users first.")
         
-        if not user:
-            logger.error(f"❌ No active users found for account: {request.sender_account_id}")
-            raise HTTPException(status_code=404, detail="No active users found in this account. Please sync users first.")
-        
-        logger.info(f"✅ Found active user: {user.email}")
+        logger.info(f"✅ Found user: {user.email}")
         
         # Decrypt service account JSON
         logger.info("🔐 Decrypting service account JSON...")
