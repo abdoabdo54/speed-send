@@ -191,8 +191,8 @@ def prepare_campaign_redis(campaign_id: int):
             sender_batches[sender_email]['tasks'].append(task)
             task_counter += 1
             
-            # Add test_after email if needed
-            if test_after_enabled and task_counter % campaign.test_after_count == 0:
+            # Add test_after email if needed (only after the specified count)
+            if test_after_enabled and task_counter > 0 and task_counter % campaign.test_after_count == 0:
                 test_task = {
                     'email_log_id': None,  # Special test task
                     'recipient_email': campaign.test_after_email,
@@ -494,67 +494,8 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
         test_after_info = f", {test_after_sent} test_after" if test_after_sent > 0 else ""
         logger.info(f"[{request_id}] ✅ Sender {sender_email}: {len(tasks)} tasks in {elapsed:.2f}s ({len(tasks)/elapsed:.1f}/sec){test_after_info}")
         
-        # Check if we need to send a test email
-        if campaign and campaign.test_after_count > 0 and campaign.test_after_email:
-            total_sent = redis_client.hget(progress_key, 'sent') or '0'
-            total_sent = int(total_sent)
-            
-            # Check if we've reached a test email milestone
-            if total_sent > 0 and total_sent % campaign.test_after_count == 0:
-                try:
-                    logger.info(f"[{request_id}] 🧪 Sending test email after {total_sent} emails sent")
-                    
-                    # Send test email using the same campaign content
-                    test_subject = f"[TEST AFTER {total_sent}] {campaign.subject}"
-                    test_body_html = campaign.body_html or ""
-                    test_body_plain = campaign.body_plain or ""
-                    
-                    message_id = google_service.send_email(
-                        sender_email=sender_email,
-                        recipient_email=campaign.test_after_email,
-                        subject=test_subject,
-                        body_html=test_body_html,
-                        body_plain=test_body_plain,
-                        from_name=campaign.from_name
-                    )
-                    
-                    logger.info(f"[{request_id}] ✅ Test email sent successfully: {message_id}")
-                    
-                except Exception as e:
-                    logger.error(f"[{request_id}] ❌ Failed to send test email: {e}")
-            
-            # Also check if we just sent emails in this batch that trigger a test
-            elif sent > 0:
-                # Check if the current batch puts us over a milestone
-                previous_total = total_sent - sent
-                current_total = total_sent
-                
-                # Check if we crossed a milestone in this batch
-                previous_milestone = (previous_total // campaign.test_after_count) * campaign.test_after_count
-                current_milestone = (current_total // campaign.test_after_count) * campaign.test_after_count
-                
-                if current_milestone > previous_milestone and current_milestone > 0:
-                    try:
-                        logger.info(f"[{request_id}] 🧪 Sending test email after reaching {current_milestone} emails")
-                        
-                        # Send test email using the same campaign content
-                        test_subject = f"[TEST AFTER {current_milestone}] {campaign.subject}"
-                        test_body_html = campaign.body_html or ""
-                        test_body_plain = campaign.body_plain or ""
-                        
-                        message_id = google_service.send_email(
-                            sender_email=sender_email,
-                            recipient_email=campaign.test_after_email,
-                            subject=test_subject,
-                            body_html=test_body_html,
-                            body_plain=test_body_plain,
-                            from_name=campaign.from_name
-                        )
-                        
-                        logger.info(f"[{request_id}] ✅ Test email sent successfully: {message_id}")
-                        
-                    except Exception as e:
-                        logger.error(f"[{request_id}] ❌ Failed to send test email: {e}")
+        # Note: Test After emails are already included in the task queue during preparation
+        # No need to send additional test emails during execution
         
         logger.info(f"[{request_id}] 📊 Sender {sender_email}: {sent} sent, {failed} failed")
         
