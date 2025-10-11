@@ -211,36 +211,29 @@ async def sync_account_users(
         users = google_service.fetch_workspace_users(admin_email)
         logger.info(f"✅ Fetched {len(users)} users from Google")
         
-        # Update database (exclude admin-like addresses from being stored if desired for sends)
+        # Clear all existing users for this account to prevent duplicates when domain changes
+        logger.info(f"🗑️ Clearing existing users for account {account_id} to prevent duplicates")
+        deleted_count = db.query(WorkspaceUser).filter(WorkspaceUser.service_account_id == account_id).delete()
+        logger.info(f"🗑️ Deleted {deleted_count} old users")
+        
+        # Insert fresh users from the new domain (no duplicates possible)
         synced_count = 0
         for user_data in users:
             # Skip admin-like addresses from being used as senders
             local_part = (user_data['email'] or '').split('@')[0].lower()
             if local_part in {'admin', 'administrator', 'postmaster', 'abuse', 'support'}:
                 continue
-            existing_user = db.query(WorkspaceUser).filter(
-                WorkspaceUser.service_account_id == account_id,
-                WorkspaceUser.email == user_data['email']
-            ).first()
-            
-            if existing_user:
-                # Update existing user
-                existing_user.full_name = user_data['full_name']
-                existing_user.first_name = user_data['first_name']
-                existing_user.last_name = user_data['last_name']
-                existing_user.is_active = user_data['is_active']
-                existing_user.updated_at = datetime.utcnow()
-            else:
-                # Create new user
-                new_user = WorkspaceUser(
-                    service_account_id=account_id,
-                    email=user_data['email'],
-                    full_name=user_data['full_name'],
-                    first_name=user_data['first_name'],
-                    last_name=user_data['last_name'],
-                    is_active=user_data['is_active']
-                )
-                db.add(new_user)
+                
+            # Create new user (no duplicates possible since we cleared all existing)
+            new_user = WorkspaceUser(
+                service_account_id=account_id,
+                email=user_data['email'],
+                full_name=user_data['full_name'],
+                first_name=user_data['first_name'],
+                last_name=user_data['last_name'],
+                is_active=user_data['is_active']
+            )
+            db.add(new_user)
             synced_count += 1
         
         # Update service account metadata

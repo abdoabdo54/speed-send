@@ -82,7 +82,7 @@ export default function AccountsPage() {
           alert(
             `✅ Successfully synced ${syncResponse.data.user_count || 0} users!\n\n` +
             `Admin email used: ${adminEmail}${useAccountName ? ' (auto-detected from account name)' : ' (manually entered)'}\n\n` +
-            'You can now create campaigns and send emails.'
+            'Please refresh the Campaigns page to see the updated user list.'
           );
         } catch (syncError: any) {
           console.error('Sync error:', syncError);
@@ -107,7 +107,7 @@ export default function AccountsPage() {
                 alert(
                   `✅ Successfully synced ${manualSyncResponse.data.user_count || 0} users!\n\n` +
                   `Admin email used: ${manualAdminEmail} (manually entered)\n\n` +
-                  'You can now create campaigns and send emails.'
+                  'Please refresh the Campaigns page to see the updated user list.'
                 );
                 return;
               } catch (manualSyncError: any) {
@@ -180,7 +180,7 @@ export default function AccountsPage() {
       
       // Try sync with account name first
       const response = await serviceAccountsApi.sync(accountId, accountName);
-      alert(`✅ Successfully synced ${response.data.user_count || 0} users using account name as admin email!`);
+      alert(`✅ Successfully synced ${response.data.user_count || 0} users using account name as admin email!\n\nPlease refresh the Campaigns page to see the updated user list.`);
       loadAccounts();
       return;
     } catch (error: any) {
@@ -203,7 +203,7 @@ export default function AccountsPage() {
       try {
         // Try sync with manually entered admin email
         const response = await serviceAccountsApi.sync(accountId, adminEmail);
-        alert(`✅ Successfully synced ${response.data.user_count || 0} users with manual admin email!`);
+        alert(`✅ Successfully synced ${response.data.user_count || 0} users with manual admin email!\n\nPlease refresh the Campaigns page to see the updated user list.`);
         loadAccounts();
       } catch (manualError: any) {
         console.error('Manual sync also failed:', manualError);
