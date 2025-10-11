@@ -117,16 +117,23 @@ def send_campaign_emails(self, campaign_id: int):
             ).all()
         
         # PowerMTA Mode: Distribute emails evenly across all senders
+        # EQUAL DISTRIBUTION: Group emails by sender for equal distribution
         emails_per_sender = {}
-        for idx, email_log in enumerate(email_logs):
-            sender = sender_pool[idx % len(sender_pool)]
+        
+        # Initialize all senders with empty lists
+        for sender in sender_pool:
             sender_key = sender['user_email']
-            
-            if sender_key not in emails_per_sender:
-                emails_per_sender[sender_key] = {
-                    'sender': sender,
-                    'emails': []
-                }
+            emails_per_sender[sender_key] = {
+                'sender': sender,
+                'emails': []
+            }
+        
+        # Distribute emails equally among senders
+        for idx, email_log in enumerate(email_logs):
+            # Use round-robin but ensure equal distribution
+            sender_index = idx % len(sender_pool)
+            sender = sender_pool[sender_index]
+            sender_key = sender['user_email']
             
             # Get recipient variables
             recipient_data = next(
@@ -140,7 +147,15 @@ def send_campaign_emails(self, campaign_id: int):
                 'variables': recipient_data.get('variables', {}),
             })
         
-        logger.info(f"📊 Distribution: {len(emails_per_sender)} senders, avg {len(email_logs) // len(emails_per_sender)} emails each")
+        # Log distribution details
+        total_emails = len(email_logs)
+        total_senders = len(sender_pool)
+        avg_per_sender = total_emails // total_senders
+        extra_emails = total_emails % total_senders
+        
+        logger.info(f"📊 EQUAL DISTRIBUTION: {total_emails} emails ÷ {total_senders} senders = {avg_per_sender} emails per sender (+ {extra_emails} extra)")
+        for sender_key, data in emails_per_sender.items():
+            logger.info(f"   👤 {sender_key}: {len(data['emails'])} emails")
         
         # INSTANT PARALLEL SENDING - All senders fire simultaneously
         # Create one task per sender (not per email)
@@ -166,18 +181,46 @@ def send_campaign_emails(self, campaign_id: int):
         job = group(tasks)
         result = job.apply_async()
         
-        # Wait for all to complete (with reasonable timeout)
+        # Wait for all to complete - NO TIMEOUT LIMIT
         try:
-            result.get(timeout=600)  # 10 minutes max
+            logger.info(f"⏳ Waiting for {len(tasks)} parallel senders to complete...")
+            result.get(timeout=None)  # NO TIMEOUT - wait until ALL emails are sent
             elapsed = time.time() - start_time
             logger.info(f"✅ Campaign {campaign_id} completed in {elapsed:.2f} seconds!")
         except Exception as e:
             logger.error(f"Campaign {campaign_id} error: {e}")
         
-        # Mark campaign as completed
+        # Mark campaign as completed - check actual results
         db.refresh(campaign)
         if campaign.status == CampaignStatus.SENDING:
-            campaign.status = CampaignStatus.COMPLETED
+            # Get actual counts from database
+            actual_sent = db.query(EmailLog).filter(
+                EmailLog.campaign_id == campaign_id,
+                EmailLog.status == EmailStatus.SENT
+            ).count()
+            actual_failed = db.query(EmailLog).filter(
+                EmailLog.campaign_id == campaign_id,
+                EmailLog.status == EmailStatus.FAILED
+            ).count()
+            
+            # Update counts
+            campaign.sent_count = actual_sent
+            campaign.failed_count = actual_failed
+            campaign.pending_count = campaign.total_recipients - actual_sent - actual_failed
+            
+            # Determine final status
+            if actual_failed == 0:
+                campaign.status = CampaignStatus.COMPLETED
+                logger.info(f"✅ Campaign {campaign_id} COMPLETED: {actual_sent} sent, 0 failed")
+            else:
+                success_rate = actual_sent / (actual_sent + actual_failed)
+                if success_rate >= 0.5:  # 50% success rate threshold
+                    campaign.status = CampaignStatus.COMPLETED
+                    logger.info(f"✅ Campaign {campaign_id} COMPLETED: {actual_sent} sent, {actual_failed} failed ({success_rate:.1%} success rate)")
+                else:
+                    campaign.status = CampaignStatus.FAILED
+                    logger.info(f"❌ Campaign {campaign_id} FAILED: {actual_sent} sent, {actual_failed} failed ({success_rate:.1%} success rate)")
+            
             campaign.completed_at = datetime.utcnow()
             db.commit()
         

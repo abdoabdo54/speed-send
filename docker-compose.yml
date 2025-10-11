@@ -53,7 +53,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 8
     restart: unless-stopped
 
   # Celery Worker (PowerMTA Mode - High Concurrency)
@@ -75,9 +75,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # PowerMTA Mode: High concurrency for instant parallel sending
+    # PowerMTA Mode: MAXIMUM concurrency for instant parallel sending
     # Each worker handles multiple senders simultaneously
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=100 --pool=threads
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=1000 --pool=threads --prefetch-multiplier=1000
     restart: unless-stopped
 
   # Celery Beat (for scheduled tasks)

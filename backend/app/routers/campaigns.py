@@ -484,6 +484,72 @@ async def resume_campaign(
         raise HTTPException(status_code=500, detail=f"Failed to resume: {str(e)}")
 
 
+@router.get("/{campaign_id}/progress/")
+async def get_campaign_progress(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get real-time progress of a campaign
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    # Get real-time counts from EmailLog
+    from app.models import EmailLog, EmailStatus
+    
+    actual_sent = db.query(EmailLog).filter(
+        EmailLog.campaign_id == campaign_id,
+        EmailLog.status == EmailStatus.SENT
+    ).count()
+    
+    actual_failed = db.query(EmailLog).filter(
+        EmailLog.campaign_id == campaign_id,
+        EmailLog.status == EmailStatus.FAILED
+    ).count()
+    
+    actual_pending = db.query(EmailLog).filter(
+        EmailLog.campaign_id == campaign_id,
+        EmailLog.status == EmailStatus.PENDING
+    ).count()
+    
+    total_processed = actual_sent + actual_failed
+    total_recipients = campaign.total_recipients or 0
+    
+    # Calculate progress percentage
+    if total_recipients > 0:
+        progress_percentage = (total_processed / total_recipients) * 100
+    else:
+        progress_percentage = 0
+    
+    # Calculate success rate
+    if total_processed > 0:
+        success_rate = (actual_sent / total_processed) * 100
+    else:
+        success_rate = 0
+    
+    return {
+        "campaign_id": campaign_id,
+        "status": campaign.status,
+        "progress": {
+            "total_recipients": total_recipients,
+            "sent": actual_sent,
+            "failed": actual_failed,
+            "pending": actual_pending,
+            "processed": total_processed,
+            "progress_percentage": round(progress_percentage, 2),
+            "success_rate": round(success_rate, 2)
+        },
+        "timestamps": {
+            "created_at": campaign.created_at,
+            "prepared_at": campaign.prepared_at,
+            "started_at": campaign.started_at,
+            "completed_at": campaign.completed_at
+        }
+    }
+
+
 @router.post("/{campaign_id}/pause/")
 async def pause_campaign(
     campaign_id: int,

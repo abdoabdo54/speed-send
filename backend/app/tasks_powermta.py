@@ -93,7 +93,7 @@ def send_bulk_from_single_sender(
         
         # Use thread pool for parallel sending from this sender
         # Gmail API is thread-safe for different messages
-        max_threads = min(len(email_batch), 50)  # Up to 50 parallel threads per sender
+        max_threads = len(email_batch)  # UNLIMITED threads - send ALL emails instantly
         
         logger.info(f"👤 Sender {sender_email}: Sending {len(email_batch)} emails with {max_threads} threads")
         start_time = time.time()

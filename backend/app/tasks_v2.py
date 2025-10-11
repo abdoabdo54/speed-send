@@ -110,13 +110,31 @@ def prepare_campaign_redis(campaign_id: int):
         existing_logs_count = db.query(EmailLog).filter(EmailLog.campaign_id == campaign_id).count()
         
         if existing_logs_count == 0:
-            logger.info(f"[{request_id}] 📝 Creating {len(campaign.recipients)} email logs...")
+            logger.info(f"[{request_id}] 📝 Creating {len(campaign.recipients)} email logs with EQUAL distribution...")
             
-            from itertools import cycle
-            round_robin = cycle(sender_pool)
+            # EQUAL DISTRIBUTION: Calculate exact emails per sender
+            total_recipients = len(campaign.recipients)
+            total_senders = len(sender_pool)
+            emails_per_sender = total_recipients // total_senders
+            extra_emails = total_recipients % total_senders
             
-            for recipient in campaign.recipients:
-                sender = next(round_robin)
+            logger.info(f"[{request_id}] 📊 EQUAL DISTRIBUTION: {total_recipients} emails ÷ {total_senders} senders = {emails_per_sender} emails per sender (+ {extra_emails} extra)")
+            
+            # Distribute emails equally
+            sender_index = 0
+            emails_for_current_sender = emails_per_sender + (1 if sender_index < extra_emails else 0)
+            emails_assigned = 0
+            
+            for idx, recipient in enumerate(campaign.recipients):
+                # Check if we need to move to next sender
+                if emails_assigned >= emails_for_current_sender:
+                    sender_index += 1
+                    emails_for_current_sender = emails_per_sender + (1 if sender_index < extra_emails else 0)
+                    emails_assigned = 0
+                
+                sender = sender_pool[sender_index]
+                emails_assigned += 1
+                
                 db.add(EmailLog(
                     campaign_id=campaign_id,
                     recipient_email=recipient.get('email'),
@@ -127,7 +145,7 @@ def prepare_campaign_redis(campaign_id: int):
                     status=EmailStatus.PENDING,
                 ))
             db.commit()
-            logger.info(f"[{request_id}] ✅ Email logs created")
+            logger.info(f"[{request_id}] ✅ Email logs created with EQUAL distribution")
         
         # Fetch all email logs
         email_logs = db.query(EmailLog).filter(
@@ -321,13 +339,14 @@ def resume_campaign_instant(campaign_id: int):
         
         logger.info(f"[{request_id}] ✅ All batches dispatched in {time.time() - start_time:.2f}s")
         
-        # Wait for completion (with timeout)
+        # Wait for completion - NO TIMEOUT LIMIT
         try:
-            result.get(timeout=600)  # 10 min timeout
+            logger.info(f"[{request_id}] ⏳ Waiting for {len(task_batches)} sender batches to complete...")
+            result.get(timeout=None)  # NO TIMEOUT - wait until ALL emails are sent
             elapsed = time.time() - start_time
             logger.info(f"[{request_id}] 🎉 V2 RESUME COMPLETE in {elapsed:.2f}s")
         except Exception as e:
-            logger.error(f"[{request_id}] ⚠️ Some tasks timed out or failed: {e}")
+            logger.error(f"[{request_id}] ⚠️ Some tasks failed: {e}")
         
         # Update final campaign status based on actual results
         db.refresh(campaign)

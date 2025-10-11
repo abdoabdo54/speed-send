@@ -9,7 +9,7 @@ celery_app = Celery(
     include=['app.tasks', 'app.tasks_powermta', 'app.tasks_v2']
 )
 
-# Configure Celery for PowerMTA-style performance
+# Configure Celery for MAXIMUM PowerMTA-style performance - NO LIMITS
 celery_app.conf.update(
     task_serializer='json',
     accept_content=['json'],
@@ -17,15 +17,20 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=3600,  # 1 hour max per task
-    task_soft_time_limit=3300,  # 55 minutes soft limit
-    worker_prefetch_multiplier=1,  # Fetch one task at a time for instant execution
-    worker_max_tasks_per_child=1000,
+    # REMOVED ALL TIME LIMITS - UNLIMITED EXECUTION
+    worker_prefetch_multiplier=1000,  # Fetch MANY tasks for instant execution
+    worker_max_tasks_per_child=100000,  # NO LIMIT on tasks per worker
     broker_connection_retry_on_startup=True,
-    # PowerMTA optimization
-    task_acks_late=True,  # Acknowledge after task completion
-    task_reject_on_worker_lost=True,
-    task_compression='gzip',  # Compress large task payloads
+    # MAXIMUM PowerMTA optimization - NO DELAYS
+    task_acks_late=False,  # Acknowledge immediately for speed
+    task_reject_on_worker_lost=False,  # Don't reject for speed
+    task_compression=None,  # NO compression for speed
+    # MAXIMUM CONCURRENCY
+    worker_concurrency=1000,  # 1000 concurrent workers
+    worker_pool='threads',  # Use threads for maximum speed
+    worker_disable_rate_limits=True,  # DISABLE ALL RATE LIMITS
+    task_ignore_result=True,  # Ignore results for speed
+    task_store_eager_result=True,  # Store results immediately
 )
 
 # Task routes
