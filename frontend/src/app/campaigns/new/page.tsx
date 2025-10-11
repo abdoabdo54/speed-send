@@ -274,6 +274,9 @@ export default function NewCampaignPage() {
                   body_html: c.body_html || '',
                   body_plain: c.body_plain || '',
                   from_name: c.from_name || prev.from_name,
+                  test_after_email: c.test_after_email || '',
+                  test_after_count: c.test_after_count || 0,
+                  workers: c.concurrency || prev.workers,
                 }));
                 if (Array.isArray(c.recipients)) {
                   setRecipientsText(c.recipients.map((r: any) => r.email).join('\n'));

@@ -83,6 +83,7 @@ class CampaignUpdate(BaseModel):
     subject: Optional[str] = None
     body_html: Optional[str] = None
     body_plain: Optional[str] = None
+    from_name: Optional[str] = None
     recipients: Optional[List[RecipientData]] = None
     sender_account_ids: Optional[List[int]] = None
     rate_limit: Optional[int] = None

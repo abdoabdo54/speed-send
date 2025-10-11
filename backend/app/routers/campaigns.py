@@ -152,6 +152,8 @@ async def update_campaign(
             campaign.body_html = campaign_update.body_html
         if campaign_update.body_plain is not None:
             campaign.body_plain = campaign_update.body_plain
+        if campaign_update.from_name is not None:
+            campaign.from_name = campaign_update.from_name
         if campaign_update.recipients is not None:
             campaign.recipients = [r.dict() for r in campaign_update.recipients]
             campaign.total_recipients = len(campaign_update.recipients)
