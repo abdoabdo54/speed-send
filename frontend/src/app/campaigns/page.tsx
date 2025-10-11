@@ -24,10 +24,15 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [preparingIds, setPreparingIds] = useState<Set<number>>(new Set());
+  const [statistics, setStatistics] = useState<any>(null);
 
   useEffect(() => {
     loadCampaigns();
-    const interval = setInterval(loadCampaigns, 2000); // Refresh every 2 seconds for faster status updates
+    loadStatistics();
+    const interval = setInterval(() => {
+      loadCampaigns();
+      loadStatistics();
+    }, 2000); // Refresh every 2 seconds for faster status updates
     return () => clearInterval(interval);
   }, []);
 
@@ -40,6 +45,18 @@ export default function CampaignsPage() {
       setCampaigns([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStatistics = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/v1/campaigns/statistics/`);
+      if (response.ok) {
+        const stats = await response.json();
+        setStatistics(stats);
+      }
+    } catch (error) {
+      console.error('Failed to load statistics:', error);
     }
   };
 
@@ -357,6 +374,61 @@ export default function CampaignsPage() {
               </div>
             </div>
           </div>
+
+          {/* Daily Limits & Statistics */}
+          {statistics && (
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Daily Limit</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {statistics.daily_limits?.total_daily_limit?.toLocaleString() || '0'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">2k per account</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Sent Today</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {statistics.daily_limits?.total_sent_today?.toLocaleString() || '0'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {statistics.emails?.sent_today?.toLocaleString() || '0'} total
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Remaining</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {statistics.daily_limits?.total_remaining?.toLocaleString() || '0'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Available today</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Sent</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {statistics.emails?.sent_all_time?.toLocaleString() || '0'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">All time</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
           
           <div className="mb-8 flex items-center justify-between">
             <div>

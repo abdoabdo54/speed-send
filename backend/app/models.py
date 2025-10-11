@@ -46,6 +46,14 @@ class ServiceAccount(Base):
     # Metadata
     status = Column(Enum(AccountStatus), default=AccountStatus.ACTIVE)
     total_users = Column(Integer, default=0)
+    
+    # Daily sending limits and tracking
+    daily_limit = Column(Integer, default=2000)  # 2k emails per day per account
+    daily_sent = Column(Integer, default=0)  # Emails sent today
+    daily_reset_date = Column(Date, default=func.current_date())  # Last reset date
+    total_sent_all_time = Column(Integer, default=0)  # Total emails sent ever
+    
+    # Legacy quota fields (keeping for compatibility)
     quota_limit = Column(Integer, default=500)  # Daily quota per user
     quota_used_today = Column(Integer, default=0)
     

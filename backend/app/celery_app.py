@@ -39,5 +39,16 @@ celery_app.conf.task_routes = {
     'app.tasks.send_bulk_from_single_sender': {'queue': 'email_queue'},
     'app.tasks.send_single_email': {'queue': 'email_queue'},
     'app.tasks.sync_workspace_users': {'queue': 'sync_queue'},
+    'app.daily_limits.reset_daily_limits': {'queue': 'maintenance_queue'},
+}
+
+# Celery Beat schedule for daily limit reset
+from celery.schedules import crontab
+
+celery_app.conf.beat_schedule = {
+    'reset-daily-limits': {
+        'task': 'app.daily_limits.reset_daily_limits',
+        'schedule': crontab(hour=0, minute=0),  # Every day at midnight
+    },
 }
 

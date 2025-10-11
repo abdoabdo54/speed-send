@@ -550,6 +550,79 @@ async def get_campaign_progress(
     }
 
 
+@router.get("/statistics/")
+async def get_campaign_statistics(db: Session = Depends(get_db)):
+    """
+    Get comprehensive campaign and account statistics
+    """
+    from app.daily_limits import get_all_accounts_statistics
+    
+    try:
+        # Get account statistics
+        account_stats = get_all_accounts_statistics()
+        
+        # Get campaign statistics
+        from app.models import Campaign, CampaignStatus, EmailLog, EmailStatus
+        
+        total_campaigns = db.query(Campaign).count()
+        active_campaigns = db.query(Campaign).filter(Campaign.status == CampaignStatus.SENDING).count()
+        completed_campaigns = db.query(Campaign).filter(Campaign.status == CampaignStatus.COMPLETED).count()
+        
+        # Get total emails sent today
+        today = datetime.now().date()
+        today_sent = db.query(EmailLog).filter(
+            EmailLog.status == EmailStatus.SENT,
+            EmailLog.created_at >= datetime.combine(today, datetime.min.time())
+        ).count()
+        
+        # Get total emails sent all time
+        total_sent = db.query(EmailLog).filter(EmailLog.status == EmailStatus.SENT).count()
+        
+        return {
+            "accounts": account_stats,
+            "campaigns": {
+                "total": total_campaigns,
+                "active": active_campaigns,
+                "completed": completed_campaigns
+            },
+            "emails": {
+                "sent_today": today_sent,
+                "sent_all_time": total_sent
+            },
+            "daily_limits": {
+                "total_daily_limit": sum(acc.get('daily_limit', 0) for acc in account_stats),
+                "total_sent_today": sum(acc.get('daily_sent', 0) for acc in account_stats),
+                "total_remaining": sum(acc.get('daily_remaining', 0) for acc in account_stats)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting statistics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get statistics: {str(e)}")
+
+
+@router.get("/accounts/{account_id}/statistics/")
+async def get_account_statistics(
+    account_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed statistics for a specific account
+    """
+    from app.daily_limits import get_account_statistics
+    
+    try:
+        stats = get_account_statistics(account_id)
+        if not stats:
+            raise HTTPException(status_code=404, detail="Account not found")
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Error getting account statistics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get account statistics: {str(e)}")
+
+
 @router.post("/{campaign_id}/pause/")
 async def pause_campaign(
     campaign_id: int,

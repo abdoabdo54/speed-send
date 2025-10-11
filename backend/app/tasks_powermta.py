@@ -88,6 +88,25 @@ def send_bulk_from_single_sender(
     sender_email = sender_data['user_email']
     
     try:
+        # Check daily limit before sending
+        from app.daily_limits import check_daily_limit, update_daily_sent
+        account_id = sender_data['service_account_id']
+        emails_to_send = len(email_batch)
+        
+        can_send, remaining_limit, would_exceed_by = check_daily_limit(account_id, emails_to_send)
+        
+        if not can_send:
+            logger.warning(f"🚫 Daily limit exceeded for account {account_id}: {emails_to_send} emails requested, {remaining_limit} remaining")
+            # Mark all emails as failed due to daily limit
+            for email_data in email_batch:
+                email_log = db.query(EmailLog).filter(EmailLog.id == email_data['email_log_id']).first()
+                if email_log:
+                    email_log.status = EmailStatus.FAILED
+                    email_log.error_message = f"Daily limit exceeded: {would_exceed_by} emails over limit"
+            db.commit()
+            return {"sent": 0, "failed": emails_to_send, "error": "Daily limit exceeded"}
+        
+        logger.info(f"✅ Daily limit check passed: {emails_to_send} emails, {remaining_limit} remaining")
         # Initialize Google API service once
         google_service = GoogleWorkspaceService(sender_data['service_account_json'])
         
@@ -173,6 +192,11 @@ def send_bulk_from_single_sender(
             workspace_user.last_used = datetime.utcnow()
         
         db.commit()
+        
+        # Update daily sent count for the account
+        if sent_count > 0:
+            update_daily_sent(account_id, sent_count)
+            logger.info(f"📊 Updated daily sent: +{sent_count} emails for account {account_id}")
         
         logger.info(f"📊 Sender {sender_email}: {sent_count} sent, {failed_count} failed")
         
