@@ -47,12 +47,12 @@ export default function AccountsPage() {
       return;
     }
 
-    // Get admin email for delegation
-    const adminEmail = prompt('Enter admin email for domain-wide delegation:');
-    if (!adminEmail || !adminEmail.includes('@')) {
-      alert('Please enter a valid admin email address');
-      return;
-    }
+    // Try using account name as admin email first
+    const accountName = uploadData.name;
+    console.log(`🔄 Attempting upload with account name as admin email: ${accountName}`);
+    
+    let adminEmail = accountName;
+    let useAccountName = true;
 
     // Validate JSON
     try {
@@ -81,19 +81,58 @@ export default function AccountsPage() {
           console.log('Sync response:', syncResponse.data);
           alert(
             `✅ Successfully synced ${syncResponse.data.user_count || 0} users!\n\n` +
+            `Admin email used: ${adminEmail}${useAccountName ? ' (auto-detected from account name)' : ' (manually entered)'}\n\n` +
             'You can now create campaigns and send emails.'
           );
         } catch (syncError: any) {
           console.error('Sync error:', syncError);
           const errorMsg = syncError.response?.data?.detail || syncError.message || 'Unknown error';
-          alert(
-            '⚠️ Sync failed: ' + errorMsg +
-            '\n\nPlease check:\n' +
-            '1. The admin email is correct\n' +
-            '2. Domain-wide delegation is set up in Google Admin Console\n' +
-            '3. The admin has super admin privileges\n\n' +
-            'Click "Sync Users" button to try again.'
-          );
+          
+          // If we used account name and it failed, try manual input
+          if (useAccountName) {
+            console.log(`❌ Sync with account name failed: ${errorMsg}`);
+            const manualAdminEmail = prompt(
+              `Automatic sync with account name failed.\n` +
+              `Account: ${accountName}\n` +
+              `Error: ${errorMsg}\n\n` +
+              `Please enter admin email manually:\n` +
+              `(Example: admin@yourdomain.com)\n\n` +
+              `This email must have admin privileges.`
+            );
+            
+            if (manualAdminEmail && manualAdminEmail.includes('@')) {
+              try {
+                console.log('Trying manual admin email:', manualAdminEmail);
+                const manualSyncResponse = await serviceAccountsApi.sync(accountId, manualAdminEmail);
+                alert(
+                  `✅ Successfully synced ${manualSyncResponse.data.user_count || 0} users!\n\n` +
+                  `Admin email used: ${manualAdminEmail} (manually entered)\n\n` +
+                  'You can now create campaigns and send emails.'
+                );
+                return;
+              } catch (manualSyncError: any) {
+                console.error('Manual sync also failed:', manualSyncError);
+                const manualErrorMsg = manualSyncError.response?.data?.detail || manualSyncError.message || 'Unknown error';
+                alert(
+                  `❌ Both sync methods failed:\n\n` +
+                  `1. Account name (${accountName}): ${errorMsg}\n` +
+                  `2. Manual email (${manualAdminEmail}): ${manualErrorMsg}\n\n` +
+                  'Please check your Google Workspace configuration.'
+                );
+              }
+            } else {
+              alert('Please provide a valid admin email address.');
+            }
+          } else {
+            alert(
+              '⚠️ Sync failed: ' + errorMsg +
+              '\n\nPlease check:\n' +
+              '1. The admin email is correct\n' +
+              '2. Domain-wide delegation is set up in Google Admin Console\n' +
+              '3. The admin has super admin privileges\n\n' +
+              'Click "Sync Users" button to try again.'
+            );
+          }
         }
       } else {
         alert(
@@ -125,31 +164,53 @@ export default function AccountsPage() {
   };
 
   const handleSync = async (accountId: number) => {
-    const adminEmail = prompt(
-      'Enter admin email from your workspace:\n' +
-      '(Example: admin@yourdomain.com)\n\n' +
-      'This email must have admin privileges.'
-    );
-    
-    if (!adminEmail || !adminEmail.includes('@')) {
-      alert('Please provide a valid admin email.');
+    // Find the account to get its name
+    const account = accounts.find(acc => acc.id === accountId);
+    if (!account) {
+      alert('Account not found.');
       return;
     }
+
+    // First, try using the account name as admin email
+    const accountName = account.name;
+    console.log(`🔄 Attempting sync with account name as admin email: ${accountName}`);
     
     try {
       setLoading(true);
-      const response = await serviceAccountsApi.sync(accountId, adminEmail);
-      alert(`✅ Successfully synced ${response.data.user_count || 0} users!`);
+      
+      // Try sync with account name first
+      const response = await serviceAccountsApi.sync(accountId, accountName);
+      alert(`✅ Successfully synced ${response.data.user_count || 0} users using account name as admin email!`);
       loadAccounts();
+      return;
     } catch (error: any) {
-      const errorMsg = error.response?.data?.detail || error.message || 'Unknown error';
-      alert(
-        '❌ Sync failed: ' + errorMsg +
-        '\n\nPlease verify:\n' +
-        '1. Admin email is correct\n' +
-        '2. Domain-wide delegation is enabled\n' +
-        '3. Correct OAuth scopes are authorized'
+      console.log(`❌ Sync with account name failed: ${error.response?.data?.detail || error.message}`);
+      
+      // If that fails, prompt for manual admin email
+      const adminEmail = prompt(
+        `Automatic sync failed. Please enter admin email from your workspace:\n` +
+        `Account: ${accountName}\n` +
+        `Error: ${error.response?.data?.detail || error.message}\n\n` +
+        `Enter admin email (Example: admin@yourdomain.com):\n` +
+        `This email must have admin privileges.`
       );
+      
+      if (!adminEmail || !adminEmail.includes('@')) {
+        alert('Please provide a valid admin email.');
+        return;
+      }
+      
+      try {
+        // Try sync with manually entered admin email
+        const response = await serviceAccountsApi.sync(accountId, adminEmail);
+        alert(`✅ Successfully synced ${response.data.user_count || 0} users with manual admin email!`);
+        loadAccounts();
+      } catch (manualError: any) {
+        console.error('Manual sync also failed:', manualError);
+        alert(`❌ Sync failed with both methods:\n\n` +
+              `1. Account name (${accountName}): ${error.response?.data?.detail || error.message}\n` +
+              `2. Manual email (${adminEmail}): ${manualError.response?.data?.detail || manualError.message}`);
+      }
     } finally {
       setLoading(false);
     }
