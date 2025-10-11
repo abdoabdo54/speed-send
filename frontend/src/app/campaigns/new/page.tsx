@@ -103,7 +103,7 @@ export default function NewCampaignPage() {
   const [inlineGeo, setInlineGeo] = useState('');
   const [inlineType, setInlineType] = useState('custom');
   const LIST_TYPES = ['custom','openers','clickers','leaders','unsubscribers','delivery'];
-  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
+  // Removed selectedListIds - not used in current implementation
   const [filterType, setFilterType] = useState<string>('');
   const [filterGeo, setFilterGeo] = useState<string>('');
   const [showRecipientModal, setShowRecipientModal] = useState(false);
@@ -316,14 +316,7 @@ export default function NewCampaignPage() {
     }
   }, [config.name]);
 
-  // Rebuild recipients from selected lists
-  useEffect(() => {
-    if (selectedListIds.length === 0) return;
-    const selected = recipientLists.filter(l => selectedListIds.includes(l.id));
-    const existing = new Set<string>();
-    selected.forEach(l => l.recipients.forEach(r => existing.add(r)));
-    setRecipientsText(Array.from(existing).join('\n'));
-  }, [selectedListIds]);
+  // Removed selectedListIds useEffect - not used in current implementation
 
   // Keyboard shortcuts
   useEffect(() => {
