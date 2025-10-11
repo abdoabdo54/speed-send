@@ -25,7 +25,8 @@ def send_single_email_sync(
     body_plain: str,
     variables: Dict,
     custom_headers: Dict = None,
-    attachments: List = None
+    attachments: List = None,
+    from_name: str = None
 ) -> tuple:
     """
     Synchronous email sending (for thread pool)
@@ -46,6 +47,7 @@ def send_single_email_sync(
             subject=final_subject,
             body_html=final_body_html,
             body_plain=final_body_plain,
+            from_name=from_name,
             custom_headers=custom_headers,
             attachments=attachments
         )
@@ -65,7 +67,8 @@ def send_bulk_from_single_sender(
     body_html: str = None,
     body_plain: str = None,
     custom_headers: Dict = None,
-    attachments: List = None
+    attachments: List = None,
+    from_name: str = None
 ):
     """
     Send multiple emails from a single sender using thread pool
@@ -111,7 +114,8 @@ def send_bulk_from_single_sender(
                     body_plain,
                     email_data['variables'],
                     custom_headers,
-                    attachments
+                    attachments,
+                    from_name
                 )
                 future_to_email[future] = email_data
             

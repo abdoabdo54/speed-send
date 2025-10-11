@@ -154,7 +154,8 @@ def send_campaign_emails(self, campaign_id: int):
                 body_html=campaign.body_html,
                 body_plain=campaign.body_plain,
                 custom_headers=campaign.custom_headers,
-                attachments=campaign.attachments
+                attachments=campaign.attachments,
+                from_name=campaign.from_name
             )
             tasks.append(task)
         
@@ -211,7 +212,8 @@ def send_single_email(
     body_plain: str = None,
     variables: Dict = None,
     custom_headers: Dict = None,
-    attachments: List = None
+    attachments: List = None,
+    from_name: str = None
 ):
     """
     Send a single email
@@ -270,6 +272,7 @@ def send_single_email(
             subject=final_subject,
             body_html=final_body_html,
             body_plain=final_body_plain,
+            from_name=from_name,
             custom_headers=custom_headers,
             attachments=attachments
         )
