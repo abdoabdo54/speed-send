@@ -156,6 +156,8 @@ export default function NewCampaignPage() {
   // Context menu handlers
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    console.log('Right-click detected!', e.clientX, e.clientY);
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -180,6 +182,18 @@ export default function NewCampaignPage() {
   const closeContextMenu = () => {
     setContextMenu({x: 0, y: 0, visible: false});
   };
+
+  // Global click handler to close context menu
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      if (contextMenu.visible) {
+        closeContextMenu();
+      }
+    };
+
+    document.addEventListener('click', handleGlobalClick);
+    return () => document.removeEventListener('click', handleGlobalClick);
+  }, [contextMenu.visible]);
   const appendErrorLog = (context: string, error: any) => {
     const status = error?.response?.status;
     const detail = error?.response?.data?.detail ?? JSON.stringify(error?.response?.data ?? {});
@@ -840,7 +854,10 @@ export default function NewCampaignPage() {
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <div 
+      className="flex h-screen bg-background"
+      onContextMenu={handleContextMenu}
+    >
       <Sidebar />
       
       <div className="flex-1 overflow-auto">
@@ -977,7 +994,7 @@ export default function NewCampaignPage() {
               </div>
               <div className="h-48 overflow-auto rounded border bg-black text-green-300 text-xs p-2 font-mono">
                 {logs.length === 0 ? (
-                  <div className="text-gray-400">No logs yet. Create a campaign to see request details here.</div>
+                  <div className="text-gray-400">No logs yet. Right-click anywhere on the page or create a campaign to see request details here.</div>
                 ) : (
                   logs.map((line, idx) => (
                     <div key={idx}>{line}</div>
