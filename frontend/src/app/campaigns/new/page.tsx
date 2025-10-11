@@ -420,7 +420,21 @@ export default function NewCampaignPage() {
         showNotification('No users found. Please sync accounts first.', 'info');
       }
     } catch (error: any) {
-      appendLog(`❌ Failed to load users: ${error.message}`);
+      const errorDetails = {
+        status: error?.response?.status || 'No status',
+        message: error?.response?.data?.detail || error?.message || 'Unknown error',
+        url: error?.config?.url || 'No URL',
+        data: error?.response?.data || 'No response data'
+      };
+      
+      appendLog(`❌ Failed to load users:`);
+      appendLog(`   Status: ${errorDetails.status}`);
+      appendLog(`   Message: ${errorDetails.message}`);
+      appendLog(`   URL: ${errorDetails.url}`);
+      if (errorDetails.data && typeof errorDetails.data === 'object') {
+        appendLog(`   Response Data: ${JSON.stringify(errorDetails.data)}`);
+      }
+      
       console.error('❌ Failed to load users:', error);
       setUsers([]);
       
@@ -784,19 +798,57 @@ export default function NewCampaignPage() {
 
       appendLog(`📊 Test email results: ${successful} successful, ${failed} failed`);
 
+      // Log detailed failure reasons
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const user = users.find(u => u.id === selectedTestUsers[index]);
+          const error = result.reason;
+          const errorDetails = {
+            user: user?.email || 'Unknown',
+            status: error?.response?.status || 'No status',
+            message: error?.response?.data?.detail || error?.message || 'Unknown error',
+            url: error?.config?.url || 'No URL',
+            data: error?.response?.data || 'No response data'
+          };
+          
+          appendLog(`❌ Test email failed for ${errorDetails.user}:`);
+          appendLog(`   Status: ${errorDetails.status}`);
+          appendLog(`   Message: ${errorDetails.message}`);
+          appendLog(`   URL: ${errorDetails.url}`);
+          if (errorDetails.data && typeof errorDetails.data === 'object') {
+            appendLog(`   Response Data: ${JSON.stringify(errorDetails.data)}`);
+          }
+        } else if (result.status === 'fulfilled') {
+          const user = users.find(u => u.id === selectedTestUsers[index]);
+          appendLog(`✅ Test email sent successfully for ${user?.email || 'Unknown'}`);
+        }
+      });
+
       if (successful > 0) {
         appendLog(`✅ Test emails sent successfully: ${successful} successful, ${failed} failed`);
         showNotification(`Test emails sent: ${successful} successful, ${failed} failed`, 'success');
       } else {
-        appendLog(`❌ All test emails failed to send`);
+        appendLog(`❌ All test emails failed to send - see detailed errors above`);
         showNotification('All test emails failed to send', 'error');
       }
       
       setShowTestModal(false);
     } catch (error: any) {
-      const errorMsg = error.response?.data?.detail || error.message || 'Failed to send test emails';
-      appendLog(`❌ Test email error: ${errorMsg}`);
-      showNotification(`Test failed: ${errorMsg}`, 'error');
+      const errorDetails = {
+        status: error?.response?.status || 'No status',
+        message: error?.response?.data?.detail || error?.message || 'Unknown error',
+        url: error?.config?.url || 'No URL',
+        data: error?.response?.data || 'No response data'
+      };
+      
+      appendLog(`❌ Test email error: ${errorDetails.message}`);
+      appendLog(`   Status: ${errorDetails.status}`);
+      appendLog(`   URL: ${errorDetails.url}`);
+      if (errorDetails.data && typeof errorDetails.data === 'object') {
+        appendLog(`   Response Data: ${JSON.stringify(errorDetails.data)}`);
+      }
+      
+      showNotification(`Test failed: ${errorDetails.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -845,9 +897,22 @@ export default function NewCampaignPage() {
         router.push('/campaigns');
       }
     } catch (error: any) {
-      const errorMsg = error.response?.data?.detail || error.message || 'Failed to create campaign';
-      appendErrorLog('Create campaign', error);
-      showNotification(`Campaign creation failed: ${errorMsg}`, 'error');
+      const errorDetails = {
+        status: error?.response?.status || 'No status',
+        message: error?.response?.data?.detail || error?.message || 'Unknown error',
+        url: error?.config?.url || 'No URL',
+        data: error?.response?.data || 'No response data'
+      };
+      
+      appendLog(`❌ Campaign creation failed:`);
+      appendLog(`   Status: ${errorDetails.status}`);
+      appendLog(`   Message: ${errorDetails.message}`);
+      appendLog(`   URL: ${errorDetails.url}`);
+      if (errorDetails.data && typeof errorDetails.data === 'object') {
+        appendLog(`   Response Data: ${JSON.stringify(errorDetails.data)}`);
+      }
+      
+      showNotification(`Campaign creation failed: ${errorDetails.message}`, 'error');
     } finally {
       setLoading(false);
     }
