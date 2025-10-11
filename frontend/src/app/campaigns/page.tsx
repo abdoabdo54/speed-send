@@ -560,7 +560,36 @@ export default function CampaignsPage() {
                             </Button>
                           )}
                           
-                          {campaign.status !== 'draft' && (
+                          {/* Completed and Failed Campaigns */}
+                          {(campaign.status === 'completed' || campaign.status === 'failed') && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDuplicate(campaign.id)}
+                              >
+                                <Copy className="mr-2 h-4 w-4" />
+                                Duplicate
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => router.push(`/campaigns/new?id=${campaign.id}`)}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDelete(campaign.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </Button>
+                            </>
+                          )}
+                          
+                          {campaign.status !== 'draft' && campaign.status !== 'completed' && campaign.status !== 'failed' && (
                             <Button
                               size="sm"
                               variant="outline"
