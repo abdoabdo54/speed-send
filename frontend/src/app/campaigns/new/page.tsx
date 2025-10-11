@@ -546,12 +546,12 @@ export default function NewCampaignPage() {
       
       if (existingByName) {
         // Update existing list
-        await dataListsApi.update(existingByName.id, {
+        await dataListsApi.update(Number(existingByName.id), {
           recipients: recipients,
           geo_filter: inlineGeo,
           list_type: inlineType,
         });
-        setSelectedRecipientListId(existingByName.id);
+        setSelectedRecipientListId(Number(existingByName.id));
       } else {
         // Create new list
         const response = await dataListsApi.create({
@@ -576,7 +576,7 @@ export default function NewCampaignPage() {
 
   const loadRecipientList = (list: any) => {
     setRecipientsText(list.recipients.join('\n'));
-    setSelectedRecipientListId(list.id);
+    setSelectedRecipientListId(Number(list.id));
     setInlineGeo(list.geo_filter || '');
     setInlineType(list.list_type || 'custom');
     showNotification(`Recipient list "${list.name}" loaded`, 'info');
@@ -1886,7 +1886,7 @@ export default function NewCampaignPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => deleteRecipientList(list.id)}
+                          onClick={() => deleteRecipientList(Number(list.id))}
                         >
                           Delete
                         </Button>
