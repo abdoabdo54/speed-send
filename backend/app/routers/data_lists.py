@@ -141,6 +141,7 @@ def search_data_lists(query: str, db: Session = Depends(get_db)):
             DataList.is_active == True,
             (DataList.name.ilike(f"%{query}%")) | 
             (DataList.tags.contains([query]))
+        )
         return data_lists.all()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to search data lists: {str(e)}")
