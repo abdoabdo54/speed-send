@@ -96,8 +96,8 @@ export default function NewCampaignPage() {
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
   const [showTestModal, setShowTestModal] = useState(false);
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, visible: boolean}>({x: 0, y: 0, visible: false});
-  const [recipientLists, setRecipientLists] = useState<Array<{id: string, name: string, recipients: string[], createdAt: string, geo?: string, type?: string}>>([]);
-  const [selectedRecipientListId, setSelectedRecipientListId] = useState<string | null>(null);
+  const [recipientLists, setRecipientLists] = useState<Array<{id: number, name: string, recipients: string[], created_at: string, geo_filter?: string, list_type?: string}>>([]);
+  const [selectedRecipientListId, setSelectedRecipientListId] = useState<number | null>(null);
   const [newListName, setNewListName] = useState('');
   const [inlineListName, setInlineListName] = useState('');
   const [inlineGeo, setInlineGeo] = useState('');
@@ -546,12 +546,12 @@ export default function NewCampaignPage() {
       
       if (existingByName) {
         // Update existing list
-        await dataListsApi.update(Number(existingByName.id), {
+        await dataListsApi.update(existingByName.id, {
           recipients: recipients,
           geo_filter: inlineGeo,
           list_type: inlineType,
         });
-        setSelectedRecipientListId(Number(existingByName.id));
+        setSelectedRecipientListId(existingByName.id);
       } else {
         // Create new list
         const response = await dataListsApi.create({
@@ -576,7 +576,7 @@ export default function NewCampaignPage() {
 
   const loadRecipientList = (list: any) => {
     setRecipientsText(list.recipients.join('\n'));
-    setSelectedRecipientListId(Number(list.id));
+    setSelectedRecipientListId(list.id);
     setInlineGeo(list.geo_filter || '');
     setInlineType(list.list_type || 'custom');
     showNotification(`Recipient list "${list.name}" loaded`, 'info');
@@ -1886,7 +1886,7 @@ export default function NewCampaignPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => deleteRecipientList(Number(list.id))}
+                          onClick={() => deleteRecipientList(list.id)}
                         >
                           Delete
                         </Button>
