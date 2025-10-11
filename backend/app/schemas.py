@@ -168,3 +168,40 @@ class TestEmail(BaseModel):
     sender_account_id: int
     sender_user_email: Optional[str]
 
+
+# Data List Schemas
+class DataListCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    list_type: str = "custom"
+    geo_filter: Optional[str] = None
+    recipients: List[str] = []
+    tags: List[str] = []
+
+
+class DataListUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    list_type: Optional[str] = None
+    geo_filter: Optional[str] = None
+    recipients: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+class DataListResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    list_type: str
+    geo_filter: Optional[str]
+    recipients: List[str]
+    tags: List[str]
+    is_active: bool
+    total_recipients: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+

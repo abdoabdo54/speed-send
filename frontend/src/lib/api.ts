@@ -131,6 +131,16 @@ export const healthCheck = async (): Promise<boolean> => {
   }
 };
 
+// Data Lists API
+export const dataListsApi = {
+  list: () => API_V1.get('/data-lists/'),
+  get: (id: number) => API_V1.get(`/data-lists/${id}`),
+  create: (data: any) => API_V1.post('/data-lists/', data),
+  update: (id: number, data: any) => API_V1.put(`/data-lists/${id}`, data),
+  delete: (id: number) => API_V1.delete(`/data-lists/${id}`),
+  search: (query: string) => API_V1.get(`/data-lists/search/${query}`),
+};
+
 // Export API_URL for debugging
 export { API_URL, API_V1 };
 

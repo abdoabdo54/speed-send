@@ -200,3 +200,21 @@ class SystemLog(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+
+class DataList(Base):
+    __tablename__ = "data_lists"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    list_type = Column(String(50), default="custom")  # custom, openers, clickers, leaders, unsubscribers, delivery
+    geo_filter = Column(String(100))  # Country/region filter
+    recipients = Column(JSON, nullable=False, default=list)  # List of email addresses
+    tags = Column(JSON, default=list)  # Tags for categorization
+    is_active = Column(Boolean, default=True)
+    
+    # Metadata
+    total_recipients = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+

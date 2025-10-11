@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sidebar } from '@/components/Sidebar';
-import { API_URL as DETECTED_API_URL } from '@/lib/api';
+import { API_URL as DETECTED_API_URL, dataListsApi } from '@/lib/api';
 import { 
   Send, 
   Users, 
@@ -467,32 +467,17 @@ export default function NewCampaignPage() {
     }
   };
 
-  const loadRecipientLists = () => {
+  const loadRecipientLists = async () => {
     try {
-      if (typeof window !== 'undefined') {
-        const savedLists = localStorage.getItem('recipient_lists');
-        if (savedLists) {
-          setRecipientLists(JSON.parse(savedLists));
-        }
-      }
+      const response = await dataListsApi.list();
+      setRecipientLists(response.data);
     } catch (error) {
       console.error('Failed to load recipient lists:', error);
       setRecipientLists([]);
     }
   };
 
-  // Keep lists in sync if they change in other tabs/windows
-  useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key === 'recipient_lists') {
-        loadRecipientLists();
-      }
-    };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', handler);
-      return () => window.removeEventListener('storage', handler);
-    }
-  }, []);
+  // No need for localStorage sync since we're using database
 
   const saveTemplate = () => {
     if (!config.name.trim() || !config.subject.trim() || !config.body_html.trim()) {
@@ -549,7 +534,7 @@ export default function NewCampaignPage() {
     }
   };
 
-  const saveRecipientList = (overrideName?: string) => {
+  const saveRecipientList = async (overrideName?: string) => {
     const effectiveName = (overrideName ?? newListName).trim();
     if (!effectiveName) {
       showNotification('Please enter a name for the recipient list', 'error');
@@ -557,31 +542,31 @@ export default function NewCampaignPage() {
     }
 
     try {
-      const trimmedName = effectiveName;
-      const existingByName = recipientLists.find(l => l.name === trimmedName);
-      let updatedLists;
+      const existingByName = recipientLists.find(l => l.name === effectiveName);
+      
       if (existingByName) {
-        // Update existing list under the same name
-        const updated = { ...existingByName, recipients: recipients, geo: inlineGeo, type: inlineType };
-        updatedLists = recipientLists.map(l => l.id === existingByName.id ? updated : l);
-      } else {
-        const newList = {
-          id: `list_${Date.now()}`,
-          name: trimmedName,
+        // Update existing list
+        await dataListsApi.update(existingByName.id, {
           recipients: recipients,
-          createdAt: new Date().toISOString(),
-          geo: inlineGeo,
-          type: inlineType
-        };
-        updatedLists = [...recipientLists, newList];
-        setSelectedRecipientListId(newList.id);
+          geo_filter: inlineGeo,
+          list_type: inlineType,
+        });
+        setSelectedRecipientListId(existingByName.id);
+      } else {
+        // Create new list
+        const response = await dataListsApi.create({
+          name: effectiveName,
+          recipients: recipients,
+          geo_filter: inlineGeo,
+          list_type: inlineType,
+          tags: [],
+        });
+        setSelectedRecipientListId(response.data.id);
       }
 
-      setRecipientLists(updatedLists);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('recipient_lists', JSON.stringify(updatedLists));
-      }
-      showNotification(`Recipient list "${trimmedName}" saved`, 'success');
+      // Reload lists from database
+      await loadRecipientLists();
+      showNotification(`Recipient list "${effectiveName}" saved`, 'success');
       setShowRecipientModal(false);
     } catch (error) {
       console.error('Failed to save recipient list:', error);
@@ -592,20 +577,22 @@ export default function NewCampaignPage() {
   const loadRecipientList = (list: any) => {
     setRecipientsText(list.recipients.join('\n'));
     setSelectedRecipientListId(list.id);
+    setInlineGeo(list.geo_filter || '');
+    setInlineType(list.list_type || 'custom');
     showNotification(`Recipient list "${list.name}" loaded`, 'info');
     setShowRecipientModal(false);
   };
 
-  const deleteRecipientList = (listId: string) => {
+  const deleteRecipientList = async (listId: number) => {
     if (confirm('Are you sure you want to delete this recipient list?')) {
-      const updatedLists = recipientLists.filter(l => l.id !== listId);
-      setRecipientLists(updatedLists);
-      
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('recipient_lists', JSON.stringify(updatedLists));
+      try {
+        await dataListsApi.delete(listId);
+        await loadRecipientLists();
+        showNotification('Recipient list deleted', 'success');
+      } catch (error) {
+        console.error('Failed to delete recipient list:', error);
+        showNotification('Failed to delete recipient list', 'error');
       }
-      
-      showNotification('Recipient list deleted', 'success');
     }
   };
 

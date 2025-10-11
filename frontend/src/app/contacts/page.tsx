@@ -7,14 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { dataListsApi } from '@/lib/api';
 
 type DataList = {
-  id: string;
+  id: number;
   name: string;
-  geo?: string;
-  type?: string; // custom | openers | clickers | leaders | unsubscribers | delivery
+  description?: string;
+  list_type: string; // custom | openers | clickers | leaders | unsubscribers | delivery
+  geo_filter?: string;
   recipients: string[];
-  createdAt: string;
+  tags: string[];
+  is_active: boolean;
+  total_recipients: number;
+  created_at: string;
+  updated_at: string;
 };
 
 const LIST_TYPES = ['custom','openers','clickers','leaders','unsubscribers','delivery'];
@@ -23,50 +29,43 @@ export default function ContactsPage() {
   const [lists, setLists] = useState<DataList[]>([]);
   const [editing, setEditing] = useState<DataList | null>(null);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [geo, setGeo] = useState('');
   const [type, setType] = useState('custom');
   const [emailsText, setEmailsText] = useState('');
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterGeo, setFilterGeo] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const persist = (next: DataList[]) => {
-    setLists(next);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('recipient_lists', JSON.stringify(next));
-    }
-  };
-
-  const load = () => {
+  const loadLists = async () => {
     try {
-      if (typeof window !== 'undefined') {
-        const raw = localStorage.getItem('recipient_lists');
-        persist(raw ? JSON.parse(raw) : []);
-      }
-    } catch {
-      persist([]);
+      setLoading(true);
+      const response = await dataListsApi.list();
+      setLists(response.data);
+    } catch (error) {
+      console.error('Failed to load data lists:', error);
+      setLists([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
-    const handler = (e: StorageEvent) => {
-      if (e.key === 'recipient_lists') load();
-    };
-    window.addEventListener('storage', handler);
-    return () => window.removeEventListener('storage', handler);
+    loadLists();
   }, []);
 
   const filtered = useMemo(() => {
     return lists
       .filter(l => !search || l.name.toLowerCase().includes(search.toLowerCase()))
-      .filter(l => !filterType || (l.type || 'custom') === filterType)
-      .filter(l => !filterGeo || (l.geo || '').toLowerCase().includes(filterGeo.toLowerCase()));
+      .filter(l => !filterType || l.list_type === filterType)
+      .filter(l => !filterGeo || (l.geo_filter || '').toLowerCase().includes(filterGeo.toLowerCase()));
   }, [lists, search, filterType, filterGeo]);
 
   const startNew = () => {
     setEditing(null);
     setName('');
+    setDescription('');
     setGeo('');
     setType('custom');
     setEmailsText('');
@@ -75,32 +74,66 @@ export default function ContactsPage() {
   const startEdit = (list: DataList) => {
     setEditing(list);
     setName(list.name);
-    setGeo(list.geo || '');
-    setType(list.type || 'custom');
+    setDescription(list.description || '');
+    setGeo(list.geo_filter || '');
+    setType(list.list_type);
     setEmailsText(list.recipients.join('\n'));
   };
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) return;
-    const recipients = Array.from(new Set(
-      emailsText.split(/\n|,|\s+/).map(s => s.trim()).filter(s => s.includes('@'))
-    ));
-    const now = new Date().toISOString();
-    if (editing) {
-      const updated: DataList = { ...editing, name: name.trim(), geo: geo.trim() || undefined, type, recipients, createdAt: editing.createdAt };
-      persist(lists.map(l => (l.id === editing.id ? updated : l)));
-      setEditing(updated);
-    } else {
-      const created: DataList = { id: `list_${Date.now()}`, name: name.trim(), geo: geo.trim() || undefined, type, recipients, createdAt: now };
-      persist([created, ...lists]);
-      setEditing(created);
+    
+    try {
+      setLoading(true);
+      const recipients = Array.from(new Set(
+        emailsText.split(/\n|,|\s+/).map(s => s.trim()).filter(s => s.includes('@'))
+      ));
+      
+      if (editing) {
+        // Update existing list
+        await dataListsApi.update(editing.id, {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          list_type: type,
+          geo_filter: geo.trim() || undefined,
+          recipients,
+        });
+      } else {
+        // Create new list
+        await dataListsApi.create({
+          name: name.trim(),
+          description: description.trim() || undefined,
+          list_type: type,
+          geo_filter: geo.trim() || undefined,
+          recipients,
+          tags: [],
+        });
+      }
+      
+      await loadLists();
+      startNew();
+    } catch (error) {
+      console.error('Failed to save data list:', error);
+      alert('Failed to save data list. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: number) => {
     if (!confirm('Delete this list?')) return;
-    persist(lists.filter(l => l.id !== id));
-    if (editing?.id === id) startNew();
+    
+    try {
+      setLoading(true);
+      await dataListsApi.delete(id);
+      await loadLists();
+      if (editing?.id === id) startNew();
+    } catch (error) {
+      console.error('Failed to delete data list:', error);
+      alert('Failed to delete data list. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -125,6 +158,10 @@ export default function ContactsPage() {
               <div>
                 <Label htmlFor="l-name">Name</Label>
                 <Input id="l-name" value={name} onChange={(e)=>setName(e.target.value)} placeholder="e.g., Elite Buyers US" />
+              </div>
+              <div>
+                <Label htmlFor="l-description">Description (optional)</Label>
+                <Input id="l-description" value={description} onChange={(e)=>setDescription(e.target.value)} placeholder="Brief description of this list" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -169,7 +206,10 @@ export default function ContactsPage() {
                   <div key={list.id} className="p-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="font-medium truncate">{list.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">{list.type || 'custom'} {list.geo ? `• ${list.geo}` : ''} • {list.recipients.length} recipients</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {list.list_type} {list.geo_filter ? `• ${list.geo_filter}` : ''} • {list.total_recipients} recipients
+                        {list.description && ` • ${list.description}`}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button size="sm" variant="outline" onClick={()=>startEdit(list)}>Edit</Button>
