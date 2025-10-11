@@ -143,7 +143,7 @@ export default function ContactsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Data Lists</h1>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={load}>Refresh</Button>
+            <Button variant="outline" onClick={loadLists}>Refresh</Button>
             <Button onClick={startNew}>New List</Button>
           </div>
         </div>
