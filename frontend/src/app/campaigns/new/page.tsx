@@ -95,6 +95,7 @@ export default function NewCampaignPage() {
   const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
   const [showTestModal, setShowTestModal] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{x: number, y: number, visible: boolean}>({x: 0, y: 0, visible: false});
   const [recipientLists, setRecipientLists] = useState<Array<{id: string, name: string, recipients: string[], createdAt: string, geo?: string, type?: string}>>([]);
   const [selectedRecipientListId, setSelectedRecipientListId] = useState<string | null>(null);
   const [newListName, setNewListName] = useState('');
@@ -150,6 +151,34 @@ export default function NewCampaignPage() {
   const appendLog = (line: string) => {
     const ts = new Date().toISOString();
     setLogs(prev => [...prev.slice(-499), `[${ts}] ${line}`]);
+  };
+
+  // Context menu handlers
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      visible: true
+    });
+    appendLog('Context menu opened');
+  };
+
+  const handleContextMenuAction = (action: 'test' | 'create') => {
+    setContextMenu({x: 0, y: 0, visible: false});
+    appendLog(`Context menu action: ${action}`);
+    
+    if (action === 'test') {
+      setShowTestModal(true);
+      appendLog('Opening test email modal from context menu');
+    } else if (action === 'create') {
+      handleCreateCampaign();
+      appendLog('Creating campaign from context menu');
+    }
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu({x: 0, y: 0, visible: false});
   };
   const appendErrorLog = (context: string, error: any) => {
     const status = error?.response?.status;
@@ -356,6 +385,7 @@ export default function NewCampaignPage() {
 
   const loadUsers = async () => {
     try {
+      appendLog('🔄 Loading Google Workspace users...');
       console.log('🔄 Loading Google Workspace users...');
       const response = await axios.get(`${API_URL}/api/v1/users/`, {
         timeout: 10000,
@@ -366,14 +396,17 @@ export default function NewCampaignPage() {
       
       if (response.data && Array.isArray(response.data)) {
         setUsers(response.data);
+        appendLog(`✅ Users loaded successfully: ${response.data.length} users`);
         console.log('✅ Users loaded successfully:', response.data.length, 'users');
         showNotification(`Loaded ${response.data.length} Google Workspace users`, 'success');
       } else {
+        appendLog('⚠️ Invalid response format from users API');
         console.warn('⚠️ Invalid response format:', response.data);
         setUsers([]);
         showNotification('No users found. Please sync accounts first.', 'info');
       }
     } catch (error: any) {
+      appendLog(`❌ Failed to load users: ${error.message}`);
       console.error('❌ Failed to load users:', error);
       setUsers([]);
       
@@ -687,15 +720,21 @@ export default function NewCampaignPage() {
   };
 
   const handleSendTest = async () => {
+    appendLog('🧪 Starting test email process...');
+    
     if (!testEmail.trim()) {
+      appendLog('❌ Test email address is required');
       showNotification('Please enter a test email address', 'error');
       return;
     }
 
     if (selectedTestUsers.length === 0) {
+      appendLog('❌ No users selected for test email');
       showNotification('Please select at least one user to send from', 'error');
       return;
     }
+
+    appendLog(`📧 Sending test email to: ${testEmail} from ${selectedTestUsers.length} users`);
 
     if (!config.subject.trim()) {
       showNotification('Please enter a subject', 'error');
@@ -729,15 +768,20 @@ export default function NewCampaignPage() {
       const successful = results.filter(r => r.status === 'fulfilled').length;
       const failed = results.filter(r => r.status === 'rejected').length;
 
+      appendLog(`📊 Test email results: ${successful} successful, ${failed} failed`);
+
       if (successful > 0) {
+        appendLog(`✅ Test emails sent successfully: ${successful} successful, ${failed} failed`);
         showNotification(`Test emails sent: ${successful} successful, ${failed} failed`, 'success');
       } else {
+        appendLog(`❌ All test emails failed to send`);
         showNotification('All test emails failed to send', 'error');
       }
       
       setShowTestModal(false);
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail || error.message || 'Failed to send test emails';
+      appendLog(`❌ Test email error: ${errorMsg}`);
       showNotification(`Test failed: ${errorMsg}`, 'error');
     } finally {
       setLoading(false);
@@ -913,7 +957,11 @@ export default function NewCampaignPage() {
       ))}
 
       {/* Main Content - 3 columns: Left (Debug+Accounts), Center (Config+Composer+Recipients), Right (Stats+Actions) */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div 
+        className="grid grid-cols-1 xl:grid-cols-3 gap-6"
+        onContextMenu={handleContextMenu}
+        onClick={closeContextMenu}
+      >
         
         {/* LEFT COLUMN: Debug Log + Google Accounts + Users */}
         <div className="space-y-6">
@@ -1029,8 +1077,20 @@ export default function NewCampaignPage() {
                   <Users className="h-5 w-5 text-indigo-600" />
                   Users of Selected Accounts ({filteredSelectedUsers.length})
                 </CardTitle>
-                <div className="text-xs text-muted-foreground">
-                  Total loaded: {users.length}
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={loadUsers}
+                    disabled={loading}
+                    className="flex items-center gap-1"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                  <div className="text-xs text-muted-foreground">
+                    Total loaded: {users.length}
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -1985,6 +2045,33 @@ export default function NewCampaignPage() {
       )}
         </div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <div
+          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            onClick={() => handleContextMenuAction('test')}
+          >
+            <TestTube className="h-4 w-4" />
+            Send Test Email
+          </button>
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            onClick={() => handleContextMenuAction('create')}
+          >
+            <Send className="h-4 w-4" />
+            Create Campaign
+          </button>
+        </div>
+      )}
     </div>
   );
 }
