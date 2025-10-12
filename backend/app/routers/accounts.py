@@ -207,9 +207,9 @@ async def sync_account_users(
         # Initialize Google API service
         google_service = GoogleWorkspaceService(decrypted_json)
         
-        # Fetch users with the provided admin email
+        # Fetch users with the provided admin email (admin detection happens automatically)
         users = google_service.fetch_workspace_users(admin_email)
-        logger.info(f"✅ Fetched {len(users)} users from Google")
+        logger.info(f"✅ Fetched {len(users)} users from Google (admin users automatically excluded)")
         
         # Clear all existing users for this account to prevent duplicates when domain changes
         logger.info(f"🗑️ Clearing existing users for account {account_id} to prevent duplicates")

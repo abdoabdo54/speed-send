@@ -43,6 +43,78 @@ class GoogleWorkspaceService:
         delegated_credentials = credentials.with_subject(user_email)
         return delegated_credentials
     
+    def _detect_admin_user(self, user_email: str, user_name: str, first_name: str, last_name: str, user_data: dict, admin_email: str = None) -> bool:
+        """
+        INTELLIGENT ADMIN DETECTION - Automatically detect admin users during fetch
+        
+        This function analyzes user data to determine if a user is an admin
+        based on multiple criteria including Google Workspace roles and permissions.
+        """
+        if not user_email:
+            return False
+        
+        email_lower = user_email.lower()
+        name_lower = user_name.lower() if user_name else ''
+        first_name_lower = first_name.lower() if first_name else ''
+        last_name_lower = last_name.lower() if last_name else ''
+        
+        # 1. Check Google Workspace roles and permissions
+        org_unit_path = user_data.get('orgUnitPath', '')
+        if org_unit_path and ('admin' in org_unit_path.lower() or 'super' in org_unit_path.lower()):
+            return True
+        
+        # 2. Check if user has admin privileges (Google Workspace specific)
+        is_admin = user_data.get('isAdmin', False)
+        is_delegated_admin = user_data.get('isDelegatedAdmin', False)
+        if is_admin or is_delegated_admin:
+            return True
+        
+        # 3. Check for admin email patterns
+        admin_email_patterns = [
+            'admin', 'administrator', 'postmaster', 'abuse', 'support',
+            'noreply', 'no-reply', 'donotreply', 'do-not-reply',
+            'system', 'automation', 'bot', 'nobot', 'no-bot',
+            'test', 'testing', 'demo', 'sample'
+        ]
+        
+        local_part = email_lower.split('@')[0]
+        for pattern in admin_email_patterns:
+            if (local_part == pattern or 
+                local_part.startswith(pattern + '.') or 
+                local_part.startswith(pattern + '_')):
+                return True
+        
+        # 4. Check for admin name patterns
+        admin_name_patterns = [
+            'admin', 'administrator', 'postmaster', 'abuse', 'support',
+            'system', 'automation', 'bot', 'test', 'demo', 'sample'
+        ]
+        
+        for pattern in admin_name_patterns:
+            if (pattern in name_lower or 
+                pattern in first_name_lower or 
+                pattern in last_name_lower):
+                return True
+        
+        # 5. Check if user is the one used for delegation (admin_email)
+        if admin_email and email_lower == admin_email.lower():
+            return True
+        
+        # 6. Check for common admin indicators in user data
+        user_notes = user_data.get('notes', '')
+        if user_notes and any(keyword in user_notes.lower() for keyword in ['admin', 'administrator', 'super user']):
+            return True
+        
+        # 7. Check for specific admin roles in custom attributes
+        custom_attributes = user_data.get('customSchemas', {})
+        for schema in custom_attributes.values():
+            if isinstance(schema, dict):
+                for value in schema.values():
+                    if isinstance(value, str) and any(keyword in value.lower() for keyword in ['admin', 'administrator', 'super']):
+                        return True
+        
+        return False
+    
     def fetch_workspace_users(self, admin_email: str = None) -> List[Dict]:
         """
         Fetch all users from Google Workspace domain
@@ -105,18 +177,34 @@ class GoogleWorkspaceService:
             
             logger.info(f"✅ Successfully fetched {len(users)} users from Google Workspace")
             
-            # Parse user data
+            # Parse user data with intelligent admin detection
             parsed_users = []
+            admin_users = []
+            
             for user in users:
+                user_email = user.get('primaryEmail')
+                user_name = user.get('name', {}).get('fullName', '')
+                first_name = user.get('name', {}).get('givenName', '')
+                last_name = user.get('name', {}).get('familyName', '')
+                
+                # INTELLIGENT ADMIN DETECTION
+                is_admin = self._detect_admin_user(user_email, user_name, first_name, last_name, user, admin_email)
+                
+                if is_admin:
+                    admin_users.append(user_email)
+                    logger.info(f"🚫 ADMIN DETECTED: {user_email} (excluded from senders)")
+                    continue  # Skip admin users
+                
                 parsed_users.append({
-                    'email': user.get('primaryEmail'),
-                    'full_name': user.get('name', {}).get('fullName'),
-                    'first_name': user.get('name', {}).get('givenName'),
-                    'last_name': user.get('name', {}).get('familyName'),
+                    'email': user_email,
+                    'full_name': user_name,
+                    'first_name': first_name,
+                    'last_name': last_name,
                     'is_active': not user.get('suspended', False)
                 })
             
             logger.info(f"📊 Parsed {len(parsed_users)} user records")
+            logger.info(f"🚫 Excluded {len(admin_users)} admin users: {admin_users}")
             
             return parsed_users
         
