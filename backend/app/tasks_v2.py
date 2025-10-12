@@ -33,14 +33,15 @@ def get_campaign_progress_key(campaign_id: int) -> str:
     return f"campaign:{campaign_id}:progress"
 
 
-def _is_admin_email(user_email: str, service_account_admin_email: str | None) -> bool:
-    """COMPREHENSIVE admin email detection to exclude admin addresses from sender pool.
+def _is_admin_email(user_email: str, service_account_admin_email: str | None, user_name: str = None) -> bool:
+    """COMPREHENSIVE admin detection (email + names) to exclude admin addresses from sender pool.
     Excludes:
     - Exact match with configured ServiceAccount.admin_email
     - Common admin aliases: admin@, administrator@, postmaster@
     - Google default addresses: abuse@, support@
     - No-reply patterns: noreply@, no-reply@, donotreply@
     - System addresses: system@, automation@, bot@
+    - Admin names: admin, administrator, postmaster, system, automation, bot, test, demo
     """
     if not user_email:
         return False
@@ -66,6 +67,13 @@ def _is_admin_email(user_email: str, service_account_admin_email: str | None) ->
     for pattern in admin_patterns:
         if local_part == pattern or local_part.startswith(pattern + '.') or local_part.startswith(pattern + '_'):
             return True
+    
+    # Check user name for admin patterns
+    if user_name:
+        name_lower = user_name.strip().lower()
+        for pattern in admin_patterns:
+            if pattern in name_lower:
+                return True
     
     return False
 
@@ -113,7 +121,7 @@ def prepare_campaign_redis(campaign_id: int):
             
             for user in users:
                 # Skip admin addresses (must not be used as senders)
-                if _is_admin_email(user.email, getattr(account, 'admin_email', None)):
+                if _is_admin_email(user.email, getattr(account, 'admin_email', None), user.full_name):
                     continue
                 sender_pool.append({
                     'service_account_id': account.id,

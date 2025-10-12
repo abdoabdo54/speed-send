@@ -412,7 +412,7 @@ export default function NewCampaignPage() {
           const email = user.email.toLowerCase();
           const localPart = email.split('@')[0];
           
-          // Admin patterns to exclude
+          // Admin patterns to exclude (email and names)
           const adminPatterns = [
             'admin', 'administrator', 'postmaster', 'abuse', 'support',
             'noreply', 'no-reply', 'donotreply', 'do-not-reply',
@@ -425,6 +425,19 @@ export default function NewCampaignPage() {
             if (localPart === pattern || 
                 localPart.startsWith(pattern + '.') || 
                 localPart.startsWith(pattern + '_')) {
+              return false; // Exclude this user
+            }
+          }
+          
+          // Check user names for admin patterns
+          const fullName = (user.full_name || '').toLowerCase();
+          const firstName = (user.first_name || '').toLowerCase();
+          const lastName = (user.last_name || '').toLowerCase();
+          
+          for (const pattern of adminPatterns) {
+            if (fullName.includes(pattern) || 
+                firstName.includes(pattern) || 
+                lastName.includes(pattern)) {
               return false; // Exclude this user
             }
           }

@@ -45,9 +45,16 @@ async def list_workspace_users(
         ).all()
         admin_email_list = [email[0] for email in admin_emails if email[0]]
         
-        # Common admin patterns
+        # Common admin patterns (email and names)
         admin_locals = [
             'admin', 'administrator', 'postmaster', 'abuse', 'support', 
+            'noreply', 'no-reply', 'donotreply', 'do-not-reply'
+        ]
+        
+        # Admin name patterns to exclude
+        admin_name_patterns = [
+            'admin', 'administrator', 'postmaster', 'abuse', 'support',
+            'system', 'automation', 'bot', 'test', 'demo', 'sample',
             'noreply', 'no-reply', 'donotreply', 'do-not-reply'
         ]
         
@@ -58,9 +65,18 @@ async def list_workspace_users(
         if admin_email_list:
             conditions.append(not_(WorkspaceUser.email.in_(admin_email_list)))
         
-        # Exclude admin patterns
+        # Exclude admin email patterns
         for local in admin_locals:
             conditions.append(not_(func.lower(WorkspaceUser.email).like(f"{local}@%")))
+        
+        # Exclude admin name patterns (full_name, first_name, last_name)
+        for pattern in admin_name_patterns:
+            # Check full_name
+            conditions.append(not_(func.lower(WorkspaceUser.full_name).like(f"%{pattern}%")))
+            # Check first_name
+            conditions.append(not_(func.lower(WorkspaceUser.first_name).like(f"%{pattern}%")))
+            # Check last_name
+            conditions.append(not_(func.lower(WorkspaceUser.last_name).like(f"%{pattern}%")))
         
         # Apply all conditions
         if conditions:
