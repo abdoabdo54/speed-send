@@ -35,16 +35,39 @@ async def list_workspace_users(
             query = query.filter(WorkspaceUser.is_active == is_active)
             logger.info(f"🔍 Filtering by is_active: {is_active}")
         
-        # Exclude admin-like accounts from listing (senders must be normal users)
-        from sqlalchemy import not_, func
+        # FORCE EXCLUDE admin-like accounts from listing (senders must be normal users)
+        from sqlalchemy import not_, func, or_, and_
+        from app.models import ServiceAccount
+        
+        # Get all service account admin emails
+        admin_emails = db.query(ServiceAccount.admin_email).filter(
+            ServiceAccount.admin_email.isnot(None)
+        ).all()
+        admin_email_list = [email[0] for email in admin_emails if email[0]]
+        
+        # Common admin patterns
         admin_locals = [
-            'admin', 'administrator', 'postmaster', 'abuse', 'support'
+            'admin', 'administrator', 'postmaster', 'abuse', 'support', 
+            'noreply', 'no-reply', 'donotreply', 'do-not-reply'
         ]
-        conditions = [
-            not_(func.lower(WorkspaceUser.email).like(f"{local}@%")) for local in admin_locals
-        ]
-        for cond in conditions:
-            query = query.filter(cond)
+        
+        # Build exclusion conditions
+        conditions = []
+        
+        # Exclude exact admin email matches
+        if admin_email_list:
+            conditions.append(not_(WorkspaceUser.email.in_(admin_email_list)))
+        
+        # Exclude admin patterns
+        for local in admin_locals:
+            conditions.append(not_(func.lower(WorkspaceUser.email).like(f"{local}@%")))
+        
+        # Apply all conditions
+        if conditions:
+            query = query.filter(and_(*conditions)) if len(conditions) > 1 else query.filter(conditions[0])
+        
+        logger.info(f"🚫 Excluded admin emails: {admin_email_list}")
+        logger.info(f"🚫 Excluded admin patterns: {admin_locals}")
         
         users = query.offset(skip).limit(limit).all()
         logger.info(f"✅ Found {len(users)} workspace users")

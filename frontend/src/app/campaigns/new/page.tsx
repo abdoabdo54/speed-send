@@ -405,10 +405,37 @@ export default function NewCampaignPage() {
       });
       
       if (response.data && Array.isArray(response.data)) {
-        setUsers(response.data);
-        appendLog(`✅ Users loaded successfully: ${response.data.length} users`);
-        console.log('✅ Users loaded successfully:', response.data.length, 'users');
-        showNotification(`Loaded ${response.data.length} Google Workspace users`, 'success');
+        // FORCE FILTER admin users on frontend as well (double protection)
+        const filteredUsers = response.data.filter(user => {
+          if (!user.email) return false;
+          
+          const email = user.email.toLowerCase();
+          const localPart = email.split('@')[0];
+          
+          // Admin patterns to exclude
+          const adminPatterns = [
+            'admin', 'administrator', 'postmaster', 'abuse', 'support',
+            'noreply', 'no-reply', 'donotreply', 'do-not-reply',
+            'system', 'automation', 'bot', 'nobot', 'no-bot',
+            'test', 'testing', 'demo', 'sample'
+          ];
+          
+          // Check if local part matches any admin pattern
+          for (const pattern of adminPatterns) {
+            if (localPart === pattern || 
+                localPart.startsWith(pattern + '.') || 
+                localPart.startsWith(pattern + '_')) {
+              return false; // Exclude this user
+            }
+          }
+          
+          return true; // Include this user
+        });
+        
+        setUsers(filteredUsers);
+        appendLog(`✅ Users loaded successfully: ${filteredUsers.length} users (${response.data.length - filteredUsers.length} admin users excluded)`);
+        console.log('✅ Users loaded successfully:', filteredUsers.length, 'users (admin users excluded)');
+        showNotification(`Loaded ${filteredUsers.length} Google Workspace users (admin users excluded)`, 'success');
       } else {
         appendLog('⚠️ Invalid response format from users API');
         console.warn('⚠️ Invalid response format:', response.data);

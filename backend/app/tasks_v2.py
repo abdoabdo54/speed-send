@@ -34,19 +34,40 @@ def get_campaign_progress_key(campaign_id: int) -> str:
 
 
 def _is_admin_email(user_email: str, service_account_admin_email: str | None) -> bool:
-    """Heuristic to exclude admin addresses from sender pool without schema change.
+    """COMPREHENSIVE admin email detection to exclude admin addresses from sender pool.
     Excludes:
     - Exact match with configured ServiceAccount.admin_email
     - Common admin aliases: admin@, administrator@, postmaster@
     - Google default addresses: abuse@, support@
+    - No-reply patterns: noreply@, no-reply@, donotreply@
+    - System addresses: system@, automation@, bot@
     """
     if not user_email:
         return False
+    
     email_lower = user_email.strip().lower()
+    
+    # Check exact admin email match
     if service_account_admin_email and email_lower == service_account_admin_email.strip().lower():
         return True
+    
+    # Extract local part (before @) for pattern matching
     local_part = email_lower.split("@")[0]
-    return local_part in {"admin", "administrator", "postmaster", "abuse", "support"}
+    
+    # Comprehensive admin patterns
+    admin_patterns = {
+        'admin', 'administrator', 'postmaster', 'abuse', 'support',
+        'noreply', 'no-reply', 'donotreply', 'do-not-reply',
+        'system', 'automation', 'bot', 'nobot', 'no-bot',
+        'test', 'testing', 'demo', 'sample'
+    }
+    
+    # Check if local part matches any admin pattern
+    for pattern in admin_patterns:
+        if local_part == pattern or local_part.startswith(pattern + '.') or local_part.startswith(pattern + '_'):
+            return True
+    
+    return False
 
 
 @celery_app.task(name='app.tasks_v2.prepare_campaign_redis')
