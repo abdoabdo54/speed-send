@@ -555,14 +555,9 @@ async def get_campaign_statistics(db: Session = Depends(get_db)):
     """
     Get comprehensive campaign and account statistics
     """
-    from app.daily_limits import get_all_accounts_statistics
-    
     try:
-        # Get account statistics
-        account_stats = get_all_accounts_statistics()
-        
         # Get campaign statistics
-        from app.models import Campaign, CampaignStatus, EmailLog, EmailStatus
+        from app.models import Campaign, CampaignStatus, EmailLog, EmailStatus, ServiceAccount
         
         total_campaigns = db.query(Campaign).count()
         active_campaigns = db.query(Campaign).filter(Campaign.status == CampaignStatus.SENDING).count()
@@ -578,6 +573,25 @@ async def get_campaign_statistics(db: Session = Depends(get_db)):
         # Get total emails sent all time
         total_sent = db.query(EmailLog).filter(EmailLog.status == EmailStatus.SENT).count()
         
+        # Get account statistics (with fallback for missing columns)
+        try:
+            from app.daily_limits import get_all_accounts_statistics
+            account_stats = get_all_accounts_statistics()
+        except Exception as e:
+            logger.warning(f"Daily limits not available, using fallback: {e}")
+            # Fallback: basic account stats
+            accounts = db.query(ServiceAccount).all()
+            account_stats = []
+            for account in accounts:
+                account_stats.append({
+                    "id": account.id,
+                    "name": account.name,
+                    "daily_limit": getattr(account, 'daily_limit', 2000),
+                    "daily_sent": getattr(account, 'daily_sent', 0),
+                    "daily_remaining": getattr(account, 'daily_limit', 2000) - getattr(account, 'daily_sent', 0),
+                    "total_sent_all_time": getattr(account, 'total_sent_all_time', 0)
+                })
+        
         return {
             "accounts": account_stats,
             "campaigns": {
@@ -590,9 +604,9 @@ async def get_campaign_statistics(db: Session = Depends(get_db)):
                 "sent_all_time": total_sent
             },
             "daily_limits": {
-                "total_daily_limit": sum(acc.get('daily_limit', 0) for acc in account_stats),
+                "total_daily_limit": sum(acc.get('daily_limit', 2000) for acc in account_stats),
                 "total_sent_today": sum(acc.get('daily_sent', 0) for acc in account_stats),
-                "total_remaining": sum(acc.get('daily_remaining', 0) for acc in account_stats)
+                "total_remaining": sum(acc.get('daily_remaining', 2000) for acc in account_stats)
             }
         }
         
