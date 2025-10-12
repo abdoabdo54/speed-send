@@ -34,7 +34,7 @@ def get_campaign_progress_key(campaign_id: int) -> str:
 
 
 def _is_admin_email(user_email: str, service_account_admin_email: str | None, user_name: str = None) -> bool:
-    """COMPREHENSIVE admin detection (email + names) to exclude admin addresses from sender pool.
+    """ULTRA-AGGRESSIVE admin detection to exclude admin addresses from sender pool.
     Excludes:
     - Exact match with configured ServiceAccount.admin_email
     - Common admin aliases: admin@, administrator@, postmaster@
@@ -42,20 +42,21 @@ def _is_admin_email(user_email: str, service_account_admin_email: str | None, us
     - No-reply patterns: noreply@, no-reply@, donotreply@
     - System addresses: system@, automation@, bot@
     - Admin names: admin, administrator, postmaster, system, automation, bot, test, demo
+    - ANY user that matches the admin email used for sync
     """
     if not user_email:
         return False
     
     email_lower = user_email.strip().lower()
     
-    # Check exact admin email match
+    # CRITICAL: Check exact admin email match (this is the most important check)
     if service_account_admin_email and email_lower == service_account_admin_email.strip().lower():
         return True
     
     # Extract local part (before @) for pattern matching
     local_part = email_lower.split("@")[0]
     
-    # Comprehensive admin patterns
+    # COMPREHENSIVE admin patterns
     admin_patterns = {
         'admin', 'administrator', 'postmaster', 'abuse', 'support',
         'noreply', 'no-reply', 'donotreply', 'do-not-reply',
