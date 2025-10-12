@@ -50,7 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_service_accounts_daily_sent ON service_accounts(d
 
 -- Show the updated table structure
 SELECT 
-    account_name,
+    name,
     daily_limit,
     daily_sent,
     daily_reset_date,
@@ -61,7 +61,7 @@ FROM service_accounts;
 
 # Test the new statistics endpoint
 echo "🔍 Testing statistics endpoint..."
-curl -s http://localhost:8000/api/v1/campaigns/statistics/ | jq '.' || echo "Statistics endpoint test completed"
+curl -s http://localhost:8000/api/v1/campaigns/statistics/ || echo "Statistics endpoint test completed"
 
 # Check backend health
 echo "🩺 Checking backend health..."
