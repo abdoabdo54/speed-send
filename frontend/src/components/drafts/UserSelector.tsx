@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Dispatch, SetStateAction } from 'react';
 import { ChevronRight, Building, User } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -14,9 +14,10 @@ interface Account {
 
 interface UserSelectorProps {
   accounts: Account[];
+  onUserSelect: Dispatch<SetStateAction<User | null>>;
 }
 
-export function UserSelector({ accounts }: UserSelectorProps) {
+export function UserSelector({ accounts, onUserSelect }: UserSelectorProps) {
   const [expandedAccounts, setExpandedAccounts] = useState<string[]>([accounts[0]?.id || '']);
   const [selectedUsers, setSelectedUsers] = useState<{ [key: string]: boolean }>({});
 
@@ -26,8 +27,10 @@ export function UserSelector({ accounts }: UserSelectorProps) {
     );
   };
 
-  const handleUserSelect = (userId: string) => {
-    setSelectedUsers(prev => ({...prev, [userId]: !prev[userId]}));
+  const handleUserSelect = (user: User) => {
+    const newSelectedUsers = {[user.id]: !selectedUsers[user.id]};
+    setSelectedUsers(newSelectedUsers);
+    onUserSelect(user);
   }
   
   const handleSelectAll = (users: Account['users']) => {
@@ -35,6 +38,8 @@ export function UserSelector({ accounts }: UserSelectorProps) {
     const newSelectedUsers = {...selectedUsers};
     users.forEach(u => newSelectedUsers[u.id] = !allSelected);
     setSelectedUsers(newSelectedUsers);
+    // This is a simplified approach. You might want to pass all selected users to the parent.
+    onUserSelect(users[0]); 
   }
 
   return (
@@ -75,7 +80,7 @@ export function UserSelector({ accounts }: UserSelectorProps) {
                   {account.users.map((user) => (
                     <li key={user.id}>
                       <label htmlFor={`user-${user.id}`} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
-                        <Checkbox id={`user-${user.id}`} onCheckedChange={() => handleUserSelect(user.id)} checked={!!selectedUsers[user.id]} />
+                        <Checkbox id={`user-${user.id}`} onCheckedChange={() => handleUserSelect(user)} checked={!!selectedUsers[user.id]} />
                         <div className="flex-grow">
                           <p className="font-medium text-gray-800">{user.name}</p>
                           <p className="text-xs text-gray-500">{user.email}</p>
