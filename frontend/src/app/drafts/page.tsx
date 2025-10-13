@@ -50,7 +50,7 @@ export default function DraftsPage() {
 
   const fetchCampaigns = async () => {
       try {
-        const data = await fetchWithRetry('http://localhost:8000/api/campaigns', {});
+        const data = await fetchWithRetry('http://localhost:8000/api/v1/campaigns', {});
         setCampaigns(data);
       } catch (error: any) {
         console.error("Failed to fetch campaigns after multiple retries:", error);
@@ -84,11 +84,11 @@ export default function DraftsPage() {
 
 
   const handleUpload = (id: string) => {
-    handleApiCall(`http://localhost:8000/api/campaigns/${id}/launch`, { method: 'POST' }, 'Successfully uploaded drafts!', 'Failed to upload drafts.');
+    handleApiCall(`http://localhost:8000/api/v1/campaigns/${id}/launch`, { method: 'POST' }, 'Successfully uploaded drafts!', 'Failed to upload drafts.');
   };
 
   const handleDuplicate = (id:string) => {
-     handleApiCall(`http://localhost:8000/api/campaigns/${id}/duplicate`, { method: 'POST' }, 'Campaign duplicated!', 'Failed to duplicate campaign.');
+     handleApiCall(`http://localhost:8000/api/v1/campaigns/${id}/duplicate`, { method: 'POST' }, 'Campaign duplicated!', 'Failed to duplicate campaign.');
   };
 
   const handleResume = (id: string) => {
@@ -98,7 +98,7 @@ export default function DraftsPage() {
 
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this campaign?')) {
-      handleApiCall(`http://localhost:8000/api/campaigns/${id}`, { method: 'DELETE' }, 'Campaign deleted.', 'Failed to delete campaign.');
+      handleApiCall(`http://localhost:8000/api/v1/campaigns/${id}`, { method: 'DELETE' }, 'Campaign deleted.', 'Failed to delete campaign.');
     }
   };
   
