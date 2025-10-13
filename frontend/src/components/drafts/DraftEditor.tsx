@@ -6,16 +6,24 @@ import { Button } from '@/components/ui/button';
 import { Paperclip, Code, Eye } from 'lucide-react';
 
 interface DraftEditorProps {
-  campaign: {
+  campaign?: {
     id: string;
     name: string;
     subject: string;
     fromName?: string;
     body: string;
-  };
+  } | null;
 }
 
 export function DraftEditor({ campaign }: DraftEditorProps) {
+  const currentCampaign = campaign || {
+    id: 'new',
+    name: '',
+    subject: '',
+    fromName: '',
+    body: '',
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 space-y-6">
       <h3 className="text-lg font-bold text-gray-900">Prepare Draft Campaign</h3>
@@ -23,15 +31,15 @@ export function DraftEditor({ campaign }: DraftEditorProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="campaignName" className="text-sm font-medium text-gray-700 block mb-2">Campaign Name</label>
-          <Input id="campaignName" defaultValue={campaign.name} />
+          <Input id="campaignName" defaultValue={currentCampaign.name} />
         </div>
         <div>
           <label htmlFor="subjectLine" className="text-sm font-medium text-gray-700 block mb-2">Subject Line</label>
-          <Input id="subjectLine" defaultValue={campaign.subject} />
+          <Input id="subjectLine" defaultValue={currentCampaign.subject} />
         </div>
         <div>
           <label htmlFor="fromName" className="text-sm font-medium text-gray-700 block mb-2">From Name <span className='text-gray-400'>(Optional)</span></label>
-          <Input id="fromName" defaultValue={campaign.fromName} />
+          <Input id="fromName" defaultValue={currentCampaign.fromName} />
         </div>
       </div>
 
@@ -47,7 +55,7 @@ export function DraftEditor({ campaign }: DraftEditorProps) {
           {/* WYSIWYG Editor Placeholder */}
           <div
             className="prose prose-sm max-w-none p-4 h-64 overflow-y-auto" 
-            dangerouslySetInnerHTML={{ __html: campaign.body }}
+            dangerouslySetInnerHTML={{ __html: currentCampaign.body }}
           />
         </div>
       </div>
