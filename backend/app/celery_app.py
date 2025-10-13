@@ -18,8 +18,7 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     # REMOVED ALL TIME LIMITS - UNLIMITED EXECUTION
-    worker_prefetch_multiplier=1000,  # Fetch MANY tasks for instant execution
-    worker_max_tasks_per_child=100000,  # NO LIMIT on tasks per worker
+    # (deduplicated in favor of higher values below)
     broker_connection_retry_on_startup=True,
     # ULTRA-MAXIMUM PowerMTA optimization - NO DELAYS, NO LIMITS
     task_acks_late=False,  # Acknowledge immediately for speed
