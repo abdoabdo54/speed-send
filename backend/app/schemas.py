@@ -79,7 +79,6 @@ class CampaignBase(AppBaseModel):
 class CampaignCreate(CampaignBase):
     sender_account_ids: List[int]
     recipients: List[Recipient] = []
-    # Removed body_plain from here, can be generated from body_html if needed
 
 class CampaignUpdate(AppBaseModel):
     name: Optional[str] = None
@@ -98,6 +97,21 @@ class CampaignResponse(CampaignBase):
     sent_count: int
     failed_count: int
     sender_accounts: List[ServiceAccountResponse] = []
+
+# --- Dashboard Schemas ---
+class QuotaUsage(BaseModel):
+    sent: int
+    limit: int
+    percentage: float
+
+class DashboardStats(AppBaseModel):
+    total_accounts: int
+    total_users: int
+    total_campaigns: int
+    active_campaigns: int
+    emails_sent_today: int
+    emails_failed_today: int
+    quota_usage: Dict[str, QuotaUsage]
 
 # --- Other Schemas ---
 class CampaignControl(AppBaseModel):
