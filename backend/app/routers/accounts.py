@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models import ServiceAccount, WorkspaceUser
 from app.schemas import ServiceAccountResponse, ServiceAccountCreate, WorkspaceUserResponse
 
-router = APIRouter(prefix="/service-accounts", tags=["service-accounts"])
+router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 @router.get("/", response_model=List[ServiceAccountResponse])
 async def list_service_accounts(db: Session = Depends(get_db)):
