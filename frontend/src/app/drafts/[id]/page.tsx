@@ -26,7 +26,7 @@ interface Account {
   id: number;
   name: string;
   client_email: string;
-  users: User[];
+  workspace_users: User[];
 }
 
 interface User {
@@ -79,7 +79,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
       // Flatten users from selected accounts
       return accounts
           .filter(acc => selectedAccounts.includes(acc.id))
-          .flatMap(acc => acc.users);
+          .flatMap(acc => acc.workspace_users || []);
   }, [accounts, selectedAccounts]);
 
   // Backend health check
@@ -359,7 +359,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
             </Card>
             
             <div className="flex items-center gap-4">
-                <Button onClick={handleSaveDraft} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-600">
+                <Button onClick={handleSaveDraft} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                   {isEditing ? 'Update Draft' : 'Save Draft'}
                 </Button>
