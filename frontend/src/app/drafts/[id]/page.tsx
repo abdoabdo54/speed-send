@@ -9,6 +9,28 @@ import { DraftActionsPanel } from '@/components/drafts/DraftActionsPanel';
 import { NewFeature } from '@/components/drafts/NewFreature';
 import { Toast } from '@/components/shared/Toast';
 
+// Define types for our data
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Account {
+  id: string;
+  name: string;
+  users: User[];
+}
+
+interface Campaign {
+  id: string;
+  name: string;
+  subject: string;
+  fromName: string;
+  body: string;
+  attachments: any[];
+}
+
 // Utility function for fetch with retry and exponential backoff
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 500) {
   for (let i = 0; i < retries; i++) {
@@ -34,8 +56,8 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
 }
 
 export default function DraftEditorPage({ params }: { params: { id: string } }) {
-  const [campaign, setCampaign] = useState(null);
-  const [accounts, setAccounts] = useState([]);
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastInfo, setToastInfo] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -44,24 +66,21 @@ export default function DraftEditorPage({ params }: { params: { id: string } }) 
       try {
         setLoading(true);
 
-        // Fetch campaign details
         if (params.id !== 'new') {
             const campaignData = await fetchWithRetry(`http://localhost:8000/api/campaigns/${params.id}`, {});
             setCampaign(campaignData);
         }
 
-        // Fetch all accounts
         const accountsData = await fetchWithRetry('http://localhost:8000/api/accounts', {});
         
-        // Fetch users for each account
-        const accountsWithUsers = await Promise.all(
-          accountsData.map(async (account: any) => {
+        const accountsWithUsers: Account[] = await Promise.all(
+          (accountsData as any[]).map(async (account: any) => {
             try {
               const users = await fetchWithRetry(`http://localhost:8000/api/users?service_account_id=${account.id}`, {});
               return { ...account, users };
             } catch (error) {
                 console.error(`Failed to fetch users for account ${account.id}`, error);
-                return { ...account, users: [] }; // Return account with empty users on error
+                return { ...account, users: [] };
             }
           })
         );
@@ -104,18 +123,15 @@ export default function DraftEditorPage({ params }: { params: { id: string } }) 
             </div>
         ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Panel - User & Account Selection */}
             <div className="lg:col-span-3 space-y-8">
                 <UserSelector accounts={accounts} />
                 <NewFeature />
             </div>
     
-            {/* Middle Panel - Draft Configuration */}
             <div className="lg:col-span-6">
                 <DraftEditor campaign={campaign} />
             </div>
     
-            {/* Right Panel - Actions */}
             <div className="lg:col-span-3">
                 <DraftActionsPanel />
             </div>
