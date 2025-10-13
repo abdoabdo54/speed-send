@@ -59,6 +59,9 @@ class DataListBase(AppBaseModel):
 class DataListCreate(DataListBase):
     recipients: List[EmailStr]
 
+class DataListUpdate(DataListBase):
+    recipients: List[EmailStr]
+
 class DataListResponse(DataListBase):
     id: int
     created_at: datetime
