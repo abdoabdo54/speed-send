@@ -19,7 +19,7 @@ interface Campaign {
 
 interface DraftActionsPanelProps {
   campaign: Campaign | null;
-  onSendTestEmail: (recipient_email: string) => void;
+  onSendTestEmail: (recipient_email: string) => Promise<void>; // Corrected type
 }
 
 export function DraftActionsPanel({ campaign, onSendTestEmail }: DraftActionsPanelProps) {

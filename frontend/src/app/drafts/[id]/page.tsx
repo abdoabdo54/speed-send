@@ -87,7 +87,7 @@ export default function DraftEditorPage({ params }: { params: { id: string } }) 
     fetchData();
   }, [params.id]);
   
-  const handleSendTestEmail = useCallback(async (recipient_email: string) => {
+  const handleSendTestEmail: (recipient_email: string) => Promise<void> = useCallback(async (recipient_email) => {
     if (!campaign || !selectedUser) {
         setToastInfo({ message: 'Campaign data or sender not selected.', type: 'error' });
         return;
