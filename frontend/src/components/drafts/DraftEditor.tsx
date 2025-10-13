@@ -5,23 +5,41 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Paperclip, Code, Eye } from 'lucide-react';
 
-interface DraftEditorProps {
-  campaign?: {
-    id: string;
-    name: string;
-    subject: string;
-    fromName?: string;
-    body: string;
-  } | null;
+// Define the campaign type to match the data from the parent page
+interface Campaign {
+  id: string;
+  name: string;
+  subject: string;
+  from_name: string;
+  body_html: string;
+  body_plain: string;
+  attachments: any[];
 }
 
-export function DraftEditor({ campaign }: DraftEditorProps) {
+interface DraftEditorProps {
+  campaign: Campaign | null;
+  onCampaignChange: (campaign: Campaign | null) => void;
+}
+
+export function DraftEditor({ campaign, onCampaignChange }: DraftEditorProps) {
+  // Use a default campaign object if none is provided
   const currentCampaign = campaign || {
     id: 'new',
     name: '',
     subject: '',
-    fromName: '',
-    body: '',
+    from_name: '',
+    body_html: '',
+    body_plain: '',
+    attachments: [],
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (onCampaignChange && currentCampaign) {
+      onCampaignChange({
+        ...currentCampaign,
+        [e.target.id]: e.target.value,
+      });
+    }
   };
 
   return (
@@ -30,16 +48,16 @@ export function DraftEditor({ campaign }: DraftEditorProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="campaignName" className="text-sm font-medium text-gray-700 block mb-2">Campaign Name</label>
-          <Input id="campaignName" defaultValue={currentCampaign.name} />
+          <label htmlFor="name" className="text-sm font-medium text-gray-700 block mb-2">Campaign Name</label>
+          <Input id="name" value={currentCampaign.name} onChange={handleInputChange} />
         </div>
         <div>
-          <label htmlFor="subjectLine" className="text-sm font-medium text-gray-700 block mb-2">Subject Line</label>
-          <Input id="subjectLine" defaultValue={currentCampaign.subject} />
+          <label htmlFor="subject" className="text-sm font-medium text-gray-700 block mb-2">Subject Line</label>
+          <Input id="subject" value={currentCampaign.subject} onChange={handleInputChange} />
         </div>
         <div>
-          <label htmlFor="fromName" className="text-sm font-medium text-gray-700 block mb-2">From Name <span className='text-gray-400'>(Optional)</span></label>
-          <Input id="fromName" defaultValue={currentCampaign.fromName} />
+          <label htmlFor="from_name" className="text-sm font-medium text-gray-700 block mb-2">From Name <span className='text-gray-400'>(Optional)</span></label>
+          <Input id="from_name" value={currentCampaign.from_name} onChange={handleInputChange} />
         </div>
       </div>
 
@@ -54,8 +72,8 @@ export function DraftEditor({ campaign }: DraftEditorProps) {
           </div>
           {/* WYSIWYG Editor Placeholder */}
           <div
-            className="prose prose-sm max-w-none p-4 h-64 overflow-y-auto" 
-            dangerouslySetInnerHTML={{ __html: currentCampaign.body }}
+            className="prose prose-sm max-w-none p-4 h-64 overflow-y-auto"
+            dangerouslySetInnerHTML={{ __html: currentCampaign.body_html }}
           />
         </div>
       </div>
