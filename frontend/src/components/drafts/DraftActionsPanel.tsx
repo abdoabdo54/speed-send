@@ -3,7 +3,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Save, Send, FileText, Settings, FlaskConical, AlertTriangle, ChevronRight, Loader2 } from 'lucide-react';
-import { NewFeature } from '@/components/drafts/NewFreature';
 import { SendTestEmail } from '@/components/drafts/SendTestEmail';
 
 // Define the campaign type to match the data from the parent page
@@ -107,7 +106,6 @@ export function DraftActionsPanel({ campaign, onSendTestEmail }: DraftActionsPan
             <p className="text-sm text-green-600 text-center">Your campaign is ready to be sent.</p>
         )}
       </div>
-      <NewFeature />
     </div>
   );
 }
