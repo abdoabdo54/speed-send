@@ -1,0 +1,94 @@
+'use client';
+
+import React, { useState } from 'react';
+import { ChevronRight, Building, User } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+
+interface Account {
+  id: string;
+  name: string;
+  users: { id: string; name: string; email: string }[];
+}
+
+interface UserSelectorProps {
+  accounts: Account[];
+}
+
+export function UserSelector({ accounts }: UserSelectorProps) {
+  const [expandedAccounts, setExpandedAccounts] = useState<string[]>([accounts[0]?.id || '']);
+  const [selectedUsers, setSelectedUsers] = useState<{ [key: string]: boolean }>({});
+
+  const toggleAccount = (id: string) => {
+    setExpandedAccounts((prev) =>
+      prev.includes(id) ? prev.filter((accId) => accId !== id) : [...prev, id]
+    );
+  };
+
+  const handleUserSelect = (userId: string) => {
+    setSelectedUsers(prev => ({...prev, [userId]: !prev[userId]}));
+  }
+  
+  const handleSelectAll = (users: Account['users']) => {
+    const allSelected = users.every(u => selectedUsers[u.id]);
+    const newSelectedUsers = {...selectedUsers};
+    users.forEach(u => newSelectedUsers[u.id] = !allSelected);
+    setSelectedUsers(newSelectedUsers);
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 space-y-4">
+      <h3 className="text-lg font-bold text-gray-900">User & Account Selection</h3>
+      
+      <div>
+        <label htmlFor="draftsPerUser" className="text-sm font-medium text-gray-700 block mb-2">Drafts per user</label>
+        <Input id="draftsPerUser" type="number" defaultValue={1} min={1} className="w-full" />
+      </div>
+
+      <div className="space-y-2">
+        {accounts.map((account) => (
+          <div key={account.id} className="border rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleAccount(account.id)}
+              className="w-full flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Building className="h-5 w-5 text-gray-500" />
+                <span className="font-semibold text-gray-800">{account.name}</span>
+              </div>
+              <ChevronRight
+                className={cn('h-5 w-5 text-gray-500 transition-transform', {
+                  'rotate-90': expandedAccounts.includes(account.id),
+                })}
+              />
+            </button>
+            {expandedAccounts.includes(account.id) && (
+              <div className="p-3 border-t">
+                <div className="flex items-center justify-between mb-3">
+                    <label htmlFor={`select-all-${account.id}`} className="flex items-center gap-2 text-sm font-medium text-gray-600 cursor-pointer">
+                        <Checkbox id={`select-all-${account.id}`} onCheckedChange={() => handleSelectAll(account.users)} checked={account.users.every(u => selectedUsers[u.id])} />
+                        Select All
+                    </label>
+                </div>
+                <ul className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {account.users.map((user) => (
+                    <li key={user.id}>
+                      <label htmlFor={`user-${user.id}`} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
+                        <Checkbox id={`user-${user.id}`} onCheckedChange={() => handleUserSelect(user.id)} checked={!!selectedUsers[user.id]} />
+                        <div className="flex-grow">
+                          <p className="font-medium text-gray-800">{user.name}</p>
+                          <p className="text-xs text-gray-500">{user.email}</p>
+                        </div>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

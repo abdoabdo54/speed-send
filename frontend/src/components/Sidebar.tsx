@@ -13,6 +13,7 @@ import {
   Building2,
   Contact,
   BarChart3,
+  FileEdit,
 } from 'lucide-react';
 
 const navigation = [
@@ -20,6 +21,7 @@ const navigation = [
   { name: 'Accounts', href: '/accounts', icon: Building2 },
   { name: 'Contacts', href: '/contacts', icon: Contact },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
+  { name: 'Draft Campaigns', href: '/drafts', icon: FileEdit },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Reports', href: '/reports', icon: Activity },
@@ -40,7 +42,7 @@ export function Sidebar() {
       
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navigation.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname.startsWith(item.href) && (item.href === '/' ? pathname === '/' : true);
           return (
             <Link
               key={item.name}
@@ -70,4 +72,3 @@ export function Sidebar() {
     </div>
   );
 }
-
