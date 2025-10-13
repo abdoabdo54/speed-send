@@ -8,11 +8,12 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { Upload, Trash2 } from 'lucide-react';
 import { UploadModal } from '@/components/data-lists/UploadModal';
 import { Toast } from '@/components/ui/toast';
+import { API_URL } from '@/lib/api'; // Correctly import API_URL
 
 interface DataList {
   id: number;
   name: string;
-  total_recipients: number;
+  recipients_count: number; // Corrected field name
   created_at: string;
 }
 
@@ -31,7 +32,8 @@ export default function DataListsPage() {
   const fetchDataLists = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/data-lists');
+      // Use the correctly imported API_URL
+      const response = await fetch(`${API_URL}/api/v1/data-lists`);
       if (!response.ok) {
         throw new Error('Failed to fetch data lists');
       }
@@ -55,7 +57,8 @@ export default function DataListsPage() {
       const emails = text.split('\n').map(line => line.trim()).filter(line => line.includes('@'));
       
       try {
-        const response = await fetch('/api/data-lists', {
+        // Use the correctly imported API_URL
+        const response = await fetch(`${API_URL}/api/v1/data-lists/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: listName, recipients: emails }),
@@ -82,7 +85,8 @@ export default function DataListsPage() {
   const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this data list?')) {
       try {
-        const response = await fetch(`/api/data-lists/${id}`, {
+        // Use the correctly imported API_URL
+        const response = await fetch(`${API_URL}/api/v1/data-lists/${id}`, {
           method: 'DELETE',
         });
 
@@ -134,7 +138,8 @@ export default function DataListsPage() {
                 {dataLists.map((list) => (
                   <TableRow key={list.id}>
                     <TableCell className="font-medium">{list.name}</TableCell>
-                    <TableCell>{list.total_recipients.toLocaleString()}</TableCell>
+                    {/* Corrected field name */}
+                    <TableCell>{list.recipients_count.toLocaleString()}</TableCell>
                     <TableCell>{new Date(list.created_at).toLocaleDateString()}</TableCell>
                     <TableCell className="space-x-2">
                       <Button variant="outline" size="sm" onClick={() => router.push(`/data-lists/${list.id}`)}>View</Button>

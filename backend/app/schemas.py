@@ -1,205 +1,84 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-from app.models import AccountStatus, CampaignStatus, EmailStatus
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional
+import datetime
 
+# User Schemas
+class UserBase(BaseModel):
+    email: EmailStr
+    name: Optional[str] = None
+    is_active: bool = True
 
-# Workspace User Schemas
-class WorkspaceUserResponse(BaseModel):
+class UserCreate(UserBase):
+    service_account_id: int
+
+class UserResponse(UserBase):
     id: int
     service_account_id: int
-    email: str
-    full_name: Optional[str]
-    first_name: Optional[str]
-    last_name: Optional[str]
-    emails_sent_today: int
-    quota_limit: int
-    is_active: bool
-    last_used: Optional[datetime]
-    
+
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 # Service Account Schemas
-class ServiceAccountCreate(BaseModel):
+class ServiceAccountBase(BaseModel):
     name: str
-    json_content: str  # Base64 encoded or raw JSON string
+    
+class ServiceAccountCreate(ServiceAccountBase):
+    json_content: str
 
-class ServiceAccountResponse(BaseModel):
+class ServiceAccountResponse(ServiceAccountBase):
     id: int
-    name: str
-    client_email: str
+    client_email: EmailStr
     domain: str
-    project_id: Optional[str]
-    status: AccountStatus
-    total_users: int
-    quota_limit: int
-    quota_used_today: int
-    created_at: datetime
-    updated_at: Optional[datetime]
-    last_synced: Optional[datetime]
-    users: List[WorkspaceUserResponse] = []
-    
+    project_id: str
+    status: str
+    users: List[UserResponse] = []
+    total_users: int = 0 # Added this field to match the response
+
     class Config:
-        from_attributes = True
-
-# Campaign Schemas
-class RecipientData(BaseModel):
-    email: EmailStr
-    variables: Optional[Dict[str, str]] = {}
-
-
-class CampaignCreate(BaseModel):
-    name: str
-    subject: str
-    body_html: Optional[str]
-    body_plain: Optional[str]
-    
-    # Advanced sender settings
-    from_name: Optional[str] = None
-    from_email: Optional[str] = None
-    reply_to: Optional[str] = None
-    return_path: Optional[str] = None
-    
-    recipients: List[RecipientData]
-    sender_account_ids: List[int]
-    sender_rotation: str = "round_robin"
-    use_ip_pool: bool = False
-    ip_pool: Optional[List[str]] = []
-    custom_headers: Optional[Dict[str, str]] = {}
-    attachments: Optional[List[Dict[str, Any]]] = []
-    rate_limit: int = 500
-    concurrency: int = 5
-    is_test: bool = False
-    test_recipients: Optional[List[str]] = []
-    test_after_email: Optional[str] = None
-    test_after_count: int = 0
-
-
-class CampaignUpdate(BaseModel):
-    name: Optional[str] = None
-    subject: Optional[str] = None
-    body_html: Optional[str] = None
-    body_plain: Optional[str] = None
-    from_name: Optional[str] = None
-    recipients: Optional[List[RecipientData]] = None
-    sender_account_ids: Optional[List[int]] = None
-    rate_limit: Optional[int] = None
-    concurrency: Optional[int] = None
-    test_after_email: Optional[str] = None
-    test_after_count: Optional[int] = None
-
-
-class CampaignResponse(BaseModel):
-    id: int
-    name: str
-    subject: str
-    body_html: Optional[str]
-    body_plain: Optional[str]
-    
-    # Advanced sender settings
-    from_name: Optional[str]
-    from_email: Optional[str]
-    reply_to: Optional[str]
-    return_path: Optional[str]
-    
-    total_recipients: int
-    status: CampaignStatus
-    sent_count: int
-    failed_count: int
-    pending_count: int
-    rate_limit: int
-    concurrency: int
-    is_test: bool
-    created_at: datetime
-    updated_at: Optional[datetime]
-    prepared_at: Optional[datetime]
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
-    paused_at: Optional[datetime]
-    celery_task_id: Optional[str]
-    
-    class Config:
-        from_attributes = True
-
-
-# Email Log Schemas
-class EmailLogResponse(BaseModel):
-    id: int
-    campaign_id: int
-    recipient_email: str
-    recipient_name: Optional[str]
-    sender_email: str
-    subject: Optional[str]
-    status: EmailStatus
-    error_message: Optional[str]
-    retry_count: int
-    created_at: datetime
-    sent_at: Optional[datetime]
-    failed_at: Optional[datetime]
-    
-    class Config:
-        from_attributes = True
-
-
-# Dashboard Stats
-class DashboardStats(BaseModel):
-    total_accounts: int
-    total_users: int
-    total_campaigns: int
-    active_campaigns: int
-    emails_sent_today: int
-    emails_failed_today: int
-    quota_usage: Dict[str, Any]
-
-
-# Campaign Control
-class CampaignControl(BaseModel):
-    action: str  # start, pause, resume, cancel
-
-
-# Test Email
-class TestEmail(BaseModel):
-    subject: str
-    body_html: Optional[str]
-    body_plain: Optional[str]
-    recipient: EmailStr
-    sender_account_id: int
-    sender_user_email: Optional[str]
-
+        orm_mode = True
 
 # Data List Schemas
-class DataListCreate(BaseModel):
+class DataListBase(BaseModel):
     name: str
     description: Optional[str] = None
-    list_type: str = "custom"
-    geo_filter: Optional[str] = None
-    recipients: List[str] = []
-    tags: List[str] = []
 
+class DataListCreate(DataListBase):
+    recipients: List[EmailStr]
 
-class DataListUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    list_type: Optional[str] = None
-    geo_filter: Optional[str] = None
-    recipients: Optional[List[str]] = None
-    tags: Optional[List[str]] = None
-    is_active: Optional[bool] = None
+class DataListUpdate(DataListBase):
+    recipients: List[EmailStr]
 
-
-class DataListResponse(BaseModel):
+class DataListResponse(DataListBase):
     id: int
-    name: str
-    description: Optional[str]
-    list_type: str
-    geo_filter: Optional[str]
-    recipients: List[str]
-    tags: List[str]
-    is_active: bool
-    total_recipients: int
-    created_at: datetime
-    updated_at: datetime
-    
+    created_at: datetime.datetime
+    recipients_count: int
+
     class Config:
-        from_attributes = True
+        orm_mode = True
+
+# Campaign Schemas
+class Recipient(BaseModel):
+    email: EmailStr
+    variables: Optional[dict] = None
+
+class CampaignBase(BaseModel):
+    name: str
+    subject: str
+    from_name: Optional[str] = None
+    body_html: str
+
+class CampaignCreate(CampaignBase):
+    recipients: List[Recipient]
+    sender_account_ids: List[int]
+    status: str = "draft"
+
+class CampaignResponse(CampaignBase):
+    id: int
+    created_at: datetime.datetime
+    status: str
+    total_recipients: int
+    sent_count: int
+    failed_count: int
+
+    class Config:
+        orm_mode = True
