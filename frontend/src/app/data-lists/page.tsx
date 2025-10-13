@@ -38,7 +38,11 @@ export default function DataListsPage() {
       const data = await response.json();
       setDataLists(data);
     } catch (err) {
-      setError(err.message);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
     } finally {
       setLoading(false);
     }
@@ -64,7 +68,11 @@ export default function DataListsPage() {
         setToast({ message: 'Data list created successfully', type: 'success' });
         fetchDataLists(); // Refresh the list
       } catch (error) {
-        setToast({ message: error.message, type: 'error' });
+        if (error instanceof Error) {
+          setToast({ message: error.message, type: 'error' });
+        } else {
+          setToast({ message: 'An unknown error occurred', type: 'error' });
+        }
       }
     };
     reader.readAsText(file);
@@ -85,7 +93,11 @@ export default function DataListsPage() {
         setToast({ message: 'Data list deleted successfully', type: 'success' });
         fetchDataLists(); // Refresh the list
       } catch (error) {
-        setToast({ message: error.message, type: 'error' });
+        if (error instanceof Error) {
+          setToast({ message: error.message, type: 'error' });
+        } else {
+          setToast({ message: 'An unknown error occurred', type: 'error' });
+        }
       }
     }
   };

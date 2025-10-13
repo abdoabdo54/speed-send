@@ -43,7 +43,11 @@ export default function DataListPage() {
       const data = await response.json();
       setDataList(data);
     } catch (err) {
-      setError(err.message);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unknown error occurred');
+      }
     } finally {
       setLoading(false);
     }
@@ -68,7 +72,11 @@ export default function DataListPage() {
         setToast({ message: 'Contact deleted successfully', type: 'success' });
         fetchDataList(); // Refresh the list
       } catch (error) {
-        setToast({ message: error.message, type: 'error' });
+        if (error instanceof Error) {
+          setToast({ message: error.message, type: 'error' });
+        } else {
+          setToast({ message: 'An unknown error occurred', type: 'error' });
+        }
       }
     }
   };
