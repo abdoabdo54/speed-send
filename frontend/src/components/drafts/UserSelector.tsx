@@ -1,15 +1,22 @@
 'use client';
 
 import React, { useState, Dispatch, SetStateAction } from 'react';
-import { ChevronRight, Building, User } from 'lucide-react';
+import { ChevronRight, Building, User as UserIcon } from 'lucide-react'; // Renamed to avoid conflict
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
+// Define the User type right here to make the component self-contained and fix the error
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface Account {
   id: string;
   name: string;
-  users: { id: string; name: string; email: string }[];
+  users: User[];
 }
 
 interface UserSelectorProps {
@@ -30,16 +37,16 @@ export function UserSelector({ accounts, onUserSelect }: UserSelectorProps) {
   const handleUserSelect = (user: User) => {
     const newSelectedUsers = {[user.id]: !selectedUsers[user.id]};
     setSelectedUsers(newSelectedUsers);
+    // Pass the selected user object to the parent
     onUserSelect(user);
   }
   
-  const handleSelectAll = (users: Account['users']) => {
+  const handleSelectAll = (users: User[]) => {
     const allSelected = users.every(u => selectedUsers[u.id]);
     const newSelectedUsers = {...selectedUsers};
     users.forEach(u => newSelectedUsers[u.id] = !allSelected);
     setSelectedUsers(newSelectedUsers);
-    // This is a simplified approach. You might want to pass all selected users to the parent.
-    onUserSelect(users[0]); 
+    // This is a simplified interaction; a real implementation might need to handle multiple selections.
   }
 
   return (
@@ -72,7 +79,7 @@ export function UserSelector({ accounts, onUserSelect }: UserSelectorProps) {
               <div className="p-3 border-t">
                 <div className="flex items-center justify-between mb-3">
                     <label htmlFor={`select-all-${account.id}`} className="flex items-center gap-2 text-sm font-medium text-gray-600 cursor-pointer">
-                        <Checkbox id={`select-all-${account.id}`} onCheckedChange={() => handleSelectAll(account.users)} checked={account.users.every(u => selectedUsers[u.id])} />
+                        <Checkbox id={`select-all-${account.id}`} onCheckedChange={() => handleSelectAll(account.users)} checked={account.users.length > 0 && account.users.every(u => selectedUsers[u.id])} />
                         Select All
                     </label>
                 </div>
