@@ -22,18 +22,15 @@ async def create_service_account(
     Create a new service account by uploading JSON credentials
     """
     try:
-        # Parse JSON
         try:
             json_data = json.loads(account.json_content)
         except json.JSONDecodeError:
-            # Try base64 decode first
             try:
                 decoded = base64.b64decode(account.json_content)
                 json_data = json.loads(decoded)
             except:
                 raise HTTPException(status_code=400, detail="Invalid JSON format")
         
-        # Validate required fields
         required_fields = ['client_email', 'project_id', 'private_key']
         for field in required_fields:
             if field not in json_data:
@@ -42,11 +39,9 @@ async def create_service_account(
                     detail=f"Missing required field: {field}"
                 )
         
-        # Extract domain from client_email
         client_email = json_data['client_email']
         domain = client_email.split('@')[1] if '@' in client_email else ''
         
-        # Check if account already exists
         existing = db.query(ServiceAccount).filter(
             ServiceAccount.client_email == client_email
         ).first()
@@ -57,10 +52,8 @@ async def create_service_account(
                 detail=f"Service account {client_email} already exists"
             )
         
-        # Encrypt JSON
         encrypted_json = encryption_service.encrypt(json.dumps(json_data))
         
-        # Create service account
         new_account = ServiceAccount(
             name=account.name,
             client_email=client_email,
@@ -73,9 +66,6 @@ async def create_service_account(
         db.add(new_account)
         db.commit()
         db.refresh(new_account)
-        
-        # Note: User sync should be triggered from frontend with admin email
-        # We cannot auto-sync here because we need the admin email from user
         
         return new_account
     
@@ -92,35 +82,21 @@ async def list_service_accounts(
     db: Session = Depends(get_db)
 ):
     """
-    List all service accounts with computed user counts and users
+    List all service accounts with their associated users.
+    This is a read-only operation.
     """
-    from app.models import WorkspaceUser
     import logging
-    
     logger = logging.getLogger(__name__)
     
     try:
-        logger.info("🔄 Fetching service accounts with users...")
+        logger.info("Fetching service accounts and their users...")
         accounts = db.query(ServiceAccount).options(joinedload(ServiceAccount.users)).offset(skip).limit(limit).all()
-        logger.info(f"✅ Found {len(accounts)} service accounts")
-        
-        # Ensure total_users is computed for each account
-        for account in accounts:
-            # Count active users for this account
-            user_count = len([user for user in account.users if user.is_active])
-            
-            # Update the account's total_users if different
-            if account.total_users != user_count:
-                account.total_users = user_count
-                db.commit()
-                logger.info(f"📊 Updated user count for {account.client_email}: {user_count}")
-        
-        logger.info(f"✅ Returning {len(accounts)} accounts with user counts and users")
+        logger.info(f"Successfully fetched {len(accounts)} accounts.")
         return accounts
         
     except Exception as e:
-        logger.error(f"❌ Failed to list service accounts: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to list service accounts: {str(e)}")
+        logger.error(f"Failed to list service accounts: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list service accounts.")
 
 
 @router.get("/{account_id}", response_model=ServiceAccountResponse)
@@ -165,12 +141,10 @@ async def sync_account_users(
     db: Session = Depends(get_db)
 ):
     """
-    Sync users from Google Workspace - RUNS SYNCHRONOUSLY for immediate results
-    Requires admin email from your workspace domain (e.g., admin@yourdomain.com)
+    Sync users from Google Workspace. This is a write-heavy operation.
     """
     from app.models import WorkspaceUser
     from app.google_api import GoogleWorkspaceService
-    from app.encryption import encryption_service
     from datetime import datetime
     import logging
     
@@ -181,77 +155,52 @@ async def sync_account_users(
     if not account:
         raise HTTPException(status_code=404, detail="Service account not found")
     
-    # Use provided admin_email or stored admin_email
     if admin_email:
-        # Update stored admin email
         account.admin_email = admin_email
-        db.commit()
-    elif account.admin_email:
-        # Use stored admin email
-        admin_email = account.admin_email
-    else:
-        # No admin email available
+    elif not account.admin_email:
         raise HTTPException(
             status_code=400, 
-            detail="Admin email is required. Please provide an admin email from your workspace domain (e.g., admin@yourdomain.com)"
+            detail="Admin email is required for the first sync."
         )
-    
+    admin_email_to_use = admin_email or account.admin_email
+
     try:
-        # Decrypt service account JSON
         decrypted_json = encryption_service.decrypt(account.encrypted_json)
-        logger.info(f"🔄 Starting sync for account: {account.client_email} with admin: {admin_email}")
-        
-        # Initialize Google API service
         google_service = GoogleWorkspaceService(decrypted_json)
         
-        # Fetch users with the provided admin email (admin detection happens automatically)
-        users = google_service.fetch_workspace_users(admin_email)
-        logger.info(f"✅ Fetched {len(users)} users from Google (admin users automatically excluded)")
-        
-        # Clear all existing users for this account to prevent duplicates when domain changes
-        logger.info(f"🗑️ Clearing existing users for account {account_id} to prevent duplicates")
-        deleted_count = db.query(WorkspaceUser).filter(WorkspaceUser.service_account_id == account_id).delete()
-        logger.info(f"🗑️ Deleted {deleted_count} old users")
-        
-        # Insert fresh users from the new domain (no duplicates possible since we cleared all existing)
+        logger.info(f"Starting sync for {account.client_email} with admin {admin_email_to_use}")
+        users_from_google = google_service.fetch_workspace_users(admin_email_to_use)
+        logger.info(f"Fetched {len(users_from_google)} users from Google Workspace.")
+
+        # Efficiently update users
+        existing_users_map = {user.email: user for user in account.users}
         synced_count = 0
-        for user_data in users:
-            # Skip admin-like addresses from being used as senders
-            local_part = (user_data['email'] or '').split('@')[0].lower()
-            if local_part in {'admin', 'administrator', 'postmaster', 'abuse', 'support'}:
-                continue
-                
-            # Create new user (no duplicates possible since we cleared all existing)
-            new_user = WorkspaceUser(
-                service_account_id=account_id,
-                email=user_data['email'],
-                full_name=user_data['full_name'],
-                first_name=user_data['first_name'],
-                last_name=user_data['last_name'],
-                is_active=user_data['is_active']
-            )
-            db.add(new_user)
+        
+        for user_data in users_from_google:
+            user_email = user_data['email']
+            if user_email in existing_users_map:
+                # Update existing user
+                user = existing_users_map.pop(user_email)
+                user.full_name = user_data['full_name']
+                user.is_active = user_data['is_active']
+            else:
+                # Add new user
+                new_user = WorkspaceUser(**user_data, service_account_id=account.id)
+                db.add(new_user)
             synced_count += 1
-        
-        # Update service account metadata
-        account.total_users = len(users)
+
+        # Deactivate users that are no longer in the workspace
+        for user_to_deactivate in existing_users_map.values():
+            user_to_deactivate.is_active = False
+
+        account.total_users = synced_count
         account.last_synced = datetime.utcnow()
-        
         db.commit()
         
-        logger.info(f"✅ Synced {synced_count} users successfully")
-        
-        return {
-            "success": True,
-            "message": f"Successfully synced {synced_count} users",
-            "user_count": synced_count,
-            "service_account": account.client_email
-        }
+        logger.info(f"Sync complete. Synced {synced_count} users.")
+        return {"message": f"Successfully synced {synced_count} users."}
         
     except Exception as e:
         db.rollback()
-        logger.error(f"❌ Sync failed: {str(e)}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to sync users: {str(e)}"
-        )
+        logger.error(f"Sync failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to sync users: {str(e)}")
