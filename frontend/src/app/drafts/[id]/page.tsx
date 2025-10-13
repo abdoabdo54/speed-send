@@ -59,6 +59,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
 export default function DraftEditorPage({ params }: { params: { id: string } }) {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [toastInfo, setToastInfo] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -87,8 +88,8 @@ export default function DraftEditorPage({ params }: { params: { id: string } }) 
   }, [params.id]);
   
   const handleSendTestEmail = useCallback(async (recipient_email: string) => {
-    if (!campaign) {
-        setToastInfo({ message: 'Campaign data not available.', type: 'error' });
+    if (!campaign || !selectedUser) {
+        setToastInfo({ message: 'Campaign data or sender not selected.', type: 'error' });
         return;
     }
     
@@ -98,7 +99,7 @@ export default function DraftEditorPage({ params }: { params: { id: string } }) 
         body_html: campaign.body_html,
         body_plain: campaign.body_plain,
         from_name: campaign.from_name,
-        sender_account_id: 'some-service-account-id', // This should be dynamically selected
+        sender_account_id: selectedUser.id, // This should be the service account id
     };
 
     try {
@@ -111,7 +112,7 @@ export default function DraftEditorPage({ params }: { params: { id: string } }) 
     } catch (error: any) {
         setToastInfo({ message: error.message || 'Failed to send test email.', type: 'error' });
     }
-}, [campaign]);
+}, [campaign, selectedUser]);
 
   return (
     <div className="bg-gray-50/50 min-h-screen">
@@ -140,7 +141,7 @@ export default function DraftEditorPage({ params }: { params: { id: string } }) 
         ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-3 space-y-8">
-                <UserSelector accounts={accounts} />
+                <UserSelector accounts={accounts} onUserSelect={setSelectedUser} />
                 <NewFeature />
             </div>
     
