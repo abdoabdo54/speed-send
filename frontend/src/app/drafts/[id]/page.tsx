@@ -10,15 +10,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { API_URL } from '@/lib/api';
+import { API_URL, dataListsApi } from '@/lib/api'; // Import dataListsApi
 import { 
   Save, 
   Users, 
-  Settings, 
   Mail, 
-  RefreshCw, 
   TestTube,
-  Eye,
   Loader2,
   AlertCircle,
   ChevronLeft
@@ -29,9 +26,7 @@ interface Account {
   id: number;
   name: string;
   client_email: string;
-  domain: string;
-  status: string;
-  total_users: number;
+  users: User[];
 }
 
 interface User {
@@ -47,6 +42,12 @@ interface DraftCampaign {
   subject: string;
   body_html: string;
   from_name: string;
+}
+
+interface RecipientList {
+    id: number;
+    name: string;
+    recipients: string[];
 }
 
 export default function NewDraftPage({ params }: { params: { id: string } }) {
@@ -71,10 +72,15 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
   const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [recipientLists, setRecipientLists] = useState<RecipientList[]>([]);
+  const [showRecipientModal, setShowRecipientModal] = useState(false);
 
   const selectedUsers = useMemo(() => {
-    return users.filter(u => selectedAccounts.includes(u.service_account_id));
-  }, [users, selectedAccounts]);
+      // Flatten users from selected accounts
+      return accounts
+          .filter(acc => selectedAccounts.includes(acc.id))
+          .flatMap(acc => acc.users);
+  }, [accounts, selectedAccounts]);
 
   // Backend health check
   const checkBackendHealth = async () => {
@@ -102,7 +108,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
     const initializeData = async () => {
       const isHealthy = await checkBackendHealth();
       if (isHealthy) {
-        await Promise.all([loadAccounts(), loadUsers()]);
+        await Promise.all([loadAccounts(), loadRecipientLists()]);
         if (isEditing) {
           loadDraft(params.id);
         }
@@ -124,7 +130,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
               body_html: draftData.body_html || '',
               from_name: draftData.from_name || '',
           });
-          // Additional fields for drafts can be loaded here if needed
+          // Here you could also load recipients if they are saved with the draft
       } catch (error) {
           showNotification('Failed to load draft data.', 'error');
           console.error('Failed to load draft:', error);
@@ -147,18 +153,15 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const loadUsers = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/users/`);
-      if (response.data && Array.isArray(response.data)) {
-        setUsers(response.data);
-      } else {
-        setUsers([]);
+  const loadRecipientLists = async () => {
+      try {
+          const response = await dataListsApi.list();
+          setRecipientLists(response.data);
+      } catch (error) {
+          console.error('Failed to load recipient lists:', error);
+          showNotification('Failed to load recipient lists.', 'error');
       }
-    } catch (error) {
-      console.error('Failed to load users:', error);
-    }
-  };
+  }
 
   // UI Notifications
   const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
@@ -174,7 +177,9 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
     try {
       const payload = {
         ...campaign,
-        // Ensure you add any other required fields for a draft
+        status: 'draft',
+        recipients: recipientsText.split('\n').filter(Boolean).map(email => ({ email })),
+        sender_account_ids: selectedAccounts,
       };
 
       let response;
@@ -182,7 +187,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
         response = await axios.patch(`${API_URL}/api/campaigns/${params.id}/`, payload);
         showNotification('Draft updated successfully!', 'success');
       } else {
-        response = await axios.post(`${API_URL}/api/campaigns/`, { ...payload, status: 'draft' });
+        response = await axios.post(`${API_URL}/api/campaigns/`, payload);
         showNotification('Draft saved successfully!', 'success');
       }
       router.push('/drafts');
@@ -202,7 +207,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
     setLoading(true);
     try {
         const testPromises = selectedTestUsers.map(userId => {
-            const user = users.find(u => u.id === userId);
+            const user = selectedUsers.find(u => u.id === userId);
             if (!user) return null;
 
             return axios.post(`${API_URL}/api/test-email/`, {
@@ -228,6 +233,12 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
         setLoading(false);
     }
   };
+
+  const handleLoadRecipients = (list: RecipientList) => {
+      setRecipientsText(list.recipients.join('\n'));
+      setShowRecipientModal(false);
+      showNotification(`Loaded ${list.recipients.length} recipients from "${list.name}".`, 'info');
+  }
 
 
   return (
@@ -297,6 +308,9 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
                     <p className="text-sm">{user.email}</p>
                   </div>
                 ))}
+                 {selectedAccounts.length > 0 && selectedUsers.length === 0 && (
+                    <div className="text-sm text-gray-500 p-4 text-center">No users found for the selected accounts.</div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -327,8 +341,12 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
               </CardContent>
             </Card>
              <Card>
-                <CardHeader>
+                <CardHeader className="flex justify-between items-center">
                     <CardTitle>Recipients</CardTitle>
+                    <Button variant="outline" size="sm" onClick={() => setShowRecipientModal(true)}>
+                        <Users className="h-4 w-4 mr-2"/>
+                        Load from Data Lists
+                    </Button>
                 </CardHeader>
                 <CardContent>
                     <Textarea 
@@ -389,6 +407,31 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
             </div>
             </div>
         )}
+
+        {/* Recipient Lists Modal */}
+        {showRecipientModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 w-full max-w-xl">
+                    <h3 className="text-lg font-semibold mb-4">Load Recipients from Data List</h3>
+                    <div className="max-h-96 overflow-y-auto space-y-2">
+                        {recipientLists.map(list => (
+                            <div key={list.id} className="flex justify-between items-center p-3 border rounded-lg">
+                                <div>
+                                    <p className="font-medium">{list.name}</p>
+                                    <p className="text-sm text-gray-500">{list.recipients.length} recipients</p>
+                                </div>
+                                <Button onClick={() => handleLoadRecipients(list)}>Load</Button>
+                            </div>
+                        ))}
+                        {recipientLists.length === 0 && <p className="text-center text-gray-500 py-4">No data lists found.</p>}
+                    </div>
+                    <div className="flex justify-end mt-4">
+                        <Button variant="outline" onClick={() => setShowRecipientModal(false)}>Cancel</Button>
+                    </div>
+                </div>
+            </div>
+        )}
+
       </div>
     </div>
   );
