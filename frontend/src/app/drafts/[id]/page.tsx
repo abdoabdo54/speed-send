@@ -122,7 +122,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
   // API Functions
   const loadDraft = async (id: string) => {
       try {
-          const response = await axios.get(`${API_URL}/api/campaigns/${id}`);
+          const response = await axios.get(`${API_URL}/api/v1/campaigns/${id}`);
           const draftData = response.data;
           setCampaign({
               name: draftData.name || '',
@@ -139,7 +139,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
 
   const loadAccounts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/accounts/`);
+      const response = await axios.get(`${API_URL}/api/v1/accounts/`);
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
         showNotification(`Loaded ${response.data.length} accounts.`, 'success');
@@ -184,10 +184,10 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
 
       let response;
       if (isEditing) {
-        response = await axios.patch(`${API_URL}/api/campaigns/${params.id}/`, payload);
+        response = await axios.patch(`${API_URL}/api/v1/campaigns/${params.id}/`, payload);
         showNotification('Draft updated successfully!', 'success');
       } else {
-        response = await axios.post(`${API_URL}/api/campaigns/`, payload);
+        response = await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
         showNotification('Draft saved successfully!', 'success');
       }
       router.push('/drafts');
@@ -210,7 +210,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
             const user = selectedUsers.find(u => u.id === userId);
             if (!user) return null;
 
-            return axios.post(`${API_URL}/api/test-email/`, {
+            return axios.post(`${API_URL}/api/v1/test-email/`, {
                 recipient_email: testEmail,
                 subject: campaign.subject,
                 body_html: campaign.body_html,
@@ -359,7 +359,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
             </Card>
             
             <div className="flex items-center gap-4">
-                <Button onClick={handleSaveDraft} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleSaveDraft} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-600">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                   {isEditing ? 'Update Draft' : 'Save Draft'}
                 </Button>
