@@ -6,7 +6,23 @@ import { Save, Send, FileText, Settings, FlaskConical, AlertTriangle, ChevronRig
 import { NewFeature } from '@/components/drafts/NewFreature';
 import { SendTestEmail } from '@/components/drafts/SendTestEmail';
 
-export function DraftActionsPanel() {
+// Define the campaign type to match the data from the parent page
+interface Campaign {
+  id: string;
+  name: string;
+  subject: string;
+  from_name: string;
+  body_html: string;
+  body_plain: string;
+  attachments: any[];
+}
+
+interface DraftActionsPanelProps {
+  campaign: Campaign | null;
+  onSendTestEmail: (recipient_email: string) => void;
+}
+
+export function DraftActionsPanel({ campaign, onSendTestEmail }: DraftActionsPanelProps) {
   const [isPreparing, setIsPreparing] = React.useState(false);
   const [isReady, setIsReady] = React.useState(false); // This would be derived from campaign state
 
@@ -16,13 +32,6 @@ export function DraftActionsPanel() {
     await new Promise(resolve => setTimeout(resolve, 2000));
     setIsPreparing(false);
     setIsReady(true);
-  };
-
-  const handleSendTestEmail = async (recipientEmail: string) => {
-    console.log(`Sending test email to ${recipientEmail}`);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log('Test email sent!');
   };
 
   return (
@@ -43,7 +52,7 @@ export function DraftActionsPanel() {
 
         <div className="border-t border-gray-200 pt-4 space-y-3">
           <h4 className="font-semibold text-gray-800">Testing</h4>
-          <SendTestEmail onSend={handleSendTestEmail} />
+          <SendTestEmail onSend={onSendTestEmail} />
         </div>
 
         <div className="border-t border-gray-200 pt-4 space-y-3">
