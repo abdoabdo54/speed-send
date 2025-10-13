@@ -1,13 +1,14 @@
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
-import datetime
+from pydantic import BaseModel, EmailStr, Field
+from typing import List, Optional, Dict, Any
+from datetime import datetime
+from app.models import CampaignStatus, AccountStatus, EmailStatus
 
-# Pydantic Model Configuration
+# --- Base Pydantic Model Configuration ---
 class AppBaseModel(BaseModel):
     class Config:
         from_attributes = True
 
-# User Schemas
+# --- User Schemas ---
 class UserBase(AppBaseModel):
     email: EmailStr
     name: Optional[str] = None
@@ -20,7 +21,6 @@ class UserResponse(UserBase):
     id: int
     service_account_id: int
 
-# This was the missing schema causing the crash
 class WorkspaceUserResponse(AppBaseModel):
     id: int
     email: EmailStr
@@ -30,25 +30,28 @@ class WorkspaceUserResponse(AppBaseModel):
     is_active: bool
     service_account_id: int
     quota_limit: Optional[int] = None
-    quota_usage: int = 0
+    emails_sent_today: int = 0
+    last_used: Optional[datetime] = None
 
-# Service Account Schemas
+# --- Service Account Schemas ---
 class ServiceAccountBase(AppBaseModel):
     name: str
-    
+
 class ServiceAccountCreate(ServiceAccountBase):
-    json_content: str
+    json_content: str  # The raw JSON key file content
 
 class ServiceAccountResponse(ServiceAccountBase):
     id: int
     client_email: EmailStr
     domain: str
     project_id: str
-    status: str
-    users: List[UserResponse] = []
-    total_users: int = 0
+    status: AccountStatus
+    total_users: int
+    daily_limit: int
+    daily_sent: int
+    users: List[WorkspaceUserResponse] = []
 
-# Data List Schemas
+# --- Data List Schemas ---
 class DataListBase(AppBaseModel):
     name: str
     description: Optional[str] = None
@@ -56,19 +59,17 @@ class DataListBase(AppBaseModel):
 class DataListCreate(DataListBase):
     recipients: List[EmailStr]
 
-class DataListUpdate(DataListBase):
-    recipients: List[EmailStr]
-
 class DataListResponse(DataListBase):
     id: int
-    created_at: datetime.datetime
-    recipients_count: int
+    created_at: datetime
+    total_recipients: int
 
-# Campaign Schemas
+# --- Recipient Schema for Campaigns ---
 class Recipient(AppBaseModel):
     email: EmailStr
-    variables: Optional[dict] = None
+    variables: Optional[Dict[str, Any]] = {}
 
+# --- Campaign Schemas ---
 class CampaignBase(AppBaseModel):
     name: str
     subject: str
@@ -76,14 +77,35 @@ class CampaignBase(AppBaseModel):
     body_html: str
 
 class CampaignCreate(CampaignBase):
-    recipients: List[Recipient]
     sender_account_ids: List[int]
-    status: str = "draft"
+    recipients: List[Recipient] = []
+    # Removed body_plain from here, can be generated from body_html if needed
+
+class CampaignUpdate(AppBaseModel):
+    name: Optional[str] = None
+    subject: Optional[str] = None
+    from_name: Optional[str] = None
+    body_html: Optional[str] = None
+    sender_account_ids: Optional[List[int]] = None
+    status: Optional[CampaignStatus] = None
+    recipients: Optional[List[Recipient]] = None
 
 class CampaignResponse(CampaignBase):
     id: int
-    created_at: datetime.datetime
-    status: str
+    created_at: datetime
+    status: CampaignStatus
     total_recipients: int
     sent_count: int
     failed_count: int
+    sender_accounts: List[ServiceAccountResponse] = []
+
+# --- Other Schemas ---
+class CampaignControl(AppBaseModel):
+    action: str # e.g., 'pause', 'resume', 'cancel'
+
+class EmailLogResponse(AppBaseModel):
+    id: int
+    recipient_email: EmailStr
+    status: EmailStatus
+    error_message: Optional[str] = None
+    sent_at: Optional[datetime] = None
