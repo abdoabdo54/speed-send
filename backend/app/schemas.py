@@ -4,30 +4,6 @@ from datetime import datetime
 from app.models import AccountStatus, CampaignStatus, EmailStatus
 
 
-# Service Account Schemas
-class ServiceAccountCreate(BaseModel):
-    name: str
-    json_content: str  # Base64 encoded or raw JSON string
-
-
-class ServiceAccountResponse(BaseModel):
-    id: int
-    name: str
-    client_email: str
-    domain: str
-    project_id: Optional[str]
-    status: AccountStatus
-    total_users: int
-    quota_limit: int
-    quota_used_today: int
-    created_at: datetime
-    updated_at: Optional[datetime]
-    last_synced: Optional[datetime]
-    
-    class Config:
-        from_attributes = True
-
-
 # Workspace User Schemas
 class WorkspaceUserResponse(BaseModel):
     id: int
@@ -44,6 +20,28 @@ class WorkspaceUserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# Service Account Schemas
+class ServiceAccountCreate(BaseModel):
+    name: str
+    json_content: str  # Base64 encoded or raw JSON string
+
+class ServiceAccountResponse(BaseModel):
+    id: int
+    name: str
+    client_email: str
+    domain: str
+    project_id: Optional[str]
+    status: AccountStatus
+    total_users: int
+    quota_limit: int
+    quota_used_today: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+    last_synced: Optional[datetime]
+    users: List[WorkspaceUserResponse] = []
+    
+    class Config:
+        from_attributes = True
 
 # Campaign Schemas
 class RecipientData(BaseModel):
@@ -205,4 +203,3 @@ class DataListResponse(BaseModel):
     
     class Config:
         from_attributes = True
-

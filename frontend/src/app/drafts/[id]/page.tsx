@@ -72,19 +72,7 @@ export default function DraftEditorPage({ params }: { params: { id: string } }) 
         }
 
         const accountsData = await fetchWithRetry('http://localhost:8000/api/accounts', {});
-        
-        const accountsWithUsers: Account[] = await Promise.all(
-          (accountsData as any[]).map(async (account: any) => {
-            try {
-              const users = await fetchWithRetry(`http://localhost:8000/api/users?service_account_id=${account.id}`, {});
-              return { ...account, users };
-            } catch (error) {
-                console.error(`Failed to fetch users for account ${account.id}`, error);
-                return { ...account, users: [] };
-            }
-          })
-        );
-        setAccounts(accountsWithUsers);
+        setAccounts(accountsData);
 
       } catch (error: any) {
         console.error("Failed to load page data:", error);

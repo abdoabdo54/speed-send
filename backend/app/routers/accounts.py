@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 import json
 import base64
@@ -92,7 +92,7 @@ async def list_service_accounts(
     db: Session = Depends(get_db)
 ):
     """
-    List all service accounts with computed user counts
+    List all service accounts with computed user counts and users
     """
     from app.models import WorkspaceUser
     import logging
@@ -100,17 +100,14 @@ async def list_service_accounts(
     logger = logging.getLogger(__name__)
     
     try:
-        logger.info("🔄 Fetching service accounts...")
-        accounts = db.query(ServiceAccount).offset(skip).limit(limit).all()
+        logger.info("🔄 Fetching service accounts with users...")
+        accounts = db.query(ServiceAccount).options(joinedload(ServiceAccount.users)).offset(skip).limit(limit).all()
         logger.info(f"✅ Found {len(accounts)} service accounts")
         
         # Ensure total_users is computed for each account
         for account in accounts:
             # Count active users for this account
-            user_count = db.query(WorkspaceUser).filter(
-                WorkspaceUser.service_account_id == account.id,
-                WorkspaceUser.is_active == True
-            ).count()
+            user_count = len([user for user in account.users if user.is_active])
             
             # Update the account's total_users if different
             if account.total_users != user_count:
@@ -118,7 +115,7 @@ async def list_service_accounts(
                 db.commit()
                 logger.info(f"📊 Updated user count for {account.client_email}: {user_count}")
         
-        logger.info(f"✅ Returning {len(accounts)} accounts with user counts")
+        logger.info(f"✅ Returning {len(accounts)} accounts with user counts and users")
         return accounts
         
     except Exception as e:
@@ -216,7 +213,7 @@ async def sync_account_users(
         deleted_count = db.query(WorkspaceUser).filter(WorkspaceUser.service_account_id == account_id).delete()
         logger.info(f"🗑️ Deleted {deleted_count} old users")
         
-        # Insert fresh users from the new domain (no duplicates possible)
+        # Insert fresh users from the new domain (no duplicates possible since we cleared all existing)
         synced_count = 0
         for user_data in users:
             # Skip admin-like addresses from being used as senders
@@ -258,4 +255,3 @@ async def sync_account_users(
             status_code=500, 
             detail=f"Failed to sync users: {str(e)}"
         )
-
