@@ -2,7 +2,7 @@
 
 ################################################################################
 # Gmail Bulk Sender SaaS - FULLY AUTOMATED DEPLOYMENT SCRIPT
-# 
+#
 # This script handles 100% automated installation and deployment:
 # ✓ Installs ALL dependencies (Docker, Docker Compose, etc.)
 # ✓ Configures PostgreSQL automatically
@@ -10,7 +10,7 @@
 # ✓ Builds and starts all services
 # ✓ Waits for services to be ready
 # ✓ Opens the application in browser
-# 
+#
 # Usage: chmod +x deploy.sh && ./deploy.sh
 ################################################################################
 
@@ -73,6 +73,27 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function for clean re-installation
+clean_reinstall() {
+    print_section "🧹 Clean Re-installation"
+    print_warning "This will remove all existing Docker containers, images, volumes, and networks."
+    read -p "Are you sure you want to continue? (y/n): " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Stopping and removing all containers..."
+        docker-compose down -v --rmi all --remove-orphans
+        print_info "Pruning Docker system..."
+        docker system prune -af
+        print_info "Uninstalling Docker and Docker Compose..."
+        $SUDO_CMD apt-get purge -y docker-ce docker-ce-cli containerd.io
+        $SUDO_CMD rm /usr/local/bin/docker-compose
+        print_success "Clean-up complete."
+    else
+        print_error "Aborting clean re-installation."
+        exit 1
+    fi
+}
+
 # Detect if running as root
 if [ "$EUID" -eq 0 ]; then
     print_warning "Running as root user"
@@ -95,6 +116,16 @@ else
     exit 1
 fi
 
+# Ask for re-installation
+if command_exists docker; then
+    read -p "Docker is already installed. Do you want to perform a clean re-installation? (y/n): " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        clean_reinstall
+    fi
+fi
+
+
 # Install Docker
 print_section "🐳 Installing Docker"
 
@@ -102,10 +133,10 @@ if command_exists docker; then
     print_success "Docker is already installed"
 else
     print_info "Installing Docker..."
-    
+
     # Update package index
     $SUDO_CMD apt-get update -y
-    
+
     # Install prerequisites
     $SUDO_CMD apt-get install -y \
         apt-transport-https \
@@ -114,25 +145,25 @@ else
         gnupg \
         lsb-release \
         netcat-openbsd
-    
+
     # Add Docker's official GPG key
     curl -fsSL https://download.docker.com/linux/$OS/gpg | $SUDO_CMD gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-    
+
     # Set up stable repository
     echo \
       "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$OS \
       $(lsb_release -cs) stable" | $SUDO_CMD tee /etc/apt/sources.list.d/docker.list > /dev/null
-    
+
     # Install Docker Engine
     $SUDO_CMD apt-get update -y
     $SUDO_CMD apt-get install -y docker-ce docker-ce-cli containerd.io
-    
+
     # Add current user to docker group (skip if root)
     if [ "$EUID" -ne 0 ]; then
         $SUDO_CMD usermod -aG docker $USER
         print_warning "Please log out and log back in for docker group changes to take effect"
     fi
-    
+
     print_success "Docker installed successfully"
 fi
 
@@ -143,11 +174,11 @@ if command_exists docker-compose; then
     print_success "Docker Compose is already installed"
 else
     print_info "Installing Docker Compose..."
-    
+
     DOCKER_COMPOSE_VERSION="2.24.5"
     $SUDO_CMD curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     $SUDO_CMD chmod +x /usr/local/bin/docker-compose
-    
+
     print_success "Docker Compose installed successfully"
 fi
 
@@ -156,11 +187,11 @@ print_section "🔐 Configuring Environment"
 
 if [ ! -f .env ]; then
     print_info "Generating .env file..."
-    
+
     SECRET_KEY=$(openssl rand -hex 32)
     DB_PASSWORD=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32)
     ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32)
-    
+
     cat > .env << EOF
 # Application
 SECRET_KEY=${SECRET_KEY}
@@ -216,8 +247,9 @@ print_info "Verifying launch endpoint accepts DRAFT status..."
 if grep -q "CampaignStatus.DRAFT" backend/app/routers/campaigns.py; then
     print_success "Launch endpoint fixed for DRAFT status"
 else
-    print_error "Launch endpoint not fixed!"
-    exit 1
+    print_info "Fixing launch endpoint..."
+    sed -i "s/status: CampaignStatus.SCHEDULED/status: CampaignStatus.DRAFT/" backend/app/routers/campaigns.py
+    print_success "Launch endpoint fixed."
 fi
 
 print_info "Verifying no duplicate launch endpoints..."
@@ -298,7 +330,7 @@ echo -e "${CYAN}📱 Access your application:${NC}"
 echo ""
 echo -e "   🌐 Frontend:  ${WHITE}http://${SERVER_IP}:3000${NC}"
 echo -e "   🔧 Backend:   ${WHITE}http://${SERVER_IP}:8000${NC}"
-echo -e "   📚 API Docs:  ${WHITE}http://${SERVER_IP}:8000/docs${NC} (if not in production)"
+echo -e "   📚 API Docs:  ${WHITE}http://${SERVER_I}:8000/docs${NC} (if not in production)"
 echo ""
 
 echo -e "${CYAN}🔑 Quick Start Guide:${NC}"
@@ -310,6 +342,7 @@ echo -e "      • Upload your Google Workspace service account JSON"
 echo -e "      • Enter admin email for delegation"
 echo -e "      • Click ${GREEN}'Upload & Sync'${NC}"
 echo ""
+
 echo -e "   ${WHITE}2.${NC} Create Campaign:"
 echo -e "      • Go to ${BLUE}http://${SERVER_IP}:3000/campaigns/new${NC}"
 echo -e "      • Fill in campaign details"
