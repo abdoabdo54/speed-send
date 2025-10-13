@@ -7,7 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { X } from 'lucide-react';
 
-export function UploadModal({ onClose, onUpload }) {
+// Define the props for the component
+interface UploadModalProps {
+  onClose: () => void;
+  onUpload: (file: File, listName: string) => void;
+}
+
+export function UploadModal({ onClose, onUpload }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [listName, setListName] = useState('');
 
