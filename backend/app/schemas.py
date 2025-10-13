@@ -1,9 +1,14 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 import datetime
 
+# Pydantic Model Configuration
+class AppBaseModel(BaseModel):
+    class Config:
+        from_attributes = True
+
 # User Schemas
-class UserBase(BaseModel):
+class UserBase(AppBaseModel):
     email: EmailStr
     name: Optional[str] = None
     is_active: bool = True
@@ -15,11 +20,20 @@ class UserResponse(UserBase):
     id: int
     service_account_id: int
 
-    class Config:
-        orm_mode = True
+# This was the missing schema causing the crash
+class WorkspaceUserResponse(AppBaseModel):
+    id: int
+    email: EmailStr
+    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_active: bool
+    service_account_id: int
+    quota_limit: Optional[int] = None
+    quota_usage: int = 0
 
 # Service Account Schemas
-class ServiceAccountBase(BaseModel):
+class ServiceAccountBase(AppBaseModel):
     name: str
     
 class ServiceAccountCreate(ServiceAccountBase):
@@ -32,13 +46,10 @@ class ServiceAccountResponse(ServiceAccountBase):
     project_id: str
     status: str
     users: List[UserResponse] = []
-    total_users: int = 0 # Added this field to match the response
-
-    class Config:
-        orm_mode = True
+    total_users: int = 0
 
 # Data List Schemas
-class DataListBase(BaseModel):
+class DataListBase(AppBaseModel):
     name: str
     description: Optional[str] = None
 
@@ -53,15 +64,12 @@ class DataListResponse(DataListBase):
     created_at: datetime.datetime
     recipients_count: int
 
-    class Config:
-        orm_mode = True
-
 # Campaign Schemas
-class Recipient(BaseModel):
+class Recipient(AppBaseModel):
     email: EmailStr
     variables: Optional[dict] = None
 
-class CampaignBase(BaseModel):
+class CampaignBase(AppBaseModel):
     name: str
     subject: str
     from_name: Optional[str] = None
@@ -79,6 +87,3 @@ class CampaignResponse(CampaignBase):
     total_recipients: int
     sent_count: int
     failed_count: int
-
-    class Config:
-        orm_mode = True
