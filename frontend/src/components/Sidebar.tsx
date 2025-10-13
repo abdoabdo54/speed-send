@@ -21,7 +21,7 @@ const navigation = [
   { name: 'Accounts', href: '/accounts', icon: Building2 },
   { name: 'Contacts', href: '/contacts', icon: Contact },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
-  { name: 'Draft Campaigns', href: '/drafts', icon: FileEdit },
+  { name: 'Drafts', href: '/drafts', icon: FileEdit },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Reports', href: '/reports', icon: Activity },
