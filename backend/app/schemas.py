@@ -1,128 +1,88 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
+from typing import List, Optional, Dict
 from datetime import datetime
-from app.models import CampaignStatus, AccountStatus, EmailStatus
 
-# --- Base Pydantic Model Configuration ---
-class AppBaseModel(BaseModel):
+class WorkspaceUserBase(BaseModel):
+    email: str
+    full_name: Optional[str] = None
+    is_active: bool = True
+
+class WorkspaceUserCreate(WorkspaceUserBase):
+    service_account_id: int
+
+class WorkspaceUserResponse(WorkspaceUserBase):
+    id: int
+    service_account_id: int
+
     class Config:
         from_attributes = True
 
-# --- User Schemas ---
-class UserBase(AppBaseModel):
-    email: EmailStr
-    name: Optional[str] = None
-    is_active: bool = True
-
-class UserCreate(UserBase):
-    service_account_id: int
-
-class UserResponse(UserBase):
-    id: int
-    service_account_id: int
-
-class WorkspaceUserResponse(AppBaseModel):
-    id: int
-    email: EmailStr
-    full_name: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    is_active: bool
-    service_account_id: int
-    quota_limit: Optional[int] = None
-    emails_sent_today: int = 0
-    last_used: Optional[datetime] = None
-
-# --- Service Account Schemas ---
-class ServiceAccountBase(AppBaseModel):
+class ServiceAccountBase(BaseModel):
     name: str
+    client_email: str
+    domain: Optional[str] = None
 
 class ServiceAccountCreate(ServiceAccountBase):
-    json_content: str  # The raw JSON key file content
+    json_content: Dict
 
 class ServiceAccountResponse(ServiceAccountBase):
     id: int
-    client_email: EmailStr
-    domain: str
-    project_id: str
-    status: AccountStatus
+    status: str
     total_users: int
-    daily_limit: int
-    daily_sent: int
-    users: List[WorkspaceUserResponse] = []
+    quota_used_today: int
+    quota_limit: int
+    last_synced: Optional[datetime] = None
+    workspace_users: List[WorkspaceUserResponse] = []
 
-# --- Data List Schemas ---
-class DataListBase(AppBaseModel):
-    name: str
-    description: Optional[str] = None
+    class Config:
+        from_attributes = True
 
-class DataListCreate(DataListBase):
-    recipients: List[EmailStr]
+class Recipient(BaseModel):
+    email: str
+    variables: Optional[Dict[str, str]] = {}
 
-class DataListUpdate(DataListBase):
-    recipients: List[EmailStr]
-
-class DataListResponse(DataListBase):
-    id: int
-    created_at: datetime
-    total_recipients: int
-
-# --- Recipient Schema for Campaigns ---
-class Recipient(AppBaseModel):
-    email: EmailStr
-    variables: Optional[Dict[str, Any]] = {}
-
-# --- Campaign Schemas ---
-class CampaignBase(AppBaseModel):
+class CampaignBase(BaseModel):
     name: str
     subject: str
-    from_name: Optional[str] = None
     body_html: str
+    from_name: Optional[str] = None
 
 class CampaignCreate(CampaignBase):
+    recipients: List[Recipient]
     sender_account_ids: List[int]
-    recipients: List[Recipient] = []
-
-class CampaignUpdate(AppBaseModel):
-    name: Optional[str] = None
-    subject: Optional[str] = None
-    from_name: Optional[str] = None
-    body_html: Optional[str] = None
-    sender_account_ids: Optional[List[int]] = None
-    status: Optional[CampaignStatus] = None
-    recipients: Optional[List[Recipient]] = None
+    # Advanced options
+    status: Optional[str] = 'draft'
+    sender_rotation: Optional[str] = 'round_robin'
+    custom_headers: Optional[Dict[str, str]] = {}
+    attachments: Optional[List[str]] = []
+    rate_limit: Optional[int] = 2000
+    concurrency: Optional[int] = 6
+    test_after_email: Optional[str] = None
+    test_after_count: Optional[int] = 0
 
 class CampaignResponse(CampaignBase):
     id: int
+    status: str
     created_at: datetime
-    status: CampaignStatus
-    total_recipients: int
-    sent_count: int
-    failed_count: int
-    sender_accounts: List[ServiceAccountResponse] = []
 
-# --- Dashboard Schemas ---
-class QuotaUsage(BaseModel):
-    sent: int
-    limit: int
-    percentage: float
+    class Config:
+        from_attributes = True
 
-class DashboardStats(AppBaseModel):
-    total_accounts: int
-    total_users: int
-    total_campaigns: int
-    active_campaigns: int
-    emails_sent_today: int
-    emails_failed_today: int
-    quota_usage: Dict[str, QuotaUsage]
+class DataListCreate(BaseModel):
+    name: str
+    recipients: List[str]
+    geo_filter: Optional[str] = None
+    list_type: Optional[str] = 'custom'
+    tags: Optional[List[str]] = []
 
-# --- Other Schemas ---
-class CampaignControl(AppBaseModel):
-    action: str # e.g., 'pause', 'resume', 'cancel'
+class DataListUpdate(BaseModel):
+    recipients: List[str]
+    geo_filter: Optional[str] = None
+    list_type: Optional[str] = 'custom'
 
-class EmailLogResponse(AppBaseModel):
+class DataListResponse(DataListCreate):
     id: int
-    recipient_email: EmailStr
-    status: EmailStatus
-    error_message: Optional[str] = None
-    sent_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
