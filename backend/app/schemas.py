@@ -1,3 +1,4 @@
+
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Literal
 from datetime import datetime
@@ -68,7 +69,6 @@ class CampaignCreate(CampaignBase):
     test_after_count: Optional[int] = 0
     body_plain: Optional[str] = None
 
-
 class CampaignUpdate(BaseModel):
     name: Optional[str] = None
     subject: Optional[str] = None
@@ -78,7 +78,6 @@ class CampaignUpdate(BaseModel):
     sender_account_ids: Optional[List[int]] = None
     status: Optional[str] = None
     body_plain: Optional[str] = None
-
 
 class CampaignResponse(CampaignBase):
     id: int
@@ -127,3 +126,13 @@ class TestEmailSchema(BaseModel):
     body_html: str
     from_name: str
     sender_account_id: int
+
+class DashboardStats(BaseModel):
+    total_campaigns: int
+    active_campaigns: int
+    completed_campaigns: int
+    total_service_accounts: int
+    total_users: int
+    emails_sent_today: int
+    emails_failed_today: int
+
