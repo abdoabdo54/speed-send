@@ -14,14 +14,12 @@ import {
   Contact,
   BarChart3,
   FileEdit,
-  Database
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Accounts', href: '/accounts', icon: Building2 },
   { name: 'Contacts', href: '/contacts', icon: Contact },
-  { name: 'Data Lists', href: '/data-lists', icon: Database },
   { name: 'Campaigns', href: '/campaigns', icon: Mail },
   { name: 'Drafts', href: '/drafts', icon: FileEdit },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },

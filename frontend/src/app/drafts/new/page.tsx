@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/multi-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { ContactListModal } from '@/components/drafts/ContactListModal';
 
 interface Account {
   id: string;
@@ -23,6 +24,7 @@ const CreateDraftCampaignPage: React.FC = () => {
   const [numberOfDraftsPerUser, setNumberOfDraftsPerUser] = useState(1);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<MultiSelectOption[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -65,6 +67,11 @@ const CreateDraftCampaignPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4">
+      <ContactListModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSelectList={setEmailList}
+      />
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Create New Draft Campaign</h1>
         <Button onClick={() => router.push('/drafts')}>Back to Drafts</Button>
@@ -95,14 +102,15 @@ const CreateDraftCampaignPage: React.FC = () => {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recipient List</CardTitle>
+              <Button variant="outline" onClick={() => setIsModalOpen(true)}>Load from Contacts</Button>
             </CardHeader>
             <CardContent>
               <Textarea
                 value={emailList.join('\n')}
                 onChange={(e) => setEmailList(e.target.value.split('\n').filter(email => email.trim() !== ''))}
-                placeholder="Enter one email address per line."
+                placeholder="Enter one email address per line, or load from a contact list."
                 rows={10}
               />
             </CardContent>
@@ -136,6 +144,20 @@ const CreateDraftCampaignPage: React.FC = () => {
                 />
                 <p className="text-sm text-muted-foreground mt-2">Each selected account will create this many drafts, with the recipient list split among them.</p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Selected Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc pl-5">
+                {selectedAccounts.map(accountId => {
+                  const account = accounts.find(a => a.value === accountId);
+                  return <li key={accountId}>{account?.label}</li>;
+                })}
+              </ul>
             </CardContent>
           </Card>
 
