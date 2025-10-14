@@ -29,6 +29,11 @@ class EmailStatus(str, enum.Enum):
     FAILED = "failed"
     RETRY = "retry"
 
+class DraftStatus(str, enum.Enum):
+    CREATED = "created"
+    SENT = "sent"
+    DELETED = "deleted"
+    FAILED = "failed"
 
 class ServiceAccount(Base):
     __tablename__ = "service_accounts"
@@ -40,29 +45,23 @@ class ServiceAccount(Base):
     project_id = Column(String(255))
     admin_email = Column(String(255))  # Admin email for domain-wide delegation
     
-    # Encrypted JSON content
     encrypted_json = Column(Text, nullable=False)
     
-    # Metadata
     status = Column(Enum(AccountStatus), default=AccountStatus.ACTIVE)
     total_users = Column(Integer, default=0)
     
-    # Daily sending limits and tracking
-    daily_limit = Column(Integer, default=2000)  # 2k emails per day per account
-    daily_sent = Column(Integer, default=0)  # Emails sent today
-    daily_reset_date = Column(Date, default=func.current_date())  # Last reset date
-    total_sent_all_time = Column(Integer, default=0)  # Total emails sent ever
+    daily_limit = Column(Integer, default=2000)
+    daily_sent = Column(Integer, default=0)
+    daily_reset_date = Column(Date, default=func.current_date())
+    total_sent_all_time = Column(Integer, default=0)
     
-    # Legacy quota fields (keeping for compatibility)
-    quota_limit = Column(Integer, default=500)  # Daily quota per user
+    quota_limit = Column(Integer, default=500)
     quota_used_today = Column(Integer, default=0)
     
-    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_synced = Column(DateTime(timezone=True))
     
-    # Relationships
     workspace_users = relationship("WorkspaceUser", back_populates="service_account", cascade="all, delete-orphan")
     campaigns = relationship("Campaign", secondary="campaign_senders", back_populates="sender_accounts")
 
@@ -78,18 +77,16 @@ class WorkspaceUser(Base):
     first_name = Column(String(255))
     last_name = Column(String(255))
     
-    # Quota tracking
     emails_sent_today = Column(Integer, default=0)
     quota_limit = Column(Integer, default=500)
     is_active = Column(Boolean, default=True)
     
-    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_used = Column(DateTime(timezone=True))
     
-    # Relationships
     service_account = relationship("ServiceAccount", back_populates="workspace_users")
+    gmail_drafts = relationship("GmailDraft", back_populates="user", cascade="all, delete-orphan")
 
 
 class Campaign(Base):
@@ -98,66 +95,53 @@ class Campaign(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     
-    # Campaign configuration
-    subject = Column(String(998), nullable=False)  # RFC 2822 limit
+    subject = Column(String(998), nullable=False)
     body_html = Column(Text)
     body_plain = Column(Text)
     
-    # Advanced sender settings
-    from_name = Column(String(255))  # Display name for sender
-    from_email = Column(String(255))  # From email (can be different from sender)
-    reply_to = Column(String(255))  # Reply-to address
-    return_path = Column(String(255))  # Return-path for bounces
+    from_name = Column(String(255))
+    from_email = Column(String(255))
+    reply_to = Column(String(255))
+    return_path = Column(String(255))
     
-    # Recipients
-    recipients = Column(JSON)  # List of recipient objects with email and variables
+    recipients = Column(JSON)
     total_recipients = Column(Integer, default=0)
     
-    # Sender configuration
-    sender_rotation = Column(String(50), default="round_robin")  # round_robin, random, sequential
-    use_ip_pool = Column(Boolean, default=False)  # Use IP pool rotation
-    ip_pool = Column(JSON)  # List of IPs if using pool
+    sender_rotation = Column(String(50), default="round_robin")
+    use_ip_pool = Column(Boolean, default=False)
+    ip_pool = Column(JSON)
     
-    # Headers and attachments
-    custom_headers = Column(JSON)  # Dict of custom headers
-    attachments = Column(JSON)  # List of attachment metadata
+    custom_headers = Column(JSON)
+    attachments = Column(JSON)
     
-    # Status and progress
     status = Column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
     sent_count = Column(Integer, default=0)
     failed_count = Column(Integer, default=0)
     pending_count = Column(Integer, default=0)
     
-    # Rate limiting
-    rate_limit = Column(Integer, default=500)  # Emails per hour
-    concurrency = Column(Integer, default=5)  # Concurrent workers
+    rate_limit = Column(Integer, default=500)
+    concurrency = Column(Integer, default=5)
     
-    # Test mode
     is_test = Column(Boolean, default=False)
     test_recipients = Column(JSON)
     
-    # Test After feature
-    test_after_email = Column(String(255))  # Email to send test to
-    test_after_count = Column(Integer, default=0)  # Send test after every X emails (0 = disabled)
+    test_after_email = Column(String(255))
+    test_after_count = Column(Integer, default=0)
     
-    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    prepared_at = Column(DateTime(timezone=True))  # When emails were prepared
-    started_at = Column(DateTime(timezone=True))  # When sending started
+    prepared_at = Column(DateTime(timezone=True))
+    started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
     paused_at = Column(DateTime(timezone=True))
     
-    # Celery task tracking
     celery_task_id = Column(String(255), index=True)
     
-    # Relationships
     sender_accounts = relationship("ServiceAccount", secondary="campaign_senders", back_populates="campaigns")
     email_logs = relationship("EmailLog", back_populates="campaign", cascade="all, delete-orphan")
 
 
 class CampaignSender(Base):
-    """Association table for campaign and service accounts"""
     __tablename__ = "campaign_senders"
     
     campaign_id = Column(Integer, ForeignKey("campaigns.id", ondelete="CASCADE"), primary_key=True)
@@ -170,39 +154,63 @@ class EmailLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id", ondelete="CASCADE"))
     
-    # Recipient info
     recipient_email = Column(String(255), nullable=False, index=True)
     recipient_name = Column(String(255))
     
-    # Sender info
     sender_email = Column(String(255), nullable=False)
     service_account_id = Column(Integer)
     
-    # Message details
     subject = Column(String(998))
-    message_id = Column(String(255))  # Gmail message ID
+    message_id = Column(String(255))
     
-    # Status
     status = Column(Enum(EmailStatus), default=EmailStatus.PENDING)
     error_message = Column(Text)
     retry_count = Column(Integer, default=0)
     max_retries = Column(Integer, default=3)
     
-    # Timing
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     sent_at = Column(DateTime(timezone=True))
     failed_at = Column(DateTime(timezone=True))
     next_retry_at = Column(DateTime(timezone=True))
     
-    # Relationships
     campaign = relationship("Campaign", back_populates="email_logs")
 
+# --- New Draft System Models ---
+
+class DraftCampaign(Base):
+    __tablename__ = "draft_campaigns"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    subject = Column(String(998), nullable=False)
+    body_html = Column(Text)
+    number_of_drafts_per_user = Column(Integer, default=1)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    gmail_drafts = relationship("GmailDraft", back_populates="draft_campaign", cascade="all, delete-orphan")
+
+class GmailDraft(Base):
+    __tablename__ = "gmail_drafts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    draft_campaign_id = Column(Integer, ForeignKey("draft_campaigns.id"))
+    user_id = Column(Integer, ForeignKey("workspace_users.id"))
+    gmail_draft_id = Column(String(255), index=True)  # The draft ID from Gmail API
+    status = Column(Enum(DraftStatus), default=DraftStatus.CREATED)
+    recipients = Column(JSON, nullable=False) # List of recipient emails
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    sent_at = Column(DateTime(timezone=True))
+
+    draft_campaign = relationship("DraftCampaign", back_populates="gmail_drafts")
+    user = relationship("WorkspaceUser", back_populates="gmail_drafts")
+
+# --- End New Draft System Models ---
 
 class SystemLog(Base):
     __tablename__ = "system_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    level = Column(String(20))  # INFO, WARNING, ERROR, CRITICAL
+    level = Column(String(20))
     message = Column(Text)
     context = Column(JSON)
     
@@ -215,13 +223,12 @@ class DataList(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
-    list_type = Column(String(50), default="custom")  # custom, openers, clickers, leaders, unsubscribers, delivery
-    geo_filter = Column(String(100))  # Country/region filter
-    recipients = Column(JSON, nullable=False, default=list)  # List of email addresses
-    tags = Column(JSON, default=list)  # Tags for categorization
+    list_type = Column(String(50), default="custom")
+    geo_filter = Column(String(100))
+    recipients = Column(JSON, nullable=False, default=list)
+    tags = Column(JSON, default=list)
     is_active = Column(Boolean, default=True)
     
-    # Metadata
     total_recipients = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

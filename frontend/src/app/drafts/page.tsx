@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { API_URL } from '@/lib/api';
 import { format } from 'date-fns';
+import { CreateDraftCampaign } from '@/components/drafts/CreateDraftCampaign';
 
 // Types
 interface DraftCampaign {
@@ -102,7 +103,7 @@ export default function DraftsPage() {
   const handleLaunchAll = async () => {
     if (!confirm('Are you sure you want to launch all draft campaigns?')) return;
     const launchPromises = drafts.map(draft => 
-        axios.post(`${API_URL}/api/v1/campaigns/${draft.id}/prepare/`)
+        axios.post(`${API_EURL}/api/v1/campaigns/${draft.id}/prepare/`)
     );
     try {
         await Promise.allSettled(launchPromises);
@@ -113,56 +114,57 @@ export default function DraftsPage() {
   }
 
   return (
-    <div className="p-8">
-      <header className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Draft Campaigns</h1>
-        <div className="flex gap-2">
-            <Button onClick={handleLaunchAll} variant="default" disabled={loading || drafts.length === 0} className="bg-green-600 hover:bg-green-700">
-                <Send className="h-4 w-4 mr-2" />
-                Launch All Drafts
-            </Button>
-            <Button onClick={() => router.push('/drafts/new')}>
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Create New Draft
-            </Button>
-        </div>
-      </header>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-8">
+      <div className="lg:col-span-2">
+        <header className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Draft Campaigns</h1>
+          <div className="flex gap-2">
+              <Button onClick={handleLaunchAll} variant="default" disabled={loading || drafts.length === 0} className="bg-green-600 hover:bg-green-700">
+                  <Send className="h-4 w-4 mr-2" />
+                  Launch All Drafts
+              </Button>
+          </div>
+        </header>
 
-      {loading && <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}
-      {error && <div className="text-red-500 text-center">{error}</div>}
+        {loading && <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}
+        {error && <div className="text-red-500 text-center">{error}</div>}
 
-      {!loading && !error && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {drafts.map((draft) => (
-            <Card key={draft.id}>
-              <CardHeader>
-                <CardTitle className="truncate">{draft.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-gray-600 truncate">Subject: {draft.subject}</p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>Status: <span className="font-semibold capitalize">{draft.status}</span></span>
-                  <span>{format(new Date(draft.created_at), 'MMM d, yyyy')}</span>
+        {!loading && !error && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {drafts.map((draft) => (
+              <Card key={draft.id}>
+                <CardHeader>
+                  <CardTitle className="truncate">{draft.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-gray-600 truncate">Subject: {draft.subject}</p>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Status: <span className="font-semibold capitalize">{draft.status}</span></span>
+                    <span>{format(new Date(draft.created_at), 'MMM d, yyyy')}</span>
+                  </div>
+                  <div className="border-t pt-4 flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(draft.id)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDuplicate(draft.id)}><Copy className="h-4 w-4" /></Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(draft.id)}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="secondary" size="sm" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white" onClick={() => handleLaunch(draft.id)}>
+                          <Rocket className="h-4 w-4 mr-2" />
+                          Launch
+                      </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {drafts.length === 0 && (
+                <div className="col-span-full text-center text-gray-500 py-10">
+                    <p>No draft campaigns found.</p>
                 </div>
-                <div className="border-t pt-4 flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEdit(draft.id)}><Pencil className="h-4 w-4" /></Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDuplicate(draft.id)}><Copy className="h-4 w-4" /></Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(draft.id)}><Trash2 className="h-4 w-4" /></Button>
-                    <Button variant="secondary" size="sm" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white" onClick={() => handleLaunch(draft.id)}>
-                        <Rocket className="h-4 w-4 mr-2" />
-                        Launch
-                    </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-           {drafts.length === 0 && (
-              <div className="col-span-full text-center text-gray-500 py-10">
-                  <p>No draft campaigns found.</p>
-              </div>
-            )}
-        </div>
-      )}
+              )}
+          </div>
+        )}
+      </div>
+      <aside>
+        <CreateDraftCampaign />
+      </aside>
     </div>
   );
 }

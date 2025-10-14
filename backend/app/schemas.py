@@ -11,6 +11,12 @@ class EmailStatus(str, Enum):
     OPENED = 'opened'
     CLICKED = 'clicked'
 
+class DraftStatus(str, Enum):
+    CREATED = "created"
+    SENT = "sent"
+    DELETED = "deleted"
+    FAILED = "failed"
+
 class WorkspaceUserBase(BaseModel):
     email: str
     full_name: Optional[str] = None
@@ -136,3 +142,41 @@ class DashboardStats(BaseModel):
     emails_sent_today: int
     emails_failed_today: int
 
+# --- New Draft System Schemas ---
+
+class GmailDraftResponse(BaseModel):
+    id: int
+    gmail_draft_id: str
+    status: DraftStatus
+    recipients: List[str]
+    user_email: str # Derived from the user relationship
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class DraftCampaignCreate(BaseModel):
+    campaign_name: str
+    subject: str
+    html_body: str
+    number_of_drafts_per_user: int
+    email_list: List[str]
+    selected_accounts: List[int]
+
+class DraftCampaignResponse(BaseModel):
+    id: int
+    name: str
+    subject: str
+    created_at: datetime
+    total_drafts: int
+    drafts_by_user: Dict[str, int]
+
+    class Config:
+        from_attributes = True
+
+class DraftLaunchResponse(BaseModel):
+    total_launched: int
+    total_failed: int
+    details: List[Dict[str, str]]
+
+# --- End New Draft System Schemas ---
