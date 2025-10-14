@@ -2,172 +2,167 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, ChevronsUpDown } from 'lucide-react';
+import axios from 'axios';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { DraftCampaignCard, DraftCampaign, CampaignStatus } from '@/components/drafts/DraftCampaignCard';
-import { Toast } from '@/components/shared/Toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  PlusCircle, 
+  Copy, 
+  Trash2, 
+  Pencil, 
+  Rocket, 
+  Loader2,
+  Send
+} from 'lucide-react';
+import { API_URL } from '@/lib/api';
+import { format } from 'date-fns';
 
-// Utility function for fetch with retry and exponential backoff
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 500) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const response = await fetch(url, options);
-      if (response.status >= 500 && response.status <= 599) {
-        // Throw an error for server-side issues to trigger retry
-        throw new Error(`Server error: ${response.status}`);
-      }
-      if (!response.ok) {
-        // For client errors, don't retry, just throw
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to parse error response' }));
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.warn(`Attempt ${i + 1} failed. Retrying in ${backoff}ms...`, error);
-      if (i === retries - 1) {
-        // Last retry failed, re-throw the final error
-        throw error;
-      }
-      // Wait for the backoff period before the next retry
-      await new Promise(res => setTimeout(res, backoff));
-      // Increase backoff for next attempt
-      backoff *= 2;
-    }
-  }
+// Types
+interface DraftCampaign {
+  id: number;
+  name: string;
+  subject: string;
+  status: string;
+  created_at: string;
 }
 
 export default function DraftsPage() {
   const router = useRouter();
-  const [campaigns, setCampaigns] = useState<DraftCampaign[]>([]);
-  const [toastInfo, setToastInfo] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-  const fetchCampaigns = async () => {
-      try {
-        const data = await fetchWithRetry('http://localhost:8000/api/v1/campaigns', {});
-        setCampaigns(data);
-      } catch (error: any) {
-        console.error("Failed to fetch campaigns after multiple retries:", error);
-        setToastInfo({ message: error.message || 'Failed to load campaigns after several attempts.', type: 'error' });
-      }
-    };
+  const [drafts, setDrafts] = useState<DraftCampaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchCampaigns();
+    loadDrafts();
   }, []);
 
-  const handleCreateNew = () => {
-    router.push('/drafts/new');
-  };
-
-  const handleApiCall = async (url: string, options: RequestInit, successMessage: string, errorMessage: string) => {
+  const loadDrafts = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const response = await fetch(url, options);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: errorMessage }));
-        throw new Error(errorData.detail);
-      }
-      setToastInfo({ message: successMessage, type: 'success' });
-      fetchCampaigns(); // Refetch campaigns to show updated state
-      return await response.json();
-    } catch (error: any) {
-      console.error(error);
-      setToastInfo({ message: error.message, type: 'error' });
+      const response = await axios.get(`${API_URL}/api/v1/campaigns/?status=draft`);
+      setDrafts(response.data || []);
+    } catch (err) {
+      setError('Failed to load drafts. Please try again.');
+      console.error('Load drafts error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-
-  const handleUpload = (id: string) => {
-    handleApiCall(`http://localhost:8000/api/v1/campaigns/${id}/launch`, { method: 'POST' }, 'Successfully uploaded drafts!', 'Failed to upload drafts.');
-  };
-
-  const handleDuplicate = (id:string) => {
-     handleApiCall(`http://localhost:8000/api/v1/campaigns/${id}/duplicate`, { method: 'POST' }, 'Campaign duplicated!', 'Failed to duplicate campaign.');
-  };
-
-  const handleResume = (id: string) => {
-    console.log(`Resuming campaign ${id}`);
-    setToastInfo({ message: 'Flash send initiated!', type: 'success' });
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this campaign?')) {
-      handleApiCall(`http://localhost:8000/api/v1/campaigns/${id}`, { method: 'DELETE' }, 'Campaign deleted.', 'Failed to delete campaign.');
-    }
-  };
-  
-  const handleEdit = (id: string) => {
+  const handleEdit = (id: number) => {
     router.push(`/drafts/${id}`);
   };
 
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this draft?')) return;
+    try {
+      await axios.delete(`${API_URL}/api/v1/campaigns/${id}/`);
+      setDrafts(drafts.filter(d => d.id !== id));
+      // Add notification
+    } catch (err) {
+      console.error('Delete draft error:', err);
+      // Add error notification
+    }
+  };
+
+  const handleDuplicate = async (id: number) => {
+    try {
+        const response = await axios.get(`${API_URL}/api/v1/campaigns/${id}`);
+        const originalDraft = response.data;
+        
+        const newDraftPayload = {
+            ...originalDraft,
+            name: `${originalDraft.name} (Copy)`,
+            status: 'draft',
+        };
+        
+        // Remove fields that should not be in a create request
+        delete newDraftPayload.id;
+        delete newDraftPayload.created_at;
+
+        await axios.post(`${API_URL}/api/v1/campaigns/`, newDraftPayload);
+        loadDrafts(); // Refresh the list
+    } catch (err) {
+        console.error('Duplicate draft error:', err);
+    }
+  };
+
+  const handleLaunch = async (id: number) => {
+    try {
+      await axios.post(`${API_URL}/api/v1/campaigns/${id}/prepare/`);
+      // This just starts the preparation. The status will update in the background.
+      // You might want to periodically refresh or use websockets for real-time status.
+      loadDrafts();
+    } catch (err) {
+      console.error('Launch draft error:', err);
+    }
+  };
+
+  const handleLaunchAll = async () => {
+    if (!confirm('Are you sure you want to launch all draft campaigns?')) return;
+    const launchPromises = drafts.map(draft => 
+        axios.post(`${API_URL}/api/v1/campaigns/${draft.id}/prepare/`)
+    );
+    try {
+        await Promise.allSettled(launchPromises);
+        loadDrafts(); // Refresh list to show status changes
+    } catch(err) {
+        console.error('Launch all drafts error:', err);
+    }
+  }
+
   return (
-    <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8">
-      {toastInfo && (
-        <Toast
-          message={toastInfo.message}
-          type={toastInfo.type}
-          onClose={() => setToastInfo(null)}
-        />
-      )}
-      <div className="max-w-7xl mx-auto">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
-          <div>
-            <p className="text-sm text-gray-500">Dashboard / Draft Campaigns</p>
-            <h1 className="text-3xl font-bold text-gray-900 mt-1">Draft Campaigns</h1>
-          </div>
-          <Button 
-            onClick={handleCreateNew}
-            className="mt-4 sm:mt-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:shadow-lg transition-all transform hover:scale-105"
-          >
-            <Plus className="mr-2 h-5 w-5" />
-            Create New Draft
-          </Button>
-        </header>
-
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-grow">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <Input placeholder="Search campaigns..." className="pl-10 w-full" />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 w-full md:w-auto">
-                  Status: All
-                  <ChevronsUpDown className="h-4 w-4 text-gray-500" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem>All</DropdownMenuItem>
-                <DropdownMenuItem>Not Uploaded</DropdownMenuItem>
-                <DropdownMenuItem>Uploaded</DropdownMenuItem>
-                <DropdownMenuItem>In Progress</DropdownMenuItem>
-                <DropdownMenuItem>Completed</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+    <div className="p-8">
+      <header className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Draft Campaigns</h1>
+        <div className="flex gap-2">
+            <Button onClick={handleLaunchAll} variant="default" disabled={loading || drafts.length === 0} className="bg-green-600 hover:bg-green-700">
+                <Send className="h-4 w-4 mr-2" />
+                Launch All Drafts
+            </Button>
+            <Button onClick={() => router.push('/drafts/new')}>
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Create New Draft
+            </Button>
         </div>
+      </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {campaigns.map((campaign) => (
-            <DraftCampaignCard
-              key={campaign.id}
-              campaign={campaign}
-              onUpload={handleUpload}
-              onDuplicate={handleDuplicate}
-              onResume={handleResume}
-              onDelete={handleDelete}
-              onEdit={handleEdit}
-            />
+      {loading && <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}
+      {error && <div className="text-red-500 text-center">{error}</div>}
+
+      {!loading && !error && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {drafts.map((draft) => (
+            <Card key={draft.id}>
+              <CardHeader>
+                <CardTitle className="truncate">{draft.name}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-gray-600 truncate">Subject: {draft.subject}</p>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>Status: <span className="font-semibold capitalize">{draft.status}</span></span>
+                  <span>{format(new Date(draft.created_at), 'MMM d, yyyy')}</span>
+                </div>
+                <div className="border-t pt-4 flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleEdit(draft.id)}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDuplicate(draft.id)}><Copy className="h-4 w-4" /></Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(draft.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="secondary" size="sm" className="flex-1 bg-blue-500 hover:bg-blue-600 text-white" onClick={() => handleLaunch(draft.id)}>
+                        <Rocket className="h-4 w-4 mr-2" />
+                        Launch
+                    </Button>
+                </div>
+              </CardContent>
+            </Card>
           ))}
+           {drafts.length === 0 && (
+              <div className="col-span-full text-center text-gray-500 py-10">
+                  <p>No draft campaigns found.</p>
+              </div>
+            )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

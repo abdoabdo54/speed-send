@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { API_URL, dataListsApi } from '@/lib/api'; // Import dataListsApi
+import { API_URL, dataListsApi } from '@/lib/api';
 import { 
   Save, 
   Users, 
@@ -57,7 +57,6 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
   // State
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
   const [recipientsText, setRecipientsText] = useState('');
   const [campaign, setCampaign] = useState<DraftCampaign>({
@@ -70,13 +69,13 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
   const [showTestModal, setShowTestModal] = useState(false);
   const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
+  const [selectedCampaignUsers, setSelectedCampaignUsers] = useState<number[]>([]);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [recipientLists, setRecipientLists] = useState<RecipientList[]>([]);
   const [showRecipientModal, setShowRecipientModal] = useState(false);
 
   const selectedUsers = useMemo(() => {
-      // Flatten users from selected accounts
       return accounts
           .filter(acc => selectedAccounts.includes(acc.id))
           .flatMap(acc => acc.workspace_users || []);
@@ -130,7 +129,6 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
               body_html: draftData.body_html || '',
               from_name: draftData.from_name || '',
           });
-          // Here you could also load recipients if they are saved with the draft
       } catch (error) {
           showNotification('Failed to load draft data.', 'error');
           console.error('Failed to load draft:', error);
@@ -142,7 +140,6 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
       const response = await axios.get(`${API_URL}/api/v1/accounts/`);
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
-        showNotification(`Loaded ${response.data.length} accounts.`, 'success');
       } else {
         setAccounts([]);
         showNotification('No accounts found.', 'info');
@@ -175,10 +172,23 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
   const handleSaveDraft = async () => {
     setLoading(true);
     try {
+      const recipientEmails = new Set<string>();
+      recipientsText.split('\n').filter(Boolean).forEach(email => recipientEmails.add(email.trim()));
+      
+      selectedUsers
+        .filter(user => selectedCampaignUsers.includes(user.id))
+        .forEach(user => recipientEmails.add(user.email));
+
+      if (recipientEmails.size === 0) {
+        showNotification('Please select at least one recipient user or add recipients manually.', 'error');
+        setLoading(false);
+        return;
+      }
+
       const payload = {
         ...campaign,
         status: 'draft',
-        recipients: recipientsText.split('\n').filter(Boolean).map(email => ({ email })),
+        recipients: Array.from(recipientEmails).map(email => ({ email })),
         sender_account_ids: selectedAccounts,
       };
 
@@ -239,7 +249,12 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
       setShowRecipientModal(false);
       showNotification(`Loaded ${list.recipients.length} recipients from "${list.name}".`, 'info');
   }
-
+  
+  const handleUserSelection = (userId: number) => {
+    setSelectedCampaignUsers(prev => 
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -262,7 +277,6 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
             </Alert>
         )}
 
-        {/* Notifications */}
         <div className="fixed top-5 right-5 z-50 w-full max-w-sm">
             {notifications.map(notification => (
                 <Alert key={notification.id} className={`mb-4 shadow-lg ${notification.type === 'success' ? 'bg-green-100 border-green-200' : notification.type === 'error' ? 'bg-red-100 border-red-200' : 'bg-blue-100 border-blue-200'}`}>
@@ -274,7 +288,6 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* LEFT COLUMN: Accounts and Users */}
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -300,12 +313,16 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
 
             <Card>
               <CardHeader>
-                <CardTitle>Users ({selectedUsers.length})</CardTitle>
+                <CardTitle>Users ({selectedUsers.length} available / {selectedCampaignUsers.length} selected)</CardTitle>
               </CardHeader>
               <CardContent className="max-h-96 overflow-y-auto">
                 {selectedUsers.map(user => (
-                  <div key={user.id} className="p-2 border-b">
-                    <p className="text-sm">{user.email}</p>
+                  <div key={user.id} className="flex items-center space-x-3 p-2 border-b">
+                     <Checkbox
+                      checked={selectedCampaignUsers.includes(user.id)}
+                      onCheckedChange={() => handleUserSelection(user.id)}
+                    />
+                    <label className="text-sm">{user.email}</label>
                   </div>
                 ))}
                  {selectedAccounts.length > 0 && selectedUsers.length === 0 && (
@@ -315,7 +332,6 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
             </Card>
           </div>
 
-          {/* CENTER COLUMN: Email Composer */}
           <div className="space-y-6 xl:col-span-2">
             <Card>
               <CardHeader>
@@ -342,7 +358,7 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
             </Card>
              <Card>
                 <CardHeader className="flex justify-between items-center">
-                    <CardTitle>Recipients</CardTitle>
+                    <CardTitle>Manual Recipient Entry</CardTitle>
                     <Button variant="outline" size="sm" onClick={() => setShowRecipientModal(true)}>
                         <Users className="h-4 w-4 mr-2"/>
                         Load from Data Lists
@@ -350,8 +366,8 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
                 </CardHeader>
                 <CardContent>
                     <Textarea 
-                        placeholder="recipient1@example.com&#10;recipient2@example.com"
-                        rows={10}
+                        placeholder="recipient1@example.com\nrecipient2@example.com"
+                        rows={5}
                         value={recipientsText}
                         onChange={(e) => setRecipientsText(e.target.value)}
                     />
@@ -372,7 +388,6 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        {/* Test Email Modal */}
         {showTestModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-lg">
@@ -408,7 +423,6 @@ export default function NewDraftPage({ params }: { params: { id: string } }) {
             </div>
         )}
 
-        {/* Recipient Lists Modal */}
         {showRecipientModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 w-full max-w-xl">
