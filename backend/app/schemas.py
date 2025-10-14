@@ -1,6 +1,14 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Literal
 from datetime import datetime
+from enum import Enum
+
+class EmailStatus(str, Enum):
+    PENDING = 'pending'
+    SENT = 'sent'
+    FAILED = 'failed'
+    OPENED = 'opened'
+    CLICKED = 'clicked'
 
 class WorkspaceUserBase(BaseModel):
     email: str
@@ -50,7 +58,6 @@ class CampaignBase(BaseModel):
 class CampaignCreate(CampaignBase):
     recipients: List[Recipient]
     sender_account_ids: List[int]
-    # Advanced options
     status: Optional[str] = 'draft'
     sender_rotation: Optional[str] = 'round_robin'
     custom_headers: Optional[Dict[str, str]] = {}
@@ -59,11 +66,38 @@ class CampaignCreate(CampaignBase):
     concurrency: Optional[int] = 6
     test_after_email: Optional[str] = None
     test_after_count: Optional[int] = 0
+    body_plain: Optional[str] = None
+
+
+class CampaignUpdate(BaseModel):
+    name: Optional[str] = None
+    subject: Optional[str] = None
+    body_html: Optional[str] = None
+    from_name: Optional[str] = None
+    recipients: Optional[List[Recipient]] = None
+    sender_account_ids: Optional[List[int]] = None
+    status: Optional[str] = None
+    body_plain: Optional[str] = None
+
 
 class CampaignResponse(CampaignBase):
     id: int
     status: str
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class CampaignControl(BaseModel):
+    action: Literal['pause', 'resume', 'cancel']
+
+class EmailLogResponse(BaseModel):
+    id: int
+    campaign_id: int
+    recipient_email: str
+    status: EmailStatus
+    created_at: datetime
+    error_message: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -86,3 +120,10 @@ class DataListResponse(DataListCreate):
 
     class Config:
         from_attributes = True
+
+class TestEmailSchema(BaseModel):
+    recipient_email: str
+    subject: str
+    body_html: str
+    from_name: str
+    sender_account_id: int
