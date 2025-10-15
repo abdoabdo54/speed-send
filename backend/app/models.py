@@ -217,19 +217,25 @@ class SystemLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-class DataList(Base):
-    __tablename__ = "data_lists"
+class ContactList(Base):
+    __tablename__ = "contact_lists"
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
-    list_type = Column(String(50), default="custom")
-    geo_filter = Column(String(100))
-    recipients = Column(JSON, nullable=False, default=list)
-    tags = Column(JSON, default=list)
-    is_active = Column(Boolean, default=True)
     
-    total_recipients = Column(Integer, default=0)
+    contacts = relationship("Contact", back_populates="contact_list", cascade="all, delete-orphan")
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+class Contact(Base):
+    __tablename__ = "contacts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contact_list_id = Column(Integer, ForeignKey("contact_lists.id"))
+    email = Column(String(255), nullable=False, index=True)
+    first_name = Column(String(255))
+    last_name = Column(String(255))
+    
+    contact_list = relationship("ContactList", back_populates="contacts")

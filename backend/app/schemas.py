@@ -107,25 +107,6 @@ class EmailLogResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class DataListCreate(BaseModel):
-    name: str
-    recipients: List[str]
-    geo_filter: Optional[str] = None
-    list_type: Optional[str] = 'custom'
-    tags: Optional[List[str]] = []
-
-class DataListUpdate(BaseModel):
-    recipients: List[str]
-    geo_filter: Optional[str] = None
-    list_type: Optional[str] = 'custom'
-
-class DataListResponse(DataListCreate):
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
 class TestEmailSchema(BaseModel):
     recipient_email: str
     subject: str
@@ -141,6 +122,39 @@ class DashboardStats(BaseModel):
     total_users: int
     emails_sent_today: int
     emails_failed_today: int
+
+# --- New Contact List Schemas ---
+
+class ContactBase(BaseModel):
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+
+class ContactCreate(ContactBase):
+    pass
+
+class ContactResponse(ContactBase):
+    id: int
+    contact_list_id: int
+
+    class Config:
+        from_attributes = True
+
+class ContactListBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class ContactListCreate(ContactListBase):
+    contacts: List[ContactBase]
+
+class ContactListResponse(ContactListBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    contacts: List[ContactResponse] = []
+
+    class Config:
+        from_attributes = True
 
 # --- New Draft System Schemas ---
 
