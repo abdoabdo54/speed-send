@@ -6,11 +6,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { API_URL } from '@/lib/api';
 
 interface ContactList {
   id: string;
   name: string;
   contacts_count: number;
+  contacts: any[];
 }
 
 interface ContactListModalProps {
@@ -27,9 +29,14 @@ export const ContactListModal: React.FC<ContactListModalProps> = ({ isOpen, onCl
   useEffect(() => {
     if (isOpen) {
       const fetchContactLists = async () => {
+        setError(null);
         try {
-          const response = await axios.get('/api/v1/contacts');
-          setContactLists(response.data);
+          const response = await axios.get(`${API_URL}/api/v1/contacts/`);
+          const lists = response.data.map((list: any) => ({
+            ...list,
+            contacts_count: list.contacts.length,
+          }));
+          setContactLists(lists);
         } catch (err) {
           setError('Failed to fetch contact lists.');
         }
@@ -44,8 +51,8 @@ export const ContactListModal: React.FC<ContactListModalProps> = ({ isOpen, onCl
       return;
     }
     try {
-      const response = await axios.get(`/api/v1/contacts/${selectedList.id}`);
-      const emails = response.data.contacts.map((c: any) => c.email);
+      // The full list data including contacts is already fetched.
+      const emails = selectedList.contacts.map((c: any) => c.email);
       onSelectList(emails);
       onClose();
     } catch (err) {
@@ -75,6 +82,9 @@ export const ContactListModal: React.FC<ContactListModalProps> = ({ isOpen, onCl
                 <span className="text-sm text-muted-foreground">{list.contacts_count} contacts</span>
               </div>
             ))}
+            {contactLists.length === 0 && !error && (
+                <div className="text-center text-gray-500">No contact lists found.</div>
+            )}
           </div>
         </ScrollArea>
         <DialogFooter>

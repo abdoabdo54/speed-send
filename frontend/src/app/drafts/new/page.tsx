@@ -17,6 +17,12 @@ interface Account {
   client_email: string;
 }
 
+interface User {
+  id: string;
+  email: string;
+  service_account_id: string;
+}
+
 const CreateDraftCampaignPage: React.FC = () => {
   const [campaignName, setCampaignName] = useState('');
   const [subject, setSubject] = useState('');
@@ -25,6 +31,7 @@ const CreateDraftCampaignPage: React.FC = () => {
   const [numberOfDraftsPerUser, setNumberOfDraftsPerUser] = useState(1);
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<MultiSelectOption[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -44,6 +51,23 @@ const CreateDraftCampaignPage: React.FC = () => {
     };
     fetchAccounts();
   }, []);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (selectedAccounts.length === 0) {
+        setUsers([]);
+        return;
+      }
+      try {
+        const response = await axios.get(`${API_URL}/api/v1/users/`);
+        const filteredUsers = response.data.filter((user: User) => selectedAccounts.includes(user.service_account_id));
+        setUsers(filteredUsers);
+      } catch (err) {
+        setError('Failed to fetch users.');
+      }
+    };
+    fetchUsers();
+  }, [selectedAccounts]);
 
   const handleSaveDraft = async () => {
     if (selectedAccounts.length === 0 || emailList.length === 0 || !campaignName || !subject || !htmlBody) {
@@ -93,7 +117,7 @@ const CreateDraftCampaignPage: React.FC = () => {
               </div>
               <div>
                 <Label htmlFor="subject">Subject</Label>
-                <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Your email subject" />
+                <Input id="subject" value={subject} onChange={(e) => setSubject(e.target..value)} placeholder="Your email subject" />
               </div>
               <div>
                 <Label htmlFor="htmlBody">Email Body (HTML)</Label>
@@ -154,10 +178,9 @@ const CreateDraftCampaignPage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <ul className="list-disc pl-5">
-                {selectedAccounts.map(accountId => {
-                  const account = accounts.find(a => a.value === accountId);
-                  return <li key={accountId}>{account?.label}</li>;
-                })}
+                {users.map(user => (
+                  <li key={user.id}>{user.email}</li>
+                ))}
               </ul>
             </CardContent>
           </Card>
