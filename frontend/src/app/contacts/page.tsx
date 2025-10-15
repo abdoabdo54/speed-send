@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ export default function ContactsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const loadLists = async () => {
+  const loadLists = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_URL}/api/v1/contacts/`);
@@ -44,14 +44,14 @@ export default function ContactsPage() {
         throw new Error('Failed to fetch contact lists');
       }
       const data = await response.json();
-      setLists(data);
+      setLists(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load contact lists:', error);
       setLists([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadLists();
