@@ -314,7 +314,7 @@ export default function NewCampaignPage() {
                         <div>
                             <Label>Send From</Label>
                             <Select onValueChange={setTestSender} value={testSender}>
-                                <SelectTrigger><SelectValue placeholder="Select a user to send from..." /></SelectTrigger>
+                                <SelectTrigger><SelectValue>{testSender ? testSender : <span className="text-muted-foreground">Select a user to send from...</span>}</SelectValue></SelectTrigger>
                                 <SelectContent>
                                     {filteredUsers.map(u => <SelectItem key={u.id} value={u.email}>{u.email}</SelectItem>)}
                                 </SelectContent>
@@ -378,7 +378,7 @@ export default function NewCampaignPage() {
             'border-blue-200 bg-blue-50 text-blue-800'
           }`}>
             <AlertDescription>{notification.message}</AlertDescription>
-          </Aler t>
+          </Alert>
         ))}
       </main>
     </div>
