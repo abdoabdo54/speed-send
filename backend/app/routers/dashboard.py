@@ -19,12 +19,13 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
     Get dashboard statistics
     """
     # Total counts
-    total_accounts = db.query(ServiceAccount).count()
+    total_service_accounts = db.query(ServiceAccount).count()
     total_users = db.query(WorkspaceUser).count()
     total_campaigns = db.query(Campaign).count()
     active_campaigns = db.query(Campaign).filter(
         Campaign.status.in_([CampaignStatus.SENDING, CampaignStatus.PAUSED, CampaignStatus.PREPARING])
     ).count()
+    completed_campaigns = db.query(Campaign).filter(Campaign.status == CampaignStatus.COMPLETED).count()
     
     # Today's stats
     today = datetime.utcnow().date()
@@ -62,13 +63,14 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         }
     
     return DashboardStats(
-        total_accounts=total_accounts,
+        total_service_accounts=total_service_accounts,
         total_users=total_users,
         total_campaigns=total_campaigns,
         active_campaigns=active_campaigns,
+        completed_campaigns=completed_campaigns,
         emails_sent_today=emails_sent_today,
         emails_failed_today=emails_failed_today,
-        quota_usage=quota_usage
+        # quota_usage=quota_usage
     )
 
 

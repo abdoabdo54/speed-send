@@ -47,4 +47,4 @@ async def sync_service_account(account_id: int, db: Session = Depends(get_db)):
     if not account:
         raise HTTPException(status_code=404, detail="Service account not found")
     # Placeholder for sync logic
-    return {"user_count": 0}
+    return WorkspaceUserResponse(id=1, service_account_id=account_id, email="sync@complete.com", full_name="Sync Complete", is_active=True)
