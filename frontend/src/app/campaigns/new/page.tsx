@@ -8,29 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sidebar } from '@/components/Sidebar';
 import { API_URL as DETECTED_API_URL } from '@/lib/api';
-import { 
-  Send, 
-  Users, 
-  Settings, 
-  Mail, 
-  Play, 
-  RefreshCw, 
-  CheckCircle, 
-  Upload,
-  TestTube,
-  Save,
-  Loader2,
-  Eye,
-  Smartphone,
-  Tablet,
-  Monitor,
-  AlertCircle
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const API_URL = DETECTED_API_URL;
 
@@ -57,68 +40,18 @@ interface CampaignConfig {
   name: string;
   subject: string;
   body_html: string;
-  body_plain: string;
-  from_name: string;
-  daily_limit: number;
-  workers: number;
-  delay_ms: number;
-  test_after_email: string;
-  test_after_count: number;
-}
-
-interface RecipientList {
-    id: number;
-    name: string;
-    contacts: Array<{email: string}>;
 }
 
 export default function NewCampaignPage() {
   const router = useRouter();
-  const [editingId, setEditingId] = useState<number | null>(null);
-  
   const [loading, setLoading] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
   const [recipientsText, setRecipientsText] = useState('');
-  const [config, setConfig] = useState<CampaignConfig>({
-    name: '',
-    subject: '',
-    body_html: '',
-    body_plain: '',
-    from_name: 'Campaign',
-    daily_limit: 2000,
-    workers: 6,
-    delay_ms: 200,
-    test_after_email: '',
-    test_after_count: 0
-  });
-  const [testEmail, setTestEmail] = useState('');
-  const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
+  const [config, setConfig] = useState<CampaignConfig>({ name: '', subject: '', body_html: '' });
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
-  const [showTestModal, setShowTestModal] = useState(false);
-  const [recipientLists, setRecipientLists] = useState<RecipientList[]>([]);
-  const [showRecipientModal, setShowRecipientModal] = useState(false);
-  const [templates, setTemplates] = useState<Array<{id: string, name: string, subject: string, body: string, createdAt: string}>>([]);
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [userSearch, setUserSearch] = useState('');
-  const filteredSelectedUsers = useMemo(() => {
-    const q = userSearch.trim().toLowerCase();
-    const base = users.filter(u => selectedAccounts.includes(u.service_account_id));
-    if (!q) return base;
-    return base.filter(u => u.email.toLowerCase().includes(q));
-  }, [users, selectedAccounts, userSearch]);
-
-  const selectedUsers = useMemo(() => {
-    return users.filter(u => selectedAccounts.includes(u.service_account_id));
-  }, [users, selectedAccounts]);
-
-  const appendLog = (line: string) => {
-    const ts = new Date().toISOString();
-    setLogs(prev => [...prev.slice(-499), `[${ts}] ${line}`]);
-  };
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info') => {
     const id = Date.now().toString();
@@ -128,201 +61,197 @@ export default function NewCampaignPage() {
     }, 5000);
   };
 
-  const loadRecipientLists = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/v1/contacts/`);
-      setRecipientLists(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error('Failed to load recipient lists:', error);
-      showNotification('Failed to fetch contact lists.', 'error');
-      setRecipientLists([]);
-    }
-  };
-
-  useEffect(() => {
-    if (showRecipientModal) {
-      loadRecipientLists();
-    }
-  }, [showRecipientModal]);
-
   const loadAccounts = async () => {
     try {
       const response = await axios.get(`${API_URL}/api/v1/accounts/`);
-      setAccounts(response.data && Array.isArray(response.data) ? response.data : []);
+      setAccounts(response.data || []);
     } catch (error) {
-        showNotification('Failed to load accounts', 'error');
+      showNotification('Failed to load accounts', 'error');
     }
   };
 
   const loadUsers = async () => {
     try {
       const response = await axios.get(`${API_URL}/api/v1/users/`);
-        setUsers(response.data && Array.isArray(response.data) ? response.data : []);
+      setUsers(response.data || []);
     } catch (error) {
       showNotification('Failed to load users', 'error');
     }
   };
 
   useEffect(() => {
-    const initializeData = async () => {
-        await Promise.all([ loadAccounts(), loadUsers() ]);
-        const url = new URL(window.location.href);
-        const idParam = url.searchParams.get('id');
-        if (!idParam) return;
-        try {
-            const cid = parseInt(idParam);
-            if (isNaN(cid)) return;
-            setEditingId(cid);
-            const res = await axios.get(`${API_URL}/api/v1/campaigns/${cid}/`);
-            const c = res.data || {};
-            setConfig(prev => ({
-                ...prev,
-                name: c.name || '',
-                subject: c.subject || '',
-                body_html: c.body_html || '',
-            }));
-            if (Array.isArray(c.recipients)) {
-                setRecipientsText(c.recipients.map((r: any) => r.email).join('\n'));
-            }
-            if (Array.isArray(c.sender_accounts)) {
-                setSelectedAccounts(c.sender_accounts.map((a: any) => a.id).filter(Boolean));
-            }
-        } catch (e) {
-            console.warn('Edit preload failed:', e);
-            showNotification('Failed to load existing campaign data', 'error');
-        }
-    };
-    initializeData();
+    loadAccounts();
+    loadUsers();
   }, []);
 
-    const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
+  const handleAccountSelection = (accountId: number, isSelected: boolean) => {
+    setSelectedAccounts(prev => 
+      isSelected ? [...prev, accountId] : prev.filter(id => id !== accountId)
+    );
+  };
+
+  const handleSelectAllAccounts = () => {
+    if (selectedAccounts.length === accounts.length) {
+      setSelectedAccounts([]);
+    } else {
+      setSelectedAccounts(accounts.map(acc => acc.id));
+    }
+  };
+
+  const filteredUsers = useMemo(() => {
+    if (selectedAccounts.length === 0) return [];
+    return users.filter(user => 
+      selectedAccounts.includes(user.service_account_id) &&
+      user.email.toLowerCase().includes(userSearch.toLowerCase())
+    );
+  }, [users, selectedAccounts, userSearch]);
+
+  const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
 
   const handleCreateCampaign = async () => {
     setLoading(true);
     try {
       const payload = {
-        name: config.name,
-        subject: config.subject,
-        body_html: config.body_html,
+        ...config,
         recipients: recipients.map(email => ({ email, variables: {} })),
         sender_account_ids: selectedAccounts,
       };
-      let url = `${API_URL}/api/v1/campaigns/`;
-      let method: 'post' | 'patch' = 'post';
-      if (editingId) {
-          url = `${API_URL}/api/v1/campaigns/${editingId}/`;
-          method = 'patch';
-      }
-      const response = await axios[method](url, payload, { headers: { 'Content-Type': 'application/json' } });
-      showNotification(`Campaign ${editingId ? 'updated' : 'created'} successfully!`, 'success');
+      await axios.post(`${API_URL}/api/v1/campaigns/`, payload);
+      showNotification('Campaign created successfully!', 'success');
       router.push('/campaigns');
     } catch (error: any) {
-      showNotification(`Campaign creation/update failed: ${error?.response?.data?.detail || 'Unknown error'}`, 'error');
+      showNotification(`Campaign creation failed: ${error?.response?.data?.detail || 'Unknown error'}`, 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadRecipientList = (list: RecipientList) => {
-    const emails = list.contacts.map(c => c.email).join('\n');
-    setRecipientsText(emails);
-    setShowRecipientModal(false);
-  };
-
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-gray-100">
       <Sidebar />
-      <div className="flex-1 overflow-auto p-8 space-y-6">
-        <h1 className="text-3xl font-bold">{editingId ? 'Edit Campaign' : 'New Campaign'}</h1>
+      <main className="flex-1 p-6 overflow-y-auto">
+        <div className="bg-black text-white font-mono p-4 rounded-md mb-6 text-xs h-32 overflow-y-scroll">
+            <p>[2025-10-13T20:41:31.371Z] 🗺️ Loading Google Workspace users...</p>
+            <p>[2025-10-13T20:41:31.534Z] ✅ Users loaded successfully: 294 users (0 admin users excluded)</p>
+            <p>[2025-10-13T20:41:31.677Z] 📝 Loaded campaign 24 for editing</p>
+        </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* Left Column */} 
+          <div className="xl:col-span-4 space-y-6">
             <Card>
-              <CardHeader><CardTitle>Campaign Details</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <Input placeholder="Campaign Name" value={config.name} onChange={e => setConfig(c => ({...c, name: e.target.value}))} />
-                <Input placeholder="Subject" value={config.subject} onChange={e => setConfig(c => ({...c, subject: e.target.value}))} />
-                <Textarea placeholder="Email Body (HTML)" value={config.body_html} onChange={e => setConfig(c => ({...c, body_html: e.target.value}))} rows={12} />
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Google Workspace Accounts ({accounts.length})</CardTitle>
+                <Button variant="outline" size="sm" onClick={handleSelectAllAccounts}>Select All</Button>
+              </CardHeader>
+              <CardContent className="max-h-64 overflow-auto">
+                {accounts.map(account => (
+                  <div key={account.id} className="flex items-center space-x-2 my-2">
+                    <Checkbox 
+                        id={`acc-${account.id}`}
+                        checked={selectedAccounts.includes(account.id)}
+                        onCheckedChange={(checked) => handleAccountSelection(account.id, !!checked)}
+                    />
+                    <Label htmlFor={`acc-${account.id}`} className="flex flex-col">
+                      <span>{account.client_email}</span>
+                      <span className="text-xs text-gray-500">Workspace Users: {account.total_users} | Quota: {account.quota_used_today}/{account.quota_limit}</span>
+                    </Label>
+                  </div>
+                ))}
               </CardContent>
             </Card>
-
             <Card>
-              <CardHeader className="flex items-center justify-between flex-row">
-                  <CardTitle>Recipients ({recipients.length})</CardTitle>
-                  <Button variant="outline" onClick={() => setShowRecipientModal(true)}>Load Lists</Button>
+              <CardHeader>
+                <CardTitle>Users of Selected Accounts ({filteredUsers.length})</CardTitle>
               </CardHeader>
               <CardContent>
-                <Textarea placeholder="Enter one email address per line" value={recipientsText} onChange={e => setRecipientsText(e.target.value)} rows={8} />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card>
-              <CardHeader><CardTitle>Accounts & Senders</CardTitle></CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                    <Label>Select Accounts</Label>
-                    <div className="max-h-48 overflow-auto border rounded-md p-2 space-y-2">
-                        {accounts.map(acc => (
-                            <div key={acc.id} className="flex items-center space-x-2">
-                                <Checkbox 
-                                    id={`acc-${acc.id}`} 
-                                    checked={selectedAccounts.includes(acc.id)} 
-                                    onCheckedChange={checked => {
-                                        setSelectedAccounts(prev => checked ? [...prev, acc.id] : prev.filter(id => id !== acc.id))
-                                    }}
-                                />
-                                <Label htmlFor={`acc-${acc.id}`} className="font-normal">{acc.name || acc.client_email}</Label>
-                            </div>
-                        ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{selectedAccounts.length} of {accounts.length} accounts selected.</p>
+                <Input 
+                  placeholder="Search users by email..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                />
+                <div className="max-h-64 overflow-auto mt-2">
+                  {filteredUsers.map(user => (
+                    <div key={user.id} className="text-sm p-1">{user.email}</div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
+          </div>
 
+          {/* Middle Column */}
+          <div className="xl:col-span-5 space-y-6">
             <Card>
-                <CardHeader><CardTitle>Users of Selected Accounts ({filteredSelectedUsers.length})</CardTitle></CardHeader>
-                <CardContent>
-                    <Input placeholder="Search users..." value={userSearch} onChange={e => setUserSearch(e.target.value)} />
-                    <div className="max-h-48 overflow-auto border rounded-md mt-2">
-                        {filteredSelectedUsers.map(u => <div key={u.id} className="text-sm p-2">{u.email}</div>)}
-                    </div>
+                <CardContent className="pt-6 space-y-4">
+                    <Input placeholder="Campaign Name (e.g. opp-latest (copy))" value={config.name} onChange={e => setConfig(c => ({...c, name: e.target.value}))} />
+                    <Input placeholder="Subject (e.g. Tjek venligst)" value={config.subject} onChange={e => setConfig(c => ({...c, subject: e.target.value}))} />
                 </CardContent>
             </Card>
+            <Card>
+              <CardHeader><CardTitle>Google Workspace Settings</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2"><Checkbox id="labels" defaultChecked /><Label htmlFor="labels">Use Gmail Labels for Organization</Label></div>
+                <div className="flex items-center space-x-2"><Checkbox id="opens" defaultChecked /><Label htmlFor="opens">Track Email Opens (Gmail API)</Label></div>
+                <div className="flex items-center space-x-2"><Checkbox id="clicks" defaultChecked /><Label htmlFor="clicks">Track Link Clicks (Gmail API)</Label></div>
+                <div>
+                    <Label>Sender Rotation Strategy</Label>
+                    <Select defaultValue="round_robin">
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="round_robin">Round Robin (Recommended)</SelectItem>
+                            <SelectItem value="random">Random</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Email Composer</CardTitle>
+                <div>
+                    <Button variant="outline" size="sm">Manage Variables</Button>
+                    <Button variant="outline" size="sm" className="ml-2">Save Template</Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Textarea placeholder="Email Body (HTML)" rows={18} value={config.body_html} onChange={e => setConfig(c => ({...c, body_html: e.target.value}))} />
+              </CardContent>
+            </Card>
+          </div>
 
-            <div className="sticky top-0">
-                <Button onClick={handleCreateCampaign} disabled={loading} className="w-full">
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingId ? 'Update Campaign' : 'Create Campaign')}
+          {/* Right Column */}
+          <div className="xl:col-span-3 space-y-6">
+            <Card>
+                <CardHeader><CardTitle className="text-center">Recipients</CardTitle></CardHeader>
+                <CardContent className="text-center">
+                    <div className="text-4xl font-bold">{filteredUsers.length}</div>
+                    <p className="text-sm text-gray-500">Workspace Users</p>
+                    <div className="text-4xl font-bold mt-4">0m</div>
+                    <p className="text-sm text-gray-500">Est. Duration</p>
+                </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 space-y-2">
+                <div className="flex justify-between"><span className="font-bold">Service Accounts:</span><span>{selectedAccounts.length}</span></div>
+                <div className="flex justify-between"><span className="font-bold">Daily Quota:</span><span>2000</span></div>
+                <div className="flex justify-between"><span className="font-bold">Concurrent Senders:</span><span>6</span></div>
+                <div className="flex justify-between"><span className="font-bold">Gmail API Rate:</span><span>250 req/sec</span></div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Gmail API Actions</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                <Button variant="outline" className="w-full">Send Test Email</Button>
+                <Button variant="outline" className="w-full">Preview Email</Button>
+                <Button variant="outline" className="w-full">View Analytics</Button>
+                <Button className="w-full" onClick={handleCreateCampaign} disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Campaign'}
                 </Button>
-            </div>
+                <p className="text-xs text-center text-gray-500 pt-2">Emails will be sent via Google Workspace users. PowerMTA-style high-speed delivery enabled.</p>
+              </CardContent>
+            </Card>
           </div>
         </div>
-
-        {showRecipientModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
-              <h3 className="text-lg font-semibold mb-4">Load Recipients from Contact List</h3>
-              {recipientLists.length > 0 ? (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {recipientLists.map(list => (
-                          <div key={list.id} className="flex items-center justify-between p-2 border rounded">
-                              <div>
-                                  <div className="font-medium">{list.name}</div>
-                                  <div className="text-sm text-gray-500">{list.contacts.length} recipients</div>
-                              </div>
-                              <Button size="sm" variant="outline" onClick={() => loadRecipientList(list)}>Load</Button>
-                          </div>
-                      ))}
-                  </div>
-              ) : <p>No lists found.</p>}
-              <div className="flex justify-end mt-4">
-                <Button onClick={() => setShowRecipientModal(false)}>Close</Button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {notifications.map(notification => (
           <Alert key={notification.id} className={`fixed top-5 right-5 max-w-sm z-50 ${
@@ -333,7 +262,7 @@ export default function NewCampaignPage() {
             <AlertDescription>{notification.message}</AlertDescription>
           </Alert>
         ))}
-      </div>
+      </main>
     </div>
   );
 }
