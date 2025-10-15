@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-
+import { API_URL } from '@/lib/api';
 
 type Contact = {
   id: number;
@@ -39,7 +39,7 @@ export default function ContactsPage() {
   const loadLists = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/contacts/');
+      const response = await fetch(`${API_URL}/api/v1/contacts/`);
       if (!response.ok) {
         throw new Error('Failed to fetch contact lists');
       }
@@ -104,14 +104,14 @@ export default function ContactsPage() {
       let response;
       if (editing) {
         // Update existing list
-        response = await fetch(`/api/v1/contacts/${editing.id}`, {
+        response = await fetch(`${API_URL}/api/v1/contacts/${editing.id}` , {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
       } else {
         // Create new list
-        response = await fetch('/api/v1/contacts/', {
+        response = await fetch(`${API_URL}/api/v1/contacts/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -137,7 +137,7 @@ export default function ContactsPage() {
     
     try {
       setLoading(true);
-      const response = await fetch(`/api/v1/contacts/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/api/v1/contacts/${id}`, { method: 'DELETE' });
       if (!response.ok) {
         throw new Error('Failed to delete contact list');
       }
