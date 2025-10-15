@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 
@@ -8,10 +9,11 @@ from app.schemas import ServiceAccountResponse, ServiceAccountCreate, WorkspaceU
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
-@router.get("/", response_model=List[ServiceAccountResponse])
+@router.get("/")
 async def list_service_accounts(db: Session = Depends(get_db)):
-    accounts = db.query(ServiceAccount).options(joinedload(ServiceAccount.workspace_users)).all()
-    return accounts
+    accounts = db.query(ServiceAccount).all()
+    response_data = [{"id": str(acc.id), "email": acc.client_email} for acc in accounts]
+    return JSONResponse(content=response_data)
 
 @router.post("/", response_model=ServiceAccountResponse)
 async def create_service_account(account: ServiceAccountCreate, db: Session = Depends(get_db)):
