@@ -117,7 +117,7 @@ const CreateDraftCampaignPage: React.FC = () => {
               </div>
               <div>
                 <Label htmlFor="subject">Subject</Label>
-                <Input id="subject" value={subject} onChange={(e) => setSubject(e.target..value)} placeholder="Your email subject" />
+                <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Your email subject" />
               </div>
               <div>
                 <Label htmlFor="htmlBody">Email Body (HTML)</Label>
