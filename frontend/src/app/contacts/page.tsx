@@ -55,7 +55,7 @@ export default function ContactsPage() {
 
   useEffect(() => {
     loadLists();
-  }, []);
+  }, [loadLists]);
 
   const filtered = useMemo(() => {
     return lists
