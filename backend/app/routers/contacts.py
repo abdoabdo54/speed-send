@@ -1,6 +1,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 
 from app.database import get_db
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 @router.get("/", response_model=List[ContactListResponse])
 async def list_contact_lists(db: Session = Depends(get_db)):
-    return db.query(ContactList).all()
+    return db.query(ContactList).options(joinedload(ContactList.contacts)).all()
 
 @router.post("/", response_model=ContactListResponse)
 async def create_contact_list(contact_list: ContactListCreate, db: Session = Depends(get_db)):

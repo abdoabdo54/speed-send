@@ -9,11 +9,10 @@ from app.schemas import ServiceAccountResponse, ServiceAccountCreate, WorkspaceU
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
-@router.get("/")
+@router.get("/", response_model=List[ServiceAccountResponse])
 async def list_service_accounts(db: Session = Depends(get_db)):
-    accounts = db.query(ServiceAccount).all()
-    response_data = [{"id": str(acc.id), "email": acc.client_email} for acc in accounts]
-    return JSONResponse(content=response_data)
+    accounts = db.query(ServiceAccount).options(joinedload(ServiceAccount.workspace_users)).all()
+    return accounts
 
 @router.post("/", response_model=ServiceAccountResponse)
 async def create_service_account(account: ServiceAccountCreate, db: Session = Depends(get_db)):
