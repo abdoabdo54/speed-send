@@ -182,6 +182,7 @@ class DraftCampaign(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
+    from_name = Column(String(255))
     subject = Column(String(998), nullable=False)
     body_html = Column(Text)
     number_of_drafts_per_user = Column(Integer, default=1)

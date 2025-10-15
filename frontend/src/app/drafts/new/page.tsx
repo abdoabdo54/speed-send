@@ -25,6 +25,7 @@ interface User {
 
 const CreateDraftCampaignPage: React.FC = () => {
   const [campaignName, setCampaignName] = useState('');
+  const [fromName, setFromName] = useState('');
   const [subject, setSubject] = useState('');
   const [htmlBody, setHtmlBody] = useState('');
   const [emailList, setEmailList] = useState<string[]>([]);
@@ -70,14 +71,15 @@ const CreateDraftCampaignPage: React.FC = () => {
   }, [selectedAccounts]);
 
   const handleSaveDraft = async () => {
-    if (selectedAccounts.length === 0 || emailList.length === 0 || !campaignName || !subject || !htmlBody) {
-      setError('Please fill all required fields: Campaign Name, Subject, Body, select at least one account, and provide at least one recipient.');
+    if (selectedAccounts.length === 0 || emailList.length === 0 || !campaignName || !subject || !htmlBody || !fromName) {
+      setError('Please fill all required fields: Campaign Name, From Name, Subject, Body, select at least one account, and provide at least one recipient.');
       return;
     }
 
     try {
       const response = await axios.post(`${API_URL}/api/v1/drafts/create`, {
         campaign_name: campaignName,
+        from_name: fromName,
         subject,
         html_body: htmlBody,
         email_list: emailList,
@@ -114,6 +116,10 @@ const CreateDraftCampaignPage: React.FC = () => {
               <div>
                 <Label htmlFor="campaignName">Campaign Name</Label>
                 <Input id="campaignName" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="e.g., Q2 Promo" />
+              </div>
+              <div>
+                <Label htmlFor="fromName">From Name</Label>
+                <Input id="fromName" value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="e.g., Your Company Name" />
               </div>
               <div>
                 <Label htmlFor="subject">Subject</Label>

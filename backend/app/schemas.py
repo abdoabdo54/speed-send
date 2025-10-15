@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Literal
 from datetime import datetime
@@ -171,6 +170,7 @@ class GmailDraftResponse(BaseModel):
 
 class DraftCampaignCreate(BaseModel):
     campaign_name: str
+    from_name: str
     subject: str
     html_body: str
     number_of_drafts_per_user: int
@@ -184,6 +184,7 @@ class DraftCampaignResponse(BaseModel):
     created_at: datetime
     total_drafts: int
     drafts_by_user: Dict[str, int]
+    from_name: Optional[str] = None
 
     class Config:
         from_attributes = True
