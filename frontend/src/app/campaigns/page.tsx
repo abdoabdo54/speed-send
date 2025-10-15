@@ -626,9 +626,10 @@ export default function CampaignsPage() {
                           {campaign.status === 'paused' && (
                             <Button
                               size="sm"
-                              onClick={() => handleControl(campaign.id, 'resume')}
+                              onClick={() => handleResume(campaign.id)}
                             >
                               <Play className="h-4 w-4" />
+                              Resume
                             </Button>
                           )}
                           
@@ -724,4 +725,3 @@ export default function CampaignsPage() {
     </div>
   );
 }
-

@@ -87,14 +87,17 @@ def create_draft_campaign(draft_data: schemas.DraftCampaignCreate, db: Session =
 
 @router.get("/api/v1/drafts", response_model=List[schemas.DraftCampaignResponse])
 def get_draft_campaigns(db: Session = Depends(get_db)):
-    draft_campaigns = db.query(models.DraftCampaign).options(joinedload(models.DraftCampaign.gmail_drafts).joinedload(models.GmailDraft.user)).all()
+    draft_campaigns = db.query(models.DraftCampaign).options(
+        joinedload(models.DraftCampaign.gmail_drafts).joinedload(models.GmailDraft.user)
+    ).all()
     response = []
     for campaign in draft_campaigns:
         total_drafts = len(campaign.gmail_drafts)
         drafts_by_user = {}
         for draft in campaign.gmail_drafts:
-            user_email = draft.user.email
-            drafts_by_user[user_email] = drafts_by_user.get(user_email, 0) + 1
+            if draft.user:
+                user_email = draft.user.email
+                drafts_by_user[user_email] = drafts_by_user.get(user_email, 0) + 1
         
         response.append(schemas.DraftCampaignResponse(
             id=campaign.id,

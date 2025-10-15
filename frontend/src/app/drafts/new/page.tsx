@@ -10,6 +10,7 @@ import { MultiSelect, MultiSelectOption } from '@/components/ui/multi-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { ContactListModal } from '@/components/drafts/ContactListModal';
+import { API_URL } from '@/lib/api';
 
 interface Account {
   id: string;
@@ -31,7 +32,7 @@ const CreateDraftCampaignPage: React.FC = () => {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const response = await axios.get('/api/v1/accounts/');
+        const response = await axios.get(`${API_URL}/api/v1/accounts/`);
         const accountOptions = response.data.map((acc: Account) => ({
           value: acc.id.toString(),
           label: acc.client_email,
@@ -51,7 +52,7 @@ const CreateDraftCampaignPage: React.FC = () => {
     }
 
     try {
-      const response = await axios.post('/api/v1/drafts/create', {
+      const response = await axios.post(`${API_URL}/api/v1/drafts/create`, {
         campaign_name: campaignName,
         subject,
         html_body: htmlBody,
