@@ -13,7 +13,7 @@ import { ContactListModal } from '@/components/drafts/ContactListModal';
 
 interface Account {
   id: string;
-  email: string;
+  client_email: string;
 }
 
 const CreateDraftCampaignPage: React.FC = () => {
@@ -31,10 +31,10 @@ const CreateDraftCampaignPage: React.FC = () => {
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const response = await axios.get('/api/v1/accounts');
+        const response = await axios.get('/api/v1/accounts/');
         const accountOptions = response.data.map((acc: Account) => ({
-          value: acc.id,
-          label: acc.email,
+          value: acc.id.toString(),
+          label: acc.client_email,
         }));
         setAccounts(accountOptions);
       } catch (err) {
