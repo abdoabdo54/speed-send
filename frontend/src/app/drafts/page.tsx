@@ -13,6 +13,7 @@ interface DraftCampaign {
   id: number;
   name: string;
   subject: string;
+  from_name?: string;
   created_at: string;
   total_drafts: number;
   drafts_by_user: { [key: string]: number };
@@ -86,6 +87,9 @@ const DraftsPage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">Subject: {campaign.subject}</p>
+              {campaign.from_name && (
+                <p className="text-sm text-muted-foreground mt-1">From Name: {campaign.from_name}</p>
+              )}
               <div className="mt-4">
                 <p className="font-semibold">Total Drafts: {campaign.total_drafts}</p>
                 <ul className="text-sm text-muted-foreground list-disc pl-5 mt-2">

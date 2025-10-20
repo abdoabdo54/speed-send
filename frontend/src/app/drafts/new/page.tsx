@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Sidebar } from '@/components/Sidebar';
 import { API_URL as DETECTED_API_URL } from '@/lib/api';
 import { 
   Send, 
@@ -231,7 +230,6 @@ export default function NewCampaignPage() {
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar />
       <div className="flex-1 overflow-auto p-8 space-y-6">
         <h1 className="text-3xl font-bold">{editingId ? 'Edit Campaign' : 'New Campaign'}</h1>
 
