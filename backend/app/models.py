@@ -189,7 +189,44 @@ class DraftCampaign(Base):
     emails_per_user = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Relationships to store selected accounts, users, and contacts
+    selected_accounts = relationship("DraftCampaignAccount", back_populates="draft_campaign", cascade="all, delete-orphan")
+    selected_users = relationship("DraftCampaignUser", back_populates="draft_campaign", cascade="all, delete-orphan")
+    selected_contacts = relationship("DraftCampaignContact", back_populates="draft_campaign", cascade="all, delete-orphan")
     gmail_drafts = relationship("GmailDraft", back_populates="draft_campaign", cascade="all, delete-orphan")
+
+class DraftCampaignAccount(Base):
+    __tablename__ = "draft_campaign_accounts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    draft_campaign_id = Column(Integer, ForeignKey("draft_campaigns.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("service_accounts.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    draft_campaign = relationship("DraftCampaign", back_populates="selected_accounts")
+    account = relationship("ServiceAccount")
+
+class DraftCampaignUser(Base):
+    __tablename__ = "draft_campaign_users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    draft_campaign_id = Column(Integer, ForeignKey("draft_campaigns.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("workspace_users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    draft_campaign = relationship("DraftCampaign", back_populates="selected_users")
+    user = relationship("User")
+
+class DraftCampaignContact(Base):
+    __tablename__ = "draft_campaign_contacts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    draft_campaign_id = Column(Integer, ForeignKey("draft_campaigns.id"), nullable=False)
+    contact_list_id = Column(Integer, ForeignKey("contact_lists.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    draft_campaign = relationship("DraftCampaign", back_populates="selected_contacts")
+    contact_list = relationship("ContactList")
 
 class GmailDraft(Base):
     __tablename__ = "gmail_drafts"

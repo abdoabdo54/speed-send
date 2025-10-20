@@ -173,6 +173,10 @@ class DraftCampaignCreate(BaseModel):
     subject: str
     from_name: Optional[str] = None
     body_html: str
+    selected_account_ids: List[int] = []
+    selected_user_ids: List[int] = []
+    selected_contact_list_ids: List[int] = []
+    emails_per_user: int = 1
 
 class DraftCampaignUpdate(BaseModel):
     name: Optional[str] = None
