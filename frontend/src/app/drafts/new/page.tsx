@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { api } from '@/lib/api';
+import { API_URL as DETECTED_API_URL, dataListsApi } from '@/lib/api';
 import { 
   Upload,
   Users, 
@@ -19,6 +20,9 @@ import {
   Save,
   ArrowRight
 } from 'lucide-react';
+
+// API Configuration - Use dynamic API URL detection
+const API_URL = DETECTED_API_URL;
 
 
 interface Account {
@@ -88,27 +92,86 @@ export default function NewDraftPage() {
 
   const loadAccounts = async () => {
     try {
-      const response = await api.get('/accounts/');
-      setAccounts(response.data && Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      showNotification('Failed to load accounts', 'error');
+      console.log('🔄 Loading Google Workspace accounts...');
+      const response = await axios.get(`${API_URL}/api/v1/accounts/`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.data && Array.isArray(response.data)) {
+        setAccounts(response.data);
+        console.log('✅ Accounts loaded successfully:', response.data.length, 'accounts');
+        showNotification(`Loaded ${response.data.length} Google Workspace accounts`, 'success');
+      } else {
+        console.warn('⚠️ Invalid response format:', response.data);
+        setAccounts([]);
+        showNotification('No accounts found. Please add Google Workspace service accounts first.', 'info');
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to load accounts:', error);
+      setAccounts([]);
+
+      let errorMessage = 'Failed to load accounts';
+      if (error.response?.status === 404) {
+        errorMessage = 'Backend API not found. Please check if the server is running.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Backend server error. Please check server logs.';
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = 'Cannot connect to backend server. Please check if the server is running on port 8000.';
+      } else if (error.message) {
+        errorMessage = `Failed to load accounts: ${error.message}`;
+      }
+
+      showNotification(errorMessage, 'error');
     }
   };
 
   const loadUsers = async () => {
     try {
-      const response = await api.get('/users/');
-      setUsers(response.data && Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
+      console.log('🔄 Loading Google Workspace users...');
+      const response = await axios.get(`${API_URL}/api/v1/users/`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.data && Array.isArray(response.data)) {
+        setUsers(response.data);
+        console.log('✅ Users loaded successfully:', response.data.length, 'users');
+      } else {
+        console.warn('⚠️ Invalid response format:', response.data);
+        setUsers([]);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to load users:', error);
+      setUsers([]);
       showNotification('Failed to load users', 'error');
     }
   };
 
   const loadContactLists = async () => {
     try {
-      const response = await api.get('/contacts/');
-      setContactLists(response.data && Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
+      console.log('🔄 Loading contact lists...');
+      const response = await axios.get(`${API_URL}/api/v1/contacts/`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.data && Array.isArray(response.data)) {
+        setContactLists(response.data);
+        console.log('✅ Contact lists loaded successfully:', response.data.length, 'lists');
+      } else {
+        console.warn('⚠️ Invalid response format:', response.data);
+        setContactLists([]);
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to load contact lists:', error);
+      setContactLists([]);
       showNotification('Failed to load contact lists', 'error');
     }
   };
@@ -157,7 +220,7 @@ export default function NewDraftPage() {
 
     setLoading(true);
     try {
-      const response = await api.post('/drafts', {
+      const response = await axios.post(`${API_URL}/api/v1/drafts`, {
         ...config,
         selected_account_ids: selectedAccounts,
         selected_user_ids: selectedUsers,
@@ -181,7 +244,7 @@ export default function NewDraftPage() {
   const uploadDrafts = async (draftId: number) => {
     setLoading(true);
     try {
-      const response = await api.post(`/drafts/${draftId}/upload`);
+      const response = await axios.post(`${API_URL}/api/v1/drafts/${draftId}/upload`);
       
       showNotification(`Successfully uploaded ${response.data.total_drafts} drafts to ${response.data.users_count} users!`, 'success');
       router.push('/drafts');
@@ -252,9 +315,9 @@ export default function NewDraftPage() {
           <div className="xl:col-span-2 space-y-6">
             {/* Step 1: Draft Details */}
             {step === 1 && (
-              <Card>
+            <Card>
                 <CardHeader><CardTitle>Draft Details</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
+              <CardContent className="space-y-4">
                   <Input 
                     placeholder="Draft Name" 
                     value={config.name} 
@@ -366,19 +429,19 @@ export default function NewDraftPage() {
                       Total drafts: {selectedUsers.length * emailsPerUser}
                     </p>
                   </div>
-                </CardContent>
-              </Card>
+              </CardContent>
+            </Card>
             )}
 
             {/* Step 3: Upload Confirmation */}
             {step === 3 && (
-              <Card>
+            <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Upload className="h-5 w-5" />
                     Upload Confirmation
                   </CardTitle>
-                </CardHeader>
+              </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <h3 className="font-semibold text-blue-900 mb-2">Ready to Upload</h3>
@@ -401,8 +464,8 @@ export default function NewDraftPage() {
                       Create & Upload Draft
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+              </CardContent>
+            </Card>
             )}
           </div>
 
@@ -422,23 +485,23 @@ export default function NewDraftPage() {
                     </div>
                   ) : (
                     <>
-                      <div className="max-h-48 overflow-auto border rounded-md p-2 space-y-2">
+                    <div className="max-h-48 overflow-auto border rounded-md p-2 space-y-2">
                         {accounts.map(acc => (
-                          <div key={acc.id} className="flex items-center space-x-2">
-                            <Checkbox 
-                              id={`acc-${acc.id}`} 
-                              checked={selectedAccounts.includes(acc.id)} 
-                              onCheckedChange={checked => {
-                                setSelectedAccounts(prev => checked ? [...prev, acc.id] : prev.filter(id => id !== acc.id))
-                              }}
-                            />
+                            <div key={acc.id} className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id={`acc-${acc.id}`} 
+                                    checked={selectedAccounts.includes(acc.id)} 
+                                    onCheckedChange={checked => {
+                                        setSelectedAccounts(prev => checked ? [...prev, acc.id] : prev.filter(id => id !== acc.id))
+                                    }}
+                                />
                             <Label htmlFor={`acc-${acc.id}`} className="font-normal text-sm">
                               {acc.name || acc.client_email}
                             </Label>
-                          </div>
+                            </div>
                         ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground">{selectedAccounts.length} of {accounts.length} accounts selected.</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{selectedAccounts.length} of {accounts.length} accounts selected.</p>
                     </>
                   )}
                 </div>
@@ -447,13 +510,13 @@ export default function NewDraftPage() {
 
             {/* Users of Selected Accounts */}
             <Card>
-              <CardHeader><CardTitle>Users of Selected Accounts ({filteredSelectedUsers.length})</CardTitle></CardHeader>
-              <CardContent>
-                <Input placeholder="Search users..." value={userSearch} onChange={e => setUserSearch(e.target.value)} />
+                <CardHeader><CardTitle>Users of Selected Accounts ({filteredSelectedUsers.length})</CardTitle></CardHeader>
+                <CardContent>
+                    <Input placeholder="Search users..." value={userSearch} onChange={e => setUserSearch(e.target.value)} />
                 {accounts.length === 0 ? (
                   <div className="text-sm text-muted-foreground mt-2">Select accounts first to view users.</div>
                 ) : (
-                  <div className="max-h-48 overflow-auto border rounded-md mt-2">
+                    <div className="max-h-48 overflow-auto border rounded-md mt-2">
                     {filteredSelectedUsers.map(u => (
                       <div key={u.id} className="flex items-center space-x-2 py-1">
                         <Checkbox
@@ -512,9 +575,9 @@ export default function NewDraftPage() {
                   <div className="mt-3 flex items-center justify-between border rounded-md p-2 bg-muted/30 text-sm">
                     <span>No contact lists found.</span>
                     <Button size="sm" variant="outline" onClick={loadContactLists}>Reload</Button>
-                  </div>
+                    </div>
                 )}
-              </CardContent>
+                </CardContent>
             </Card>
 
             {/* Step Navigation */}
