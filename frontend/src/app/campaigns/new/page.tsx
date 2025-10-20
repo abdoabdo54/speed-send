@@ -36,8 +36,13 @@ const API_URL = DETECTED_API_URL;
 // Types
 interface Account {
   id: number;
-  name: string;
-  test_after_count: number;
+  name?: string;
+  client_email?: string;
+  status?: string;
+  domain?: string;
+  total_users?: number;
+  quota_used_today?: number;
+  quota_limit?: number;
 }
 
 export default function NewCampaignPage() {
@@ -48,6 +53,30 @@ export default function NewCampaignPage() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [users, setUsers] = useState<Array<{
+    id: number;
+    email: string;
+    is_active: boolean;
+    service_account_id: number;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
+  }>>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
+  const [recipientsText, setRecipientsText] = useState('');
+  const [config, setConfig] = useState({
+    name: '',
+    subject: '',
+    body_html: '',
+    body_plain: '',
+    from_name: '',
+    daily_limit: 100,
+    workers: 1,
+    delay_ms: 0,
+    test_after_email: '',
+    test_after_count: 0,
+  });
+  const [testEmail, setTestEmail] = useState('');
   const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -93,7 +122,8 @@ export default function NewCampaignPage() {
   const [userSearch, setUserSearch] = useState('');
   const filteredSelectedUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
-    return base.filter(u => u.email.toLowerCase().includes(q));
+    const base = users.filter(u => selectedAccounts.includes(u.service_account_id));
+    return q ? base.filter(u => (u.email || '').toLowerCase().includes(q)) : base;
   }, [users, selectedAccounts, userSearch]);
 
   // Derived collections
