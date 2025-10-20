@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,9 +17,7 @@ import {
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
-import { API_URL as DETECTED_API_URL } from '@/lib/api';
-
-const API_URL = DETECTED_API_URL;
+import { api } from '@/lib/api';
 
 interface DraftCampaign {
   id: number;
@@ -49,7 +46,7 @@ const DraftsPage: React.FC = () => {
 
   const fetchDraftCampaigns = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/v1/drafts`);
+      const response = await api.get('/drafts');
       setDraftCampaigns(response.data);
       setError(null);
     } catch (err) {
@@ -60,7 +57,7 @@ const DraftsPage: React.FC = () => {
   const launchDrafts = async (draftId: number) => {
     setLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/v1/drafts/${draftId}/launch`);
+      const response = await api.post(`/drafts/${draftId}/launch`);
       setDraftCampaigns(prev => prev.map(d => 
         d.id === draftId ? { ...d, status: 'launched' } : d
       ));
@@ -77,7 +74,7 @@ const DraftsPage: React.FC = () => {
       const originalDraft = draftCampaigns.find(d => d.id === draftId);
       if (!originalDraft) return;
 
-      const response = await axios.post(`${API_URL}/api/v1/drafts`, {
+      const response = await api.post('/drafts', {
         name: `${originalDraft.name} (Copy)`,
         subject: originalDraft.subject,
         from_name: originalDraft.from_name,
@@ -94,7 +91,7 @@ const DraftsPage: React.FC = () => {
     if (!confirm('Are you sure you want to delete this draft?')) return;
     
     try {
-      await axios.delete(`${API_URL}/api/v1/drafts/${draftId}`);
+      await api.delete(`/drafts/${draftId}`);
       setDraftCampaigns(prev => prev.filter(d => d.id !== draftId));
     } catch (err: any) {
       setError(`Failed to delete draft: ${err.response?.data?.detail || err.message}`);

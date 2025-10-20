@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { API_URL as DETECTED_API_URL } from '@/lib/api';
+import { api } from '@/lib/api';
 import { 
   Upload,
   Users, 
@@ -21,7 +20,6 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-const API_URL = DETECTED_API_URL;
 
 interface Account {
   id: number;
@@ -90,7 +88,7 @@ export default function NewDraftPage() {
 
   const loadAccounts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/v1/accounts/`);
+      const response = await api.get('/accounts/');
       setAccounts(response.data && Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       showNotification('Failed to load accounts', 'error');
@@ -99,7 +97,7 @@ export default function NewDraftPage() {
 
   const loadUsers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/v1/users/`);
+      const response = await api.get('/users/');
       setUsers(response.data && Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       showNotification('Failed to load users', 'error');
@@ -108,7 +106,7 @@ export default function NewDraftPage() {
 
   const loadContactLists = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/v1/contacts/`);
+      const response = await api.get('/contacts/');
       setContactLists(response.data && Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       showNotification('Failed to load contact lists', 'error');
@@ -159,7 +157,7 @@ export default function NewDraftPage() {
 
     setLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/v1/drafts`, {
+      const response = await api.post('/drafts', {
         ...config,
         selected_account_ids: selectedAccounts,
         selected_user_ids: selectedUsers,
@@ -183,7 +181,7 @@ export default function NewDraftPage() {
   const uploadDrafts = async (draftId: number) => {
     setLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/v1/drafts/${draftId}/upload`);
+      const response = await api.post(`/drafts/${draftId}/upload`);
       
       showNotification(`Successfully uploaded ${response.data.total_drafts} drafts to ${response.data.users_count} users!`, 'success');
       router.push('/drafts');
