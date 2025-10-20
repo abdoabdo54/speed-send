@@ -12,11 +12,22 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sidebar } from '@/components/Sidebar';
 import { API_URL as DETECTED_API_URL, dataListsApi } from '@/lib/api';
-import { 
-  Send, 
-  Users, 
-	@@ -32,10 +32,8 @@ import {
-  AlertCircle
+import {
+  Send,
+  Users,
+  AlertCircle,
+  RefreshCw,
+  Mail,
+  Settings,
+  Save,
+  Eye,
+  TestTube,
+  CheckCircle,
+  Loader2,
+  Monitor,
+  Tablet,
+  Smartphone,
+  Play
 } from 'lucide-react';
 
 // API Configuration - Use dynamic API URL detection
@@ -26,7 +37,6 @@ const API_URL = DETECTED_API_URL;
 interface Account {
   id: number;
   name: string;
-	@@ -68,11 +66,16 @@ interface CampaignConfig {
   test_after_count: number;
 }
 
@@ -38,7 +48,6 @@ export default function NewCampaignPage() {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-	@@ -95,45 +98,11 @@ export default function NewCampaignPage() {
   const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -84,7 +93,6 @@ export default function NewCampaignPage() {
   const [userSearch, setUserSearch] = useState('');
   const filteredSelectedUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
-	@@ -142,2041 +111,229 @@ export default function NewCampaignPage() {
     return base.filter(u => u.email.toLowerCase().includes(q));
   }, [users, selectedAccounts, userSearch]);
 
