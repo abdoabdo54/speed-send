@@ -155,6 +155,31 @@ export default function NewDraftPage() {
   const loadContactLists = async () => {
     try {
       console.log('🔄 Loading contact lists...');
+      // Try data-lists endpoint first (like campaigns/new)
+      try {
+        const response = await axios.get(`${API_URL}/api/v1/data-lists/`, {
+          timeout: 10000,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (response.data && Array.isArray(response.data)) {
+          // Convert data-lists format to contact lists format
+          const contactLists = response.data.map((list: any) => ({
+            id: list.id,
+            name: list.name,
+            contacts: list.recipients?.map((email: string) => ({ email })) || []
+          }));
+          setContactLists(contactLists);
+          console.log('✅ Contact lists loaded successfully from data-lists:', contactLists.length, 'lists');
+          return;
+        }
+      } catch (dataListsError) {
+        console.log('⚠️ data-lists endpoint not available, trying contacts endpoint...');
+      }
+
+      // Fallback to contacts endpoint
       const response = await axios.get(`${API_URL}/api/v1/contacts/`, {
         timeout: 10000,
         headers: {
@@ -164,7 +189,7 @@ export default function NewDraftPage() {
 
       if (response.data && Array.isArray(response.data)) {
         setContactLists(response.data);
-        console.log('✅ Contact lists loaded successfully:', response.data.length, 'lists');
+        console.log('✅ Contact lists loaded successfully from contacts:', response.data.length, 'lists');
       } else {
         console.warn('⚠️ Invalid response format:', response.data);
         setContactLists([]);

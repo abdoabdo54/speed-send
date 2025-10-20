@@ -155,6 +155,33 @@ class ContactListResponse(ContactListBase):
     class Config:
         from_attributes = True
 
+# Data Lists Schemas
+class DataListBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    recipients: List[str] = []
+    geo_filter: Optional[str] = None
+    list_type: str = 'custom'
+
+class DataListCreate(DataListBase):
+    pass
+
+class DataListUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    recipients: Optional[List[str]] = None
+    geo_filter: Optional[str] = None
+    list_type: Optional[str] = None
+
+class DataListResponse(DataListBase):
+    id: int
+    total_recipients: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # --- New Draft System Schemas ---
 
 class GmailDraftResponse(BaseModel):

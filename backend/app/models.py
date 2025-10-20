@@ -278,3 +278,18 @@ class Contact(Base):
     last_name = Column(String(255))
     
     contact_list = relationship("ContactList", back_populates="contacts")
+
+
+class DataList(Base):
+    __tablename__ = "data_lists"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    recipients = Column(JSON)  # Store as JSON array of email strings
+    total_recipients = Column(Integer, default=0)
+    geo_filter = Column(String(255))
+    list_type = Column(String(50), default='custom')
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
