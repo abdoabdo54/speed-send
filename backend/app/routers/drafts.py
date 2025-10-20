@@ -8,7 +8,7 @@ from datetime import datetime
 
 router = APIRouter()
 
-@router.post("/api/v1/drafts", response_model=schemas.DraftCampaignResponse)
+@router.post("/drafts", response_model=schemas.DraftCampaignResponse)
 def create_draft_campaign(draft_data: schemas.DraftCampaignCreate, db: Session = Depends(get_db)):
     """
     Creates a new Draft Campaign.
@@ -38,7 +38,7 @@ def create_draft_campaign(draft_data: schemas.DraftCampaignCreate, db: Session =
         emails_per_user=0
     )
 
-@router.get("/api/v1/drafts", response_model=List[schemas.DraftCampaignResponse])
+@router.get("/drafts", response_model=List[schemas.DraftCampaignResponse])
 def get_draft_campaigns(db: Session = Depends(get_db)):
     """
     Get all draft campaigns.
@@ -75,7 +75,7 @@ def get_draft_campaigns(db: Session = Depends(get_db)):
         ))
     return response
 
-@router.get("/api/v1/drafts/{draft_id}", response_model=schemas.DraftCampaignResponse)
+@router.get("/drafts/{draft_id}", response_model=schemas.DraftCampaignResponse)
 def get_draft_campaign(draft_id: int, db: Session = Depends(get_db)):
     """
     Get a specific draft campaign.
@@ -111,7 +111,7 @@ def get_draft_campaign(draft_id: int, db: Session = Depends(get_db)):
         emails_per_user=campaign.emails_per_user or 0
     )
 
-@router.patch("/api/v1/drafts/{draft_id}", response_model=schemas.DraftCampaignResponse)
+@router.patch("/drafts/{draft_id}", response_model=schemas.DraftCampaignResponse)
 def update_draft_campaign(draft_id: int, draft_data: schemas.DraftCampaignUpdate, db: Session = Depends(get_db)):
     """
     Update a draft campaign.
@@ -147,7 +147,7 @@ def update_draft_campaign(draft_id: int, draft_data: schemas.DraftCampaignUpdate
         emails_per_user=campaign.emails_per_user or 0
     )
 
-@router.delete("/api/v1/drafts/{draft_id}")
+@router.delete("/drafts/{draft_id}")
 def delete_draft_campaign(draft_id: int, db: Session = Depends(get_db)):
     """
     Delete a draft campaign and all associated drafts.
@@ -165,7 +165,7 @@ def delete_draft_campaign(draft_id: int, db: Session = Depends(get_db)):
     
     return {"detail": f"Draft campaign '{campaign.name}' and all its associated drafts have been deleted."}
 
-@router.post("/api/v1/drafts/{draft_id}/upload")
+@router.post("/drafts/{draft_id}/upload")
 def upload_drafts_to_users(draft_id: int, upload_data: schemas.DraftUploadRequest, db: Session = Depends(get_db)):
     """
     Upload draft messages to selected users with specified recipients.
@@ -236,7 +236,7 @@ def upload_drafts_to_users(draft_id: int, upload_data: schemas.DraftUploadReques
         "recipients_count": len(all_recipients)
     }
 
-@router.post("/api/v1/drafts/{draft_id}/launch")
+@router.post("/drafts/{draft_id}/launch")
 def launch_drafts(draft_id: int, db: Session = Depends(get_db)):
     """
     Launch (send) all drafts for a specific campaign.
@@ -292,7 +292,7 @@ def launch_drafts(draft_id: int, db: Session = Depends(get_db)):
         "details": details
     }
 
-@router.post("/api/v1/drafts/launch", response_model=schemas.DraftLaunchResponse)
+@router.post("/drafts/launch", response_model=schemas.DraftLaunchResponse)
 def launch_all_drafts(db: Session = Depends(get_db)):
     """
     Launch all uploaded drafts across all campaigns.
