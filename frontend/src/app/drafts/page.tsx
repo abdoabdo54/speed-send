@@ -278,6 +278,219 @@ const DraftsPage: React.FC = () => {
         </Alert>
       )}
 
+      {/* Draft Distribution Logic Section */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Draft Distribution Logic
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Account Selection */}
+            <div>
+              <Label className="text-base font-medium">Select Accounts</Label>
+              <div className="max-h-48 overflow-y-auto border rounded-md p-3 mt-2">
+                {accounts.map(acc => (
+                  <div key={acc.id} className="flex items-center space-x-2 py-1">
+                    <Checkbox
+                      id={`dist-acc-${acc.id}`}
+                      checked={selectedAccounts.includes(acc.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedAccounts(prev => [...prev, acc.id]);
+                        } else {
+                          setSelectedAccounts(prev => prev.filter(id => id !== acc.id));
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`dist-acc-${acc.id}`} className="text-sm">
+                      {acc.name || acc.client_email}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedAccounts.length} accounts selected
+              </p>
+            </div>
+
+            {/* User Selection */}
+            <div>
+              <Label className="text-base font-medium">Select Users</Label>
+              <div className="max-h-48 overflow-y-auto border rounded-md p-3 mt-2">
+                {users.filter(u => selectedAccounts.includes(u.service_account_id)).map(user => (
+                  <div key={user.id} className="flex items-center space-x-2 py-1">
+                    <Checkbox
+                      id={`dist-user-${user.id}`}
+                      checked={selectedUsers.includes(user.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedUsers(prev => [...prev, user.id]);
+                        } else {
+                          setSelectedUsers(prev => prev.filter(id => id !== user.id));
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`dist-user-${user.id}`} className="text-sm">
+                      {user.email}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedUsers.length} users selected
+              </p>
+            </div>
+
+            {/* Emails Per User */}
+            <div>
+              <Label className="text-base font-medium">Emails Per User</Label>
+              <Input
+                type="number"
+                min="1"
+                value={emailsPerUser}
+                onChange={(e) => setEmailsPerUser(parseInt(e.target.value) || 1)}
+                className="mt-2"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Each user will receive {emailsPerUser} draft(s)
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Total drafts: {selectedUsers.length * emailsPerUser}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recipients Section */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Recipients Selection
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Contact Lists Selection */}
+            <div>
+              <Label className="text-base font-medium">Select Contact Lists</Label>
+              <div className="max-h-64 overflow-y-auto border rounded-md p-3 mt-2">
+                {contactLists.map(list => (
+                  <div key={list.id} className="flex items-center space-x-2 py-1">
+                    <Checkbox
+                      id={`recipient-contact-${list.id}`}
+                      checked={selectedContacts.includes(list.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedContacts(prev => [...prev, list.id]);
+                        } else {
+                          setSelectedContacts(prev => prev.filter(id => id !== list.id));
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`recipient-contact-${list.id}`} className="text-sm">
+                      {list.name} ({list.contacts.length} contacts)
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedContacts.length} contact lists selected
+              </p>
+            </div>
+
+            {/* Recipients Summary */}
+            <div>
+              <Label className="text-base font-medium">Recipients Summary</Label>
+              <div className="mt-2 p-3 bg-gray-50 rounded-md">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total Recipients:</span>
+                    <span className="font-medium">
+                      {contactLists
+                        .filter(list => selectedContacts.includes(list.id))
+                        .reduce((total, list) => total + list.contacts.length, 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Selected Users:</span>
+                    <span className="font-medium">{selectedUsers.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Emails per User:</span>
+                    <span className="font-medium">{emailsPerUser}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="font-medium">Total Drafts:</span>
+                    <span className="font-medium text-blue-600">
+                      {selectedUsers.length * emailsPerUser}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bulk Actions Section */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Play className="h-5 w-5" />
+            Bulk Actions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <Button 
+              onClick={() => {
+                // Launch all uploaded drafts
+                const uploadedDrafts = draftCampaigns.filter(d => d.status === 'uploaded');
+                if (uploadedDrafts.length === 0) {
+                  setError('No uploaded drafts to launch.');
+                  return;
+                }
+                // Launch each uploaded draft
+                uploadedDrafts.forEach(draft => launchDrafts(draft.id));
+              }}
+              disabled={loading || draftCampaigns.filter(d => d.status === 'uploaded').length === 0}
+              className="flex items-center gap-2"
+            >
+              <Play className="h-4 w-4" />
+              Launch All Uploaded Drafts
+            </Button>
+            
+            <Button 
+              variant="outline"
+              onClick={() => {
+                // Upload to all drafts that are in 'draft' status
+                const draftStatusDrafts = draftCampaigns.filter(d => d.status === 'draft');
+                if (draftStatusDrafts.length === 0) {
+                  setError('No draft campaigns to upload.');
+                  return;
+                }
+                if (selectedUsers.length === 0 || selectedContacts.length === 0) {
+                  setError('Please select users and contact lists first.');
+                  return;
+                }
+                // Upload each draft
+                draftStatusDrafts.forEach(draft => uploadDrafts(draft.id));
+              }}
+              disabled={loading || selectedUsers.length === 0 || selectedContacts.length === 0}
+              className="flex items-center gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Upload All Drafts
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {draftCampaigns.map((campaign) => (
           <Card key={campaign.id} className="hover:shadow-lg transition-shadow">
