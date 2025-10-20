@@ -224,7 +224,7 @@ class DraftCampaignUser(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     draft_campaign = relationship("DraftCampaign", back_populates="selected_users")
-    user = relationship("User")
+    user = relationship("WorkspaceUser")
 
 class DraftCampaignContact(Base):
     __tablename__ = "draft_campaign_contacts"
