@@ -65,11 +65,11 @@ class ServiceAccount(Base):
     workspace_users = relationship("WorkspaceUser", back_populates="service_account", cascade="all, delete-orphan")
     campaigns = relationship("Campaign", secondary="campaign_senders", back_populates="sender_accounts")
     
-    @property
-    def json_content(self):
+    def get_json_content(self):
         """Decrypt and return the JSON content for API responses"""
-        from app.services.encryption import encryption_service
+        from app.encryption import EncryptionService
         try:
+            encryption_service = EncryptionService()
             return encryption_service.decrypt(self.encrypted_json)
         except Exception:
             return {}
