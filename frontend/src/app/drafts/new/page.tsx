@@ -203,6 +203,7 @@ export default function NewCampaignPage() {
         name: config.name,
         subject: config.subject,
         body_html: config.body_html,
+        from_name: config.from_name,
         recipients: recipients.map(email => ({ email, variables: {} })),
         sender_account_ids: selectedAccounts,
       };
@@ -240,6 +241,7 @@ export default function NewCampaignPage() {
               <CardContent className="space-y-4">
                 <Input placeholder="Campaign Name" value={config.name} onChange={e => setConfig(c => ({...c, name: e.target.value}))} />
                 <Input placeholder="Subject" value={config.subject} onChange={e => setConfig(c => ({...c, subject: e.target.value}))} />
+                <Input placeholder="From Name" value={config.from_name} onChange={e => setConfig(c => ({...c, from_name: e.target.value}))} />
                 <Textarea placeholder="Email Body (HTML)" value={config.body_html} onChange={e => setConfig(c => ({...c, body_html: e.target.value}))} rows={12} />
               </CardContent>
             </Card>
