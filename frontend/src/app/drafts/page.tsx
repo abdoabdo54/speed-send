@@ -266,7 +266,7 @@ const DraftsPage: React.FC = () => {
           <h1 className="text-3xl font-bold">Draft Management</h1>
           <p className="text-gray-600 mt-2">Upload and manage draft messages for bulk distribution</p>
         </div>
-        <Button onClick={() => setShowUploadModal(true)} className="flex items-center gap-2">
+        <Button onClick={() => router.push('/drafts/new')} className="flex items-center gap-2">
           <Upload className="h-4 w-4" />
           Create New Draft
         </Button>
@@ -307,11 +307,17 @@ const DraftsPage: React.FC = () => {
                     Duplicate
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => uploadDrafts(campaign.id)}
+                    onClick={() => {
+                      setSelectedUsers([]);
+                      setSelectedContacts([]);
+                      setEmailsPerUser(1);
+                      setShowUploadModal(true);
+                      setEditingDraft(campaign);
+                    }}
                     disabled={loading || campaign.status === 'uploaded' || campaign.status === 'launched'}
                   >
                     <Upload className="h-4 w-4 mr-2" />
-                    Upload Drafts
+                    Upload
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => launchDrafts(campaign.id)}
@@ -374,45 +380,135 @@ const DraftsPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Create/Edit Draft Modal */}
-      {(showUploadModal || showEditModal) && (
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">Upload Drafts to Users</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* User Selection */}
+              <div>
+                <Label className="text-base font-medium">Select Users</Label>
+                <div className="max-h-64 overflow-y-auto border rounded-md p-3 mt-2">
+                  {users.filter(u => selectedAccounts.includes(u.service_account_id)).map(user => (
+                    <div key={user.id} className="flex items-center space-x-2 py-1">
+                      <Checkbox
+                        id={`user-${user.id}`}
+                        checked={selectedUsers.includes(user.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedUsers(prev => [...prev, user.id]);
+                          } else {
+                            setSelectedUsers(prev => prev.filter(id => id !== user.id));
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`user-${user.id}`} className="text-sm">
+                        {user.email}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {selectedUsers.length} users selected
+                </p>
+              </div>
+
+              {/* Contact Lists Selection */}
+              <div>
+                <Label className="text-base font-medium">Select Contact Lists</Label>
+                <div className="max-h-64 overflow-y-auto border rounded-md p-3 mt-2">
+                  {contactLists.map(list => (
+                    <div key={list.id} className="flex items-center space-x-2 py-1">
+                      <Checkbox
+                        id={`contact-${list.id}`}
+                        checked={selectedContacts.includes(list.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedContacts(prev => [...prev, list.id]);
+                          } else {
+                            setSelectedContacts(prev => prev.filter(id => id !== list.id));
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`contact-${list.id}`} className="text-sm">
+                        {list.name} ({list.contacts.length} contacts)
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {selectedContacts.length} contact lists selected
+                </p>
+              </div>
+            </div>
+
+            {/* Emails Per User */}
+            <div className="mt-6">
+              <Label htmlFor="emails-per-user">Emails Per User</Label>
+              <Input
+                id="emails-per-user"
+                type="number"
+                min="1"
+                value={emailsPerUser}
+                onChange={(e) => setEmailsPerUser(parseInt(e.target.value) || 1)}
+                className="w-32"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Each user will receive {emailsPerUser} draft(s)
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="outline" onClick={() => setShowUploadModal(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => uploadDrafts(editingDraft?.id || 0)} disabled={loading}>
+                {loading ? 'Uploading...' : 'Upload Drafts'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">
-              {showEditModal ? 'Edit Draft' : 'Create New Draft'}
-            </h3>
+            <h3 className="text-lg font-semibold mb-4">Edit Draft</h3>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="draft-name">Draft Name</Label>
+                <Label htmlFor="edit-draft-name">Draft Name</Label>
                 <Input
-                  id="draft-name"
+                  id="edit-draft-name"
                   placeholder="Enter draft name"
                   value={newDraft.name}
                   onChange={(e) => setNewDraft(prev => ({ ...prev, name: e.target.value }))}
                 />
               </div>
               <div>
-                <Label htmlFor="draft-subject">Subject</Label>
+                <Label htmlFor="edit-draft-subject">Subject</Label>
                 <Input
-                  id="draft-subject"
+                  id="edit-draft-subject"
                   placeholder="Enter email subject"
                   value={newDraft.subject}
                   onChange={(e) => setNewDraft(prev => ({ ...prev, subject: e.target.value }))}
                 />
               </div>
               <div>
-                <Label htmlFor="draft-from-name">From Name</Label>
+                <Label htmlFor="edit-draft-from-name">From Name</Label>
                 <Input
-                  id="draft-from-name"
+                  id="edit-draft-from-name"
                   placeholder="Enter sender name"
                   value={newDraft.from_name}
                   onChange={(e) => setNewDraft(prev => ({ ...prev, from_name: e.target.value }))}
                 />
               </div>
               <div>
-                <Label htmlFor="draft-body">Email Body (HTML)</Label>
+                <Label htmlFor="edit-draft-body">Email Body (HTML)</Label>
                 <Textarea
-                  id="draft-body"
+                  id="edit-draft-body"
                   placeholder="Enter email content"
                   value={newDraft.body_html}
                   onChange={(e) => setNewDraft(prev => ({ ...prev, body_html: e.target.value }))}
@@ -422,21 +518,19 @@ const DraftsPage: React.FC = () => {
             </div>
             <div className="flex justify-end gap-2 mt-6">
               <Button variant="outline" onClick={() => {
-                setShowUploadModal(false);
                 setShowEditModal(false);
                 setEditingDraft(null);
                 setNewDraft({ name: '', subject: '', from_name: '', body_html: '' });
               }}>
                 Cancel
               </Button>
-              <Button onClick={showEditModal ? updateDraft : createDraft}>
-                {showEditModal ? 'Update Draft' : 'Create Draft'}
+              <Button onClick={updateDraft}>
+                Update Draft
               </Button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };
