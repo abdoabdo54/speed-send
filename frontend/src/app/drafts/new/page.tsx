@@ -122,6 +122,25 @@ export default function NewDraftPage() {
     initializeData();
   }, []);
 
+  // If the user advances to Distribution or Upload steps and lists are empty, refetch defensively
+  useEffect(() => {
+    const refetchIfEmpty = async () => {
+      if (step >= 2) {
+        if (accounts.length === 0) {
+          await loadAccounts();
+        }
+        if (users.length === 0) {
+          await loadUsers();
+        }
+        if (contactLists.length === 0) {
+          await loadContactLists();
+        }
+      }
+    };
+    refetchIfEmpty();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   const createDraft = async () => {
     if (!config.name.trim() || !config.subject.trim() || !config.body_html.trim()) {
       showNotification('Please fill in all required fields.', 'error');
@@ -395,23 +414,35 @@ export default function NewDraftPage() {
               <CardHeader><CardTitle>Select Accounts</CardTitle></CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <div className="max-h-48 overflow-auto border rounded-md p-2 space-y-2">
-                    {accounts.map(acc => (
-                      <div key={acc.id} className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`acc-${acc.id}`} 
-                          checked={selectedAccounts.includes(acc.id)} 
-                          onCheckedChange={checked => {
-                            setSelectedAccounts(prev => checked ? [...prev, acc.id] : prev.filter(id => id !== acc.id))
-                          }}
-                        />
-                        <Label htmlFor={`acc-${acc.id}`} className="font-normal text-sm">
-                          {acc.name || acc.client_email}
-                        </Label>
+                  {accounts.length === 0 ? (
+                    <div className="border rounded-md p-3 bg-muted/30 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span>No accounts found.</span>
+                        <Button size="sm" variant="outline" onClick={loadAccounts}>Reload</Button>
                       </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{selectedAccounts.length} of {accounts.length} accounts selected.</p>
+                      <p className="mt-1 text-muted-foreground">If this persists, ensure service accounts exist via the Accounts page.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="max-h-48 overflow-auto border rounded-md p-2 space-y-2">
+                        {accounts.map(acc => (
+                          <div key={acc.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                              id={`acc-${acc.id}`} 
+                              checked={selectedAccounts.includes(acc.id)} 
+                              onCheckedChange={checked => {
+                                setSelectedAccounts(prev => checked ? [...prev, acc.id] : prev.filter(id => id !== acc.id))
+                              }}
+                            />
+                            <Label htmlFor={`acc-${acc.id}`} className="font-normal text-sm">
+                              {acc.name || acc.client_email}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{selectedAccounts.length} of {accounts.length} accounts selected.</p>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -421,26 +452,30 @@ export default function NewDraftPage() {
               <CardHeader><CardTitle>Users of Selected Accounts ({filteredSelectedUsers.length})</CardTitle></CardHeader>
               <CardContent>
                 <Input placeholder="Search users..." value={userSearch} onChange={e => setUserSearch(e.target.value)} />
-                <div className="max-h-48 overflow-auto border rounded-md mt-2">
-                  {filteredSelectedUsers.map(u => (
-                    <div key={u.id} className="flex items-center space-x-2 py-1">
-                      <Checkbox
-                        id={`user-${u.id}`}
-                        checked={selectedUsers.includes(u.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedUsers(prev => [...prev, u.id]);
-                          } else {
-                            setSelectedUsers(prev => prev.filter(id => id !== u.id));
-                          }
-                        }}
-                      />
-                      <Label htmlFor={`user-${u.id}`} className="text-sm">
-                        {u.email}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                {accounts.length === 0 ? (
+                  <div className="text-sm text-muted-foreground mt-2">Select accounts first to view users.</div>
+                ) : (
+                  <div className="max-h-48 overflow-auto border rounded-md mt-2">
+                    {filteredSelectedUsers.map(u => (
+                      <div key={u.id} className="flex items-center space-x-2 py-1">
+                        <Checkbox
+                          id={`user-${u.id}`}
+                          checked={selectedUsers.includes(u.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedUsers(prev => [...prev, u.id]);
+                            } else {
+                              setSelectedUsers(prev => prev.filter(id => id !== u.id));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`user-${u.id}`} className="text-sm">
+                          {u.email}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
                   {selectedUsers.length} users selected
                 </p>
@@ -475,6 +510,12 @@ export default function NewDraftPage() {
                     </span>
                   </div>
                 </div>
+                {contactLists.length === 0 && (
+                  <div className="mt-3 flex items-center justify-between border rounded-md p-2 bg-muted/30 text-sm">
+                    <span>No contact lists found.</span>
+                    <Button size="sm" variant="outline" onClick={loadContactLists}>Reload</Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
