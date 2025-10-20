@@ -211,6 +211,10 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     """
     Upload draft messages to selected users via Google Cloud API.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🚀 UPLOAD FUNCTION CALLED: Starting upload for draft {draft_id}")
+    
     campaign = db.query(models.DraftCampaign).options(
         joinedload(models.DraftCampaign.selected_users).joinedload(models.DraftCampaignUser.user),
         joinedload(models.DraftCampaign.selected_contacts).joinedload(models.DraftCampaignContact.contact_list)
