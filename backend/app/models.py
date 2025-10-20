@@ -244,6 +244,7 @@ class GmailDraft(Base):
     draft_campaign_id = Column(Integer, ForeignKey("draft_campaigns.id"))
     user_id = Column(Integer, ForeignKey("workspace_users.id"))
     gmail_draft_id = Column(String(255), index=True)  # The draft ID from Gmail API
+    gmail_message_id = Column(String(255), index=True)  # The message ID after sending
     status = Column(Enum(DraftStatus), default=DraftStatus.CREATED)
     recipients = Column(JSON, nullable=False) # List of recipient emails
     created_at = Column(DateTime(timezone=True), server_default=func.now())

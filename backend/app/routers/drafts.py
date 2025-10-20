@@ -255,7 +255,8 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
                         subject=campaign.subject,
                         from_name=campaign.from_name,
                         body_html=campaign.body_html,
-                        recipients=user_recipients
+                        recipients=user_recipients,
+                        db=db
                     )
                     
                     # Save draft to database
@@ -283,30 +284,92 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
         "recipients_count": len(all_recipients)
     }
 
-def create_gmail_draft(user_id: int, subject: str, from_name: str, body_html: str, recipients: List[str]) -> str:
+def create_gmail_draft(user_id: int, subject: str, from_name: str, body_html: str, recipients: List[str], db: Session) -> str:
     """
     Create a Gmail draft using Google Cloud API.
     """
     try:
-        # Get user's credentials (this would need to be implemented based on your auth system)
-        # For now, we'll return a mock draft ID
-        import uuid
-        return f"draft_{uuid.uuid4().hex[:16]}"
+        import logging
+        logger = logging.getLogger(__name__)
         
-        # TODO: Implement actual Gmail API integration
-        # 1. Get user's OAuth credentials
-        # 2. Build Gmail service
-        # 3. Create draft message
-        # 4. Return draft ID
+        # Get user and their service account
+        user = db.query(models.WorkspaceUser).filter(models.WorkspaceUser.id == user_id).first()
+        if not user:
+            raise Exception(f"User with ID {user_id} not found")
+        
+        service_account = user.service_account
+        if not service_account:
+            raise Exception(f"No service account found for user {user.email}")
+        
+        # Decrypt service account credentials
+        from app.encryption import EncryptionService
+        encryption_service = EncryptionService()
+        service_account_json = encryption_service.decrypt(service_account.encrypted_json)
+        
+        # Initialize Google Workspace Service
+        from app.google_api import GoogleWorkspaceService
+        google_service = GoogleWorkspaceService(service_account_json)
+        
+        # Get delegated credentials for the user
+        from app.config import settings
+        credentials = google_service.get_delegated_credentials(
+            user.email, 
+            settings.GMAIL_SCOPES
+        )
+        
+        # Build Gmail service
+        from googleapiclient.discovery import build
+        gmail_service = build('gmail', 'v1', credentials=credentials)
+        
+        # Create the email message
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        import base64
+        
+        # Create multipart message
+        message = MIMEMultipart('alternative')
+        message['To'] = ', '.join(recipients)
+        message['From'] = f"{from_name} <{user.email}>" if from_name else user.email
+        message['Subject'] = subject
+        
+        # Add HTML body
+        html_part = MIMEText(body_html, 'html')
+        message.attach(html_part)
+        
+        # Encode message
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        # Create draft
+        draft_body = {
+            'message': {
+                'raw': raw_message
+            }
+        }
+        
+        logger.info(f"Creating Gmail draft for user {user.email} with {len(recipients)} recipients")
+        result = gmail_service.users().drafts().create(
+            userId='me',
+            body=draft_body
+        ).execute()
+        
+        draft_id = result['id']
+        logger.info(f"✅ Gmail draft created successfully: {draft_id}")
+        return draft_id
         
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"❌ Failed to create Gmail draft: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create Gmail draft: {str(e)}")
 
 @router.post("/drafts/{draft_id}/launch")
 def launch_drafts(draft_id: int, db: Session = Depends(get_db)):
     """
-    Launch (send) all drafts for a specific campaign.
+    Launch (send) all drafts for a specific campaign using Gmail API.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     campaign = db.query(models.DraftCampaign).filter(models.DraftCampaign.id == draft_id).first()
     
     if not campaign:
@@ -318,20 +381,115 @@ def launch_drafts(draft_id: int, db: Session = Depends(get_db)):
     if not drafts:
         raise HTTPException(status_code=400, detail="No drafts found for this campaign")
     
-    # Update draft status to launched (simulate sending)
+    total_launched = 0
+    total_failed = 0
+    details = []
+    
+    # Group drafts by user for efficient API calls
+    drafts_by_user = {}
     for draft in drafts:
-        draft.status = 'sent'
-        draft.sent_at = datetime.utcnow()
+        if draft.user_id not in drafts_by_user:
+            drafts_by_user[draft.user_id] = []
+        drafts_by_user[draft.user_id].append(draft)
+    
+    # Send drafts for each user
+    for user_id, user_drafts in drafts_by_user.items():
+        try:
+            # Get user and service account
+            user = db.query(models.WorkspaceUser).filter(models.WorkspaceUser.id == user_id).first()
+            if not user:
+                logger.error(f"User with ID {user_id} not found")
+                continue
+                
+            service_account = user.service_account
+            if not service_account:
+                logger.error(f"No service account found for user {user.email}")
+                continue
+            
+            # Decrypt service account credentials
+            from app.encryption import EncryptionService
+            encryption_service = EncryptionService()
+            service_account_json = encryption_service.decrypt(service_account.encrypted_json)
+            
+            # Initialize Google Workspace Service
+            from app.google_api import GoogleWorkspaceService
+            google_service = GoogleWorkspaceService(service_account_json)
+            
+            # Get delegated credentials for the user
+            from app.config import settings
+            credentials = google_service.get_delegated_credentials(
+                user.email, 
+                settings.GMAIL_SCOPES
+            )
+            
+            # Build Gmail service
+            from googleapiclient.discovery import build
+            gmail_service = build('gmail', 'v1', credentials=credentials)
+            
+            logger.info(f"🚀 Launching {len(user_drafts)} drafts for user {user.email}")
+            
+            # Send each draft
+            for draft in user_drafts:
+                try:
+                    # Send the draft
+                    result = gmail_service.users().drafts().send(
+                        userId='me',
+                        body={'id': draft.gmail_draft_id}
+                    ).execute()
+                    
+                    # Update draft status
+                    draft.status = 'sent'
+                    draft.sent_at = datetime.utcnow()
+                    draft.gmail_message_id = result.get('id')
+                    
+                    total_launched += 1
+                    details.append({
+                        "draft_id": str(draft.id),
+                        "gmail_draft_id": draft.gmail_draft_id,
+                        "user_email": user.email,
+                        "status": "sent",
+                        "message_id": result.get('id')
+                    })
+                    
+                    logger.info(f"✅ Draft {draft.id} sent successfully for user {user.email}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ Failed to send draft {draft.id} for user {user.email}: {str(e)}")
+                    draft.status = 'failed'
+                    total_failed += 1
+                    details.append({
+                        "draft_id": str(draft.id),
+                        "gmail_draft_id": draft.gmail_draft_id,
+                        "user_email": user.email,
+                        "status": "failed",
+                        "error": str(e)
+                    })
+        
+        except Exception as e:
+            logger.error(f"❌ Failed to process drafts for user {user_id}: {str(e)}")
+            # Mark all drafts for this user as failed
+            for draft in user_drafts:
+                draft.status = 'failed'
+                total_failed += 1
+                details.append({
+                    "draft_id": str(draft.id),
+                    "gmail_draft_id": draft.gmail_draft_id,
+                    "user_email": user.email if 'user' in locals() else f"user_{user_id}",
+                    "status": "failed",
+                    "error": str(e)
+                })
     
     # Update campaign status
     campaign.status = 'launched'
     
     db.commit()
     
+    logger.info(f"🎯 Launch completed: {total_launched} sent, {total_failed} failed")
+    
     return {
-        "total_launched": len(drafts),
-        "total_failed": 0,
-        "details": [{"draft_id": str(draft.id), "status": "sent"} for draft in drafts]
+        "total_launched": total_launched,
+        "total_failed": total_failed,
+        "details": details
     }
 
 @router.post("/drafts/launch", response_model=schemas.DraftLaunchResponse)
