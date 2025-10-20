@@ -41,7 +41,7 @@ class ServiceAccount(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     client_email = Column(String(255), nullable=False, unique=True)
-    domain = Column(String(255), nullable=False)
+    domain = Column(String(255), nullable=True)
     project_id = Column(String(255))
     admin_email = Column(String(255))  # Admin email for domain-wide delegation
     
@@ -64,6 +64,15 @@ class ServiceAccount(Base):
     
     workspace_users = relationship("WorkspaceUser", back_populates="service_account", cascade="all, delete-orphan")
     campaigns = relationship("Campaign", secondary="campaign_senders", back_populates="sender_accounts")
+    
+    @property
+    def json_content(self):
+        """Decrypt and return the JSON content for API responses"""
+        from app.services.encryption import encryption_service
+        try:
+            return encryption_service.decrypt(self.encrypted_json)
+        except Exception:
+            return {}
 
 
 class WorkspaceUser(Base):

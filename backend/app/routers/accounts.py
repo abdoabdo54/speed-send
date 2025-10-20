@@ -17,7 +17,17 @@ async def list_service_accounts(db: Session = Depends(get_db)):
 @router.post("/", response_model=ServiceAccountResponse)
 async def create_service_account(account: ServiceAccountCreate, db: Session = Depends(get_db)):
     # Logic to create a service account
-    db_account = ServiceAccount(name=account.name, json_content=account.json_content)
+    from app.services.encryption import encryption_service
+    
+    # Encrypt the JSON content before storing
+    encrypted_json = encryption_service.encrypt(account.json_content)
+    
+    db_account = ServiceAccount(
+        name=account.name,
+        client_email=account.client_email,
+        domain=account.domain,
+        encrypted_json=encrypted_json
+    )
     db.add(db_account)
     db.commit()
     db.refresh(db_account)

@@ -47,6 +47,7 @@ class ServiceAccountResponse(ServiceAccountBase):
     quota_limit: int
     last_synced: Optional[datetime] = None
     workspace_users: List[WorkspaceUserResponse] = []
+    json_content: Optional[Dict] = None
 
     class Config:
         from_attributes = True
