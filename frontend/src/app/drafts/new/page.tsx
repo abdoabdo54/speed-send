@@ -82,9 +82,9 @@ export default function NewDraftPage() {
     from_name: ''
   });
   const [notifications, setNotifications] = useState<Array<{id: string, message: string, type: 'success' | 'error' | 'info'}>>([]);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [createdDraftId, setCreatedDraftId] = useState<number | null>(null);
   const [userSearch, setUserSearch] = useState('');
+  const [showUploadSection, setShowUploadSection] = useState(false);
 
   const filteredSelectedUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
@@ -145,10 +145,11 @@ export default function NewDraftPage() {
     try {
       const response = await axios.post(`${API_URL}/api/v1/drafts`, config);
       setCreatedDraftId(response.data.id);
-      showNotification('Draft created successfully!', 'success');
-      setShowUploadModal(true);
+      showNotification('Draft created successfully! Now configure distribution.', 'success');
+      setShowUploadSection(true);
     } catch (error: any) {
-      showNotification(`Failed to create draft: ${error?.response?.data?.detail || 'Unknown error'}`, 'error');
+      console.error('Create draft error:', error);
+      showNotification(`Failed to create draft: ${error?.response?.data?.detail || error?.message || 'Unknown error'}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -179,10 +180,10 @@ export default function NewDraftPage() {
       });
       
       showNotification(`Successfully uploaded ${response.data.total_drafts} drafts to ${response.data.users_count} users!`, 'success');
-      setShowUploadModal(false);
       router.push('/drafts');
     } catch (error: any) {
-      showNotification(`Failed to upload drafts: ${error?.response?.data?.detail || 'Unknown error'}`, 'error');
+      console.error('Upload drafts error:', error);
+      showNotification(`Failed to upload drafts: ${error?.response?.data?.detail || error?.message || 'Unknown error'}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -221,6 +222,102 @@ export default function NewDraftPage() {
                 />
               </CardContent>
             </Card>
+
+            {/* Upload Section - Only show after draft is created */}
+            {showUploadSection && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Upload className="h-5 w-5" />
+                    Upload Drafts to Users
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* User Selection */}
+                    <div>
+                      <Label className="text-base font-medium">Select Users</Label>
+                      <div className="max-h-64 overflow-y-auto border rounded-md p-3 mt-2">
+                        {users.filter(u => selectedAccounts.includes(u.service_account_id)).map(user => (
+                          <div key={user.id} className="flex items-center space-x-2 py-1">
+                            <Checkbox
+                              id={`user-${user.id}`}
+                              checked={selectedUsers.includes(user.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedUsers(prev => [...prev, user.id]);
+                                } else {
+                                  setSelectedUsers(prev => prev.filter(id => id !== user.id));
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`user-${user.id}`} className="text-sm">
+                              {user.email}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {selectedUsers.length} users selected
+                      </p>
+                    </div>
+
+                    {/* Contact Lists Selection */}
+                    <div>
+                      <Label className="text-base font-medium">Select Contact Lists</Label>
+                      <div className="max-h-64 overflow-y-auto border rounded-md p-3 mt-2">
+                        {contactLists.map(list => (
+                          <div key={list.id} className="flex items-center space-x-2 py-1">
+                            <Checkbox
+                              id={`contact-${list.id}`}
+                              checked={selectedContacts.includes(list.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedContacts(prev => [...prev, list.id]);
+                                } else {
+                                  setSelectedContacts(prev => prev.filter(id => id !== list.id));
+                                }
+                              }}
+                            />
+                            <Label htmlFor={`contact-${list.id}`} className="text-sm">
+                              {list.name} ({list.contacts.length} contacts)
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {selectedContacts.length} contact lists selected
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Emails Per User */}
+                  <div>
+                    <Label htmlFor="emails-per-user">Emails Per User</Label>
+                    <Input
+                      id="emails-per-user"
+                      type="number"
+                      min="1"
+                      value={emailsPerUser}
+                      onChange={(e) => setEmailsPerUser(parseInt(e.target.value) || 1)}
+                      className="w-32"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Each user will receive {emailsPerUser} draft(s)
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => router.push('/drafts')}>
+                      Skip Upload
+                    </Button>
+                    <Button onClick={uploadDrafts} disabled={loading}>
+                      {loading ? 'Uploading...' : 'Upload Drafts'}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -280,103 +377,11 @@ export default function NewDraftPage() {
 
             <div className="sticky top-0">
               <Button onClick={createDraft} disabled={loading} className="w-full">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Draft & Upload'}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Draft'}
               </Button>
             </div>
           </div>
         </div>
-
-        {/* Upload Modal */}
-        {showUploadModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-              <h3 className="text-lg font-semibold mb-4">Upload Drafts to Users</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* User Selection */}
-                <div>
-                  <Label className="text-base font-medium">Select Users</Label>
-                  <div className="max-h-64 overflow-y-auto border rounded-md p-3 mt-2">
-                    {users.filter(u => selectedAccounts.includes(u.service_account_id)).map(user => (
-                      <div key={user.id} className="flex items-center space-x-2 py-1">
-                        <Checkbox
-                          id={`modal-user-${user.id}`}
-                          checked={selectedUsers.includes(user.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedUsers(prev => [...prev, user.id]);
-                            } else {
-                              setSelectedUsers(prev => prev.filter(id => id !== user.id));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`modal-user-${user.id}`} className="text-sm">
-                          {user.email}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {selectedUsers.length} users selected
-                  </p>
-                </div>
-
-                {/* Contact Lists Selection */}
-                <div>
-                  <Label className="text-base font-medium">Select Contact Lists</Label>
-                  <div className="max-h-64 overflow-y-auto border rounded-md p-3 mt-2">
-                    {contactLists.map(list => (
-                      <div key={list.id} className="flex items-center space-x-2 py-1">
-                        <Checkbox
-                          id={`contact-${list.id}`}
-                          checked={selectedContacts.includes(list.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedContacts(prev => [...prev, list.id]);
-                            } else {
-                              setSelectedContacts(prev => prev.filter(id => id !== list.id));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`contact-${list.id}`} className="text-sm">
-                          {list.name} ({list.contacts.length} contacts)
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {selectedContacts.length} contact lists selected
-                  </p>
-                </div>
-              </div>
-
-              {/* Emails Per User */}
-              <div className="mt-6">
-                <Label htmlFor="emails-per-user">Emails Per User</Label>
-                <Input
-                  id="emails-per-user"
-                  type="number"
-                  min="1"
-                  value={emailsPerUser}
-                  onChange={(e) => setEmailsPerUser(parseInt(e.target.value) || 1)}
-                  className="w-32"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Each user will receive {emailsPerUser} draft(s)
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2 mt-6">
-                <Button variant="outline" onClick={() => setShowUploadModal(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={uploadDrafts} disabled={loading}>
-                  {loading ? 'Uploading...' : 'Upload Drafts'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {notifications.map(notification => (
           <Alert key={notification.id} className={`fixed top-5 right-5 max-w-sm z-50 ${
