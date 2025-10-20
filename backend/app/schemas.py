@@ -169,22 +169,34 @@ class GmailDraftResponse(BaseModel):
         from_attributes = True
 
 class DraftCampaignCreate(BaseModel):
-    campaign_name: str
-    from_name: str
+    name: str
     subject: str
-    html_body: str
-    number_of_drafts_per_user: int
-    email_list: List[str]
-    selected_accounts: List[int]
+    from_name: Optional[str] = None
+    body_html: str
+
+class DraftCampaignUpdate(BaseModel):
+    name: Optional[str] = None
+    subject: Optional[str] = None
+    from_name: Optional[str] = None
+    body_html: Optional[str] = None
+
+class DraftUploadRequest(BaseModel):
+    user_ids: List[int]
+    contact_list_ids: List[int]
+    emails_per_user: int
 
 class DraftCampaignResponse(BaseModel):
     id: int
     name: str
     subject: str
+    from_name: Optional[str] = None
     created_at: datetime
     total_drafts: int
     drafts_by_user: Dict[str, int]
-    from_name: Optional[str] = None
+    status: str
+    recipients_count: int
+    users_count: int
+    emails_per_user: int
 
     class Config:
         from_attributes = True

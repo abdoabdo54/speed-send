@@ -185,7 +185,8 @@ class DraftCampaign(Base):
     from_name = Column(String(255))
     subject = Column(String(998), nullable=False)
     body_html = Column(Text)
-    number_of_drafts_per_user = Column(Integer, default=1)
+    status = Column(String(50), default='draft')  # draft, uploaded, launched
+    emails_per_user = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     gmail_drafts = relationship("GmailDraft", back_populates="draft_campaign", cascade="all, delete-orphan")
