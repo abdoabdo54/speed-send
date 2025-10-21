@@ -234,9 +234,17 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     
     # Get all recipients from selected contact lists
     all_recipients = []
+    logger.info(f"🔍 DEBUG: Processing {len(campaign.selected_contacts)} contact lists")
+    
     for contact_assoc in campaign.selected_contacts:
         if contact_assoc.contact_list:
-            all_recipients.extend([contact.email for contact in contact_assoc.contact_list.contacts])
+            contact_emails = [contact.email for contact in contact_assoc.contact_list.contacts]
+            logger.info(f"🔍 DEBUG: Contact list '{contact_assoc.contact_list.name}' has {len(contact_emails)} recipients: {contact_emails}")
+            all_recipients.extend(contact_emails)
+        else:
+            logger.warning(f"🔍 DEBUG: Contact association has no contact_list")
+    
+    logger.info(f"🔍 DEBUG: Total recipients collected: {len(all_recipients)} - {all_recipients}")
     
     if not all_recipients:
         raise HTTPException(status_code=400, detail="No recipients found in selected contact lists")
