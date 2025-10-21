@@ -89,19 +89,19 @@ def add_sample_data():
         # 2. Add sample workspace users
         print("👥 Adding workspace users...")
         sample_users = [
-            {"email": "user1@yourdomain.com", "name": "User One", "account_id": account_ids[0]},
-            {"email": "user2@yourdomain.com", "name": "User Two", "account_id": account_ids[0]},
-            {"email": "user3@yourdomain.com", "name": "User Three", "account_id": account_ids[1]},
-            {"email": "user4@yourdomain.com", "name": "User Four", "account_id": account_ids[1]},
-            {"email": "user5@yourdomain.com", "name": "User Five", "account_id": account_ids[2]},
-            {"email": "user6@yourdomain.com", "name": "User Six", "account_id": account_ids[2]}
+            {"email": "user1@yourdomain.com", "full_name": "User One", "account_id": account_ids[0]},
+            {"email": "user2@yourdomain.com", "full_name": "User Two", "account_id": account_ids[0]},
+            {"email": "user3@yourdomain.com", "full_name": "User Three", "account_id": account_ids[1]},
+            {"email": "user4@yourdomain.com", "full_name": "User Four", "account_id": account_ids[1]},
+            {"email": "user5@yourdomain.com", "full_name": "User Five", "account_id": account_ids[2]},
+            {"email": "user6@yourdomain.com", "full_name": "User Six", "account_id": account_ids[2]}
         ]
         
         user_ids = []
         for user_data in sample_users:
             user = WorkspaceUser(
                 email=user_data["email"],
-                name=user_data["name"],
+                full_name=user_data["full_name"],
                 is_active=True,
                 service_account_id=user_data["account_id"]
             )
