@@ -223,9 +223,6 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     if not campaign:
         raise HTTPException(status_code=404, detail="Draft campaign not found")
     
-    logger.info(f"🔍 DEBUG: Found {len(campaign.selected_users)} selected users")
-    logger.info(f"🔍 DEBUG: Found {len(campaign.selected_contacts)} selected contacts")
-    
     if not campaign.selected_users:
         raise HTTPException(status_code=400, detail="No users selected for this campaign")
     
@@ -234,41 +231,26 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     
     # Get all recipients from selected contact lists
     all_recipients = []
-    logger.info(f"🔍 DEBUG: Processing {len(campaign.selected_contacts)} contact lists")
-    
     for contact_assoc in campaign.selected_contacts:
         if contact_assoc.contact_list:
-            contact_emails = [contact.email for contact in contact_assoc.contact_list.contacts]
-            logger.info(f"🔍 DEBUG: Contact list '{contact_assoc.contact_list.name}' has {len(contact_emails)} recipients: {contact_emails}")
-            all_recipients.extend(contact_emails)
-        else:
-            logger.warning(f"🔍 DEBUG: Contact association has no contact_list")
-    
-    logger.info(f"🔍 DEBUG: Total recipients collected: {len(all_recipients)} - {all_recipients}")
+            all_recipients.extend([contact.email for contact in contact_assoc.contact_list.contacts])
     
     if not all_recipients:
         raise HTTPException(status_code=400, detail="No recipients found in selected contact lists")
     
-    # Get all users
-    logger.info(f"🔍 DEBUG: campaign.selected_users has {len(campaign.selected_users)} associations")
-    for i, assoc in enumerate(campaign.selected_users):
-        logger.info(f"🔍 DEBUG: Association {i}: user_id={assoc.user_id}, user={assoc.user}")
-    
+    # Calculate recipients per user
     users = [assoc.user for assoc in campaign.selected_users if assoc.user]
-    logger.info(f"👥 Found {len(users)} users to process: {[user.email for user in users]}")
+    recipients_per_user = math.ceil(len(all_recipients) / len(users)) if users else 0
     
     # Create Gmail drafts for each user
     total_drafts_created = 0
-    for user_index, user in enumerate(users):
-        logger.info(f"🔄 Processing user {user_index + 1}/{len(users)}: {user.email}")
-        
-        # Each user gets ALL recipients (not divided)
-        user_recipients = all_recipients.copy()  # Give each user all recipients
-        logger.info(f"📧 User {user.email} will get {len(user_recipients)} recipients")
+    for user in users:
+        # Get recipients for this user
+        user_recipients = all_recipients[:recipients_per_user]
+        all_recipients = all_recipients[recipients_per_user:]
         
         # Create drafts for this user
         for i in range(campaign.emails_per_user):
-            logger.info(f"📝 Creating draft {i + 1}/{campaign.emails_per_user} for user {user.email}")
             if user_recipients:
                 # Create Gmail draft via API
                 try:
@@ -291,13 +273,10 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
                     )
                     db.add(draft)
                     total_drafts_created += 1
-                    logger.info(f"✅ Successfully created draft {i + 1} for user {user.email} with {len(user_recipients)} recipients")
                     
                 except Exception as e:
-                    logger.error(f"❌ Failed to create draft {i + 1} for user {user.email}: {str(e)}")
+                    print(f"Failed to create draft for user {user.email}: {str(e)}")
                     continue
-        
-        logger.info(f"🎯 Completed processing user {user.email} - created {campaign.emails_per_user} drafts")
     
     # Update campaign status
     campaign.status = 'uploaded'
