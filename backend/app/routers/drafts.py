@@ -238,16 +238,14 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     if not all_recipients:
         raise HTTPException(status_code=400, detail="No recipients found in selected contact lists")
     
-    # Calculate recipients per user
+    # Get all users
     users = [assoc.user for assoc in campaign.selected_users if assoc.user]
-    recipients_per_user = math.ceil(len(all_recipients) / len(users)) if users else 0
     
     # Create Gmail drafts for each user
     total_drafts_created = 0
     for user in users:
-        # Get recipients for this user
-        user_recipients = all_recipients[:recipients_per_user]
-        all_recipients = all_recipients[recipients_per_user:]
+        # Each user gets ALL recipients (not divided)
+        user_recipients = all_recipients.copy()  # Give each user all recipients
         
         # Create drafts for this user
         for i in range(campaign.emails_per_user):
