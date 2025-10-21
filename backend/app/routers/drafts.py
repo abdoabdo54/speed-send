@@ -250,6 +250,10 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No recipients found in selected contact lists")
     
     # Get all users
+    logger.info(f"🔍 DEBUG: campaign.selected_users has {len(campaign.selected_users)} associations")
+    for i, assoc in enumerate(campaign.selected_users):
+        logger.info(f"🔍 DEBUG: Association {i}: user_id={assoc.user_id}, user={assoc.user}")
+    
     users = [assoc.user for assoc in campaign.selected_users if assoc.user]
     logger.info(f"👥 Found {len(users)} users to process: {[user.email for user in users]}")
     
