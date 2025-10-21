@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { API_URL as DETECTED_API_URL, dataListsApi } from '@/lib/api';
+import { serviceAccountsApi, usersApi, dataListsApi, API_URL as DETECTED_API_URL } from '@/lib/api';
 import { 
   Upload,
   Users, 
@@ -93,12 +93,7 @@ export default function NewDraftPage() {
   const loadAccounts = async () => {
     try {
       console.log('🔄 Loading Google Workspace accounts...');
-      const response = await axios.get(`${API_URL}/api/v1/accounts/`, {
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      const response = await serviceAccountsApi.list();
 
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
@@ -131,12 +126,7 @@ export default function NewDraftPage() {
   const loadUsers = async () => {
     try {
       console.log('🔄 Loading Google Workspace users...');
-      const response = await axios.get(`${API_URL}/api/v1/users/`, {
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      const response = await usersApi.list();
 
       if (response.data && Array.isArray(response.data)) {
         setUsers(response.data);
@@ -157,12 +147,7 @@ export default function NewDraftPage() {
       console.log('🔄 Loading contact lists...');
       // Try data-lists endpoint first (like campaigns/new)
       try {
-        const response = await axios.get(`${API_URL}/api/v1/data-lists/`, {
-          timeout: 10000,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
+        const response = await dataListsApi.list();
 
         if (response.data && Array.isArray(response.data)) {
           // Convert data-lists format to contact lists format
