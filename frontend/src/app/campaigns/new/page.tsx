@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sidebar } from '@/components/Sidebar';
-import { API_URL as DETECTED_API_URL, dataListsApi } from '@/lib/api';
+import { serviceAccountsApi, usersApi, dataListsApi, API_URL as DETECTED_API_URL } from '@/lib/api';
 import {
   Send,
   Users,
@@ -342,12 +342,7 @@ export default function NewCampaignPage() {
   const loadAccounts = async () => {
     try {
       console.log('🔄 Loading Google Workspace accounts...');
-      const response = await axios.get(`${API_URL}/api/v1/accounts/`, {
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      const response = await serviceAccountsApi.list();
 
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
