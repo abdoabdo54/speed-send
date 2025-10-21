@@ -223,6 +223,9 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     if not campaign:
         raise HTTPException(status_code=404, detail="Draft campaign not found")
     
+    logger.info(f"🔍 DEBUG: Found {len(campaign.selected_users)} selected users")
+    logger.info(f"🔍 DEBUG: Found {len(campaign.selected_contacts)} selected contacts")
+    
     if not campaign.selected_users:
         raise HTTPException(status_code=400, detail="No users selected for this campaign")
     
