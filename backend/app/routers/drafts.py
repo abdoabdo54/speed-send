@@ -140,7 +140,7 @@ def get_draft_campaign(draft_id: int, db: Session = Depends(get_db)):
     for contact_assoc in campaign.selected_contacts:
         if contact_assoc.contact_list:
             recipients_count += len(contact_assoc.contact_list.contacts)
-    
+
     return schemas.DraftCampaignResponse(
         id=campaign.id,
         name=campaign.name,
@@ -240,15 +240,20 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     
     # Get all users
     users = [assoc.user for assoc in campaign.selected_users if assoc.user]
+    logger.info(f"👥 Found {len(users)} users to process: {[user.email for user in users]}")
     
     # Create Gmail drafts for each user
     total_drafts_created = 0
-    for user in users:
+    for user_index, user in enumerate(users):
+        logger.info(f"🔄 Processing user {user_index + 1}/{len(users)}: {user.email}")
+        
         # Each user gets ALL recipients (not divided)
         user_recipients = all_recipients.copy()  # Give each user all recipients
+        logger.info(f"📧 User {user.email} will get {len(user_recipients)} recipients")
         
         # Create drafts for this user
         for i in range(campaign.emails_per_user):
+            logger.info(f"📝 Creating draft {i + 1}/{campaign.emails_per_user} for user {user.email}")
             if user_recipients:
                 # Create Gmail draft via API
                 try:
@@ -271,10 +276,13 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
                     )
                     db.add(draft)
                     total_drafts_created += 1
+                    logger.info(f"✅ Successfully created draft {i + 1} for user {user.email} with {len(user_recipients)} recipients")
                     
                 except Exception as e:
-                    print(f"Failed to create draft for user {user.email}: {str(e)}")
+                    logger.error(f"❌ Failed to create draft {i + 1} for user {user.email}: {str(e)}")
                     continue
+        
+        logger.info(f"🎯 Completed processing user {user.email} - created {campaign.emails_per_user} drafts")
     
     # Update campaign status
     campaign.status = 'uploaded'
