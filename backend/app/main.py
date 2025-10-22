@@ -31,16 +31,23 @@ async def lifespan(app: FastAPI):
         # Database tables created successfully
         logger.info("Database tables created successfully")
         
-        # Check if database has any data
-        from app.models import Campaign, ServiceAccount
-        from app.database import SessionLocal
-        db = SessionLocal()
+        # Check if database has any data (optional - don't fail if tables don't exist yet)
         try:
-            campaign_count = db.query(Campaign).count()
-            account_count = db.query(ServiceAccount).count()
-            logger.info(f"Database status: {campaign_count} campaigns, {account_count} service accounts")
-        finally:
-            db.close()
+            from app.models import Campaign, ServiceAccount
+            from app.database import SessionLocal
+            db = SessionLocal()
+            try:
+                campaign_count = db.query(Campaign).count()
+                account_count = db.query(ServiceAccount).count()
+                logger.info(f"Database status: {campaign_count} campaigns, {account_count} service accounts")
+            except Exception as e:
+                logger.info(f"Database tables not yet created or accessible: {e}")
+                logger.info("Database will be initialized on first use")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.info(f"Database status check skipped: {e}")
+            logger.info("Database will be initialized on first use")
         
     except Exception as e:
         if "already exists" in str(e) or "duplicate key" in str(e):
