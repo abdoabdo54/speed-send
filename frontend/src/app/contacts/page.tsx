@@ -98,7 +98,6 @@ export default function ContactsPage() {
       const payload = {
         name: name.trim(),
         description: description.trim() || undefined,
-        contacts,
       };
 
       let response;
@@ -111,7 +110,7 @@ export default function ContactsPage() {
         });
       } else {
         // Create new list
-        response = await fetch(`${API_URL}/api/v1/contacts/`, {
+        response = await fetch(`${API_URL}/api/v1/contacts/lists`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -120,6 +119,35 @@ export default function ContactsPage() {
 
       if (!response.ok) {
         throw new Error('Failed to save contact list');
+      }
+      
+      const result = await response.json();
+      console.log('Contact list saved:', result);
+      
+      // If we have contacts and this is a new list, create the contacts
+      if (contacts.length > 0 && !editing) {
+        try {
+          for (const contact of contacts) {
+            const contactPayload = {
+              contact_list_id: result.id,
+              email: contact.email,
+              first_name: contact.first_name,
+              last_name: contact.last_name
+            };
+            
+            const contactResponse = await fetch(`${API_URL}/api/v1/contacts/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(contactPayload),
+            });
+            
+            if (!contactResponse.ok) {
+              console.error('Failed to create contact:', contact.email);
+            }
+          }
+        } catch (error) {
+          console.error('Error creating contacts:', error);
+        }
       }
       
       await loadLists();
