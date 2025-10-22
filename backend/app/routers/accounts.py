@@ -35,22 +35,34 @@ async def create_service_account(account: ServiceAccountCreate, db: Session = De
         if not account.json_content:
             raise HTTPException(status_code=400, detail="JSON content is required")
         
-        # Convert JSON to string if it's a dict
+        # Handle JSON content - it could be dict or string
         json_content = account.json_content
         if isinstance(json_content, dict):
             import json
             json_content = json.dumps(json_content)
+        elif isinstance(json_content, str):
+            # Validate it's valid JSON
+            try:
+                json.loads(json_content)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid JSON format in json_content")
         
         # Encrypt the JSON content
         encryption_service = EncryptionService()
         encrypted_json = encryption_service.encrypt(json_content)
         
+        # Extract client_email and other fields from JSON if not provided
+        parsed_json = json.loads(json_content) if isinstance(json_content, str) else json_content
+        client_email = account.client_email or parsed_json.get('client_email', '')
+        domain = account.domain or (client_email.split('@')[1] if '@' in client_email else '')
+        project_id = account.project_id or parsed_json.get('project_id', '')
+        
         # Create service account
         db_account = ServiceAccount(
             name=account.name,
-            client_email=account.client_email,
-            domain=account.domain,
-            project_id=account.project_id,
+            client_email=client_email,
+            domain=domain,
+            project_id=project_id,
             admin_email=account.admin_email,
             encrypted_json=encrypted_json
         )

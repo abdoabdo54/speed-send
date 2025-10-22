@@ -87,7 +87,7 @@ api.interceptors.response.use(
 export const serviceAccountsApi = {
   list: () => api.get('/accounts/'),
   get: (id: number) => api.get(`/accounts/${id}/`),
-  create: (data: { name: string; json_content: string; admin_email?: string }) => api.post('/accounts/', data),
+  create: (data: { name: string; json_content: any; client_email?: string; domain?: string; project_id?: string; admin_email?: string }) => api.post('/accounts/', data),
   update: (id: number, data: any) => api.put(`/accounts/${id}/`, data),
   delete: (id: number) => api.delete(`/accounts/${id}/`),
   sync: (id: number, adminEmail: string) => api.post(`/accounts/${id}/sync/`, { admin_email: adminEmail }),

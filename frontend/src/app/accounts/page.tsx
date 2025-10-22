@@ -84,7 +84,7 @@ export default function AccountsPage() {
       console.log('Uploading service account...', { name: uploadData.name });
       const response = await serviceAccountsApi.create({
         name: uploadData.name,
-        json_content: uploadData.json,
+        json_content: JSON.parse(uploadData.json),
         admin_email: adminEmail,
       });
       console.log('Upload successful:', response.data);
