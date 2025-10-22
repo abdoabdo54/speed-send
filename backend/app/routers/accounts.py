@@ -57,11 +57,82 @@ async def delete_service_account(account_id: int, db: Session = Depends(get_db))
     db.commit()
     return
 
-@router.post("/{account_id}/sync", response_model=WorkspaceUserResponse)
-async def sync_service_account(account_id: int, db: Session = Depends(get_db)):
-    # Logic to sync users for a service account
-    account = db.query(ServiceAccount).filter(ServiceAccount.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Service account not found")
-    # Placeholder for sync logic
-    return WorkspaceUserResponse(id=1, service_account_id=account_id, email="sync@complete.com", full_name="Sync Complete", is_active=True)
+@router.post("/{account_id}/sync")
+async def sync_service_account(account_id: int, admin_email: str = None, db: Session = Depends(get_db)):
+    """
+    Sync workspace users for a service account using Google Workspace API
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Get the service account
+        account = db.query(ServiceAccount).filter(ServiceAccount.id == account_id).first()
+        if not account:
+            raise HTTPException(status_code=404, detail="Service account not found")
+        
+        logger.info(f"🔄 Starting sync for account: {account.name}")
+        
+        # Decrypt service account credentials
+        from app.encryption import EncryptionService
+        encryption_service = EncryptionService()
+        service_account_json = encryption_service.decrypt(account.encrypted_json)
+        
+        # Initialize Google Workspace Service
+        from app.google_api import GoogleWorkspaceService
+        google_service = GoogleWorkspaceService(service_account_json)
+        
+        # Use admin_email if provided, otherwise use account admin_email
+        admin_email_to_use = admin_email or account.admin_email
+        if not admin_email_to_use:
+            raise HTTPException(status_code=400, detail="Admin email is required for syncing users")
+        
+        logger.info(f"🔍 Syncing users with admin email: {admin_email_to_use}")
+        
+        # Fetch workspace users
+        users = google_service.fetch_workspace_users(admin_email_to_use)
+        
+        logger.info(f"📊 Found {len(users)} users from Google Workspace")
+        
+        # Clear existing users for this account
+        db.query(WorkspaceUser).filter(WorkspaceUser.service_account_id == account_id).delete()
+        
+        # Add new users
+        synced_users = []
+        for user_data in users:
+            user = WorkspaceUser(
+                service_account_id=account_id,
+                email=user_data['email'],
+                full_name=user_data.get('full_name', ''),
+                first_name=user_data.get('first_name', ''),
+                last_name=user_data.get('last_name', ''),
+                is_active=user_data.get('is_active', True),
+                quota_limit=100,  # Default quota
+                emails_sent_today=0
+            )
+            db.add(user)
+            synced_users.append(user)
+        
+        # Update account total_users count
+        account.total_users = len(synced_users)
+        
+        db.commit()
+        
+        logger.info(f"✅ Successfully synced {len(synced_users)} users")
+        
+        return {
+            "message": f"Successfully synced {len(synced_users)} users!",
+            "user_count": len(synced_users),
+            "admin_email_used": admin_email_to_use,
+            "users": [
+                {
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "is_active": user.is_active
+                } for user in synced_users
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Sync failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to sync users: {str(e)}")
