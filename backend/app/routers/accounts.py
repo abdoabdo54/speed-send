@@ -19,14 +19,21 @@ async def create_service_account(account: ServiceAccountCreate, db: Session = De
     # Logic to create a service account
     from app.encryption import EncryptionService
     
+    # Convert JSON content to string if it's a dict
+    json_content = account.json_content
+    if isinstance(json_content, dict):
+        import json
+        json_content = json.dumps(json_content)
+    
     # Encrypt the JSON content before storing
     encryption_service = EncryptionService()
-    encrypted_json = encryption_service.encrypt(account.json_content)
+    encrypted_json = encryption_service.encrypt(json_content)
     
     db_account = ServiceAccount(
         name=account.name,
         client_email=account.client_email,
         domain=account.domain,
+        admin_email=account.admin_email,
         encrypted_json=encrypted_json
     )
     db.add(db_account)

@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { serviceAccountsApi, usersApi, dataListsApi, API_URL as DETECTED_API_URL } from '@/lib/api';
+import { serviceAccountsApi, usersApi, dataListsApi, contactsApi, API_URL as DETECTED_API_URL } from '@/lib/api';
 import { 
   Upload,
   Users, 
@@ -165,12 +165,7 @@ export default function NewDraftPage() {
       }
 
       // Fallback to contacts endpoint
-      const response = await axios.get(`${API_URL}/api/v1/contacts/`, {
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
+      const response = await contactsApi.list();
 
       if (response.data && Array.isArray(response.data)) {
         setContactLists(response.data);

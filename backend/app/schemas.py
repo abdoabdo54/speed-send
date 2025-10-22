@@ -38,6 +38,7 @@ class ServiceAccountBase(BaseModel):
 
 class ServiceAccountCreate(ServiceAccountBase):
     json_content: Dict
+    admin_email: Optional[str] = None
 
 class ServiceAccountResponse(ServiceAccountBase):
     id: int

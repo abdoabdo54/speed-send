@@ -98,6 +98,14 @@ export const usersApi = {
   update: (id: number, data: any) => api.patch(`/users/${id}/`, data),
 };
 
+// Contacts
+export const contactsApi = {
+  list: () => api.get('/contacts/'),
+  get: (id: number) => api.get(`/contacts/${id}/`),
+  create: (data: any) => api.post('/contacts/', data),
+  delete: (id: number) => api.delete(`/contacts/${id}/`),
+};
+
 // Campaigns
 export const campaignsApi = {
   list: (status?: string) => api.get('/campaigns/', { params: { status } }),
