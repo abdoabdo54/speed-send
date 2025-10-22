@@ -3,12 +3,19 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
 
-# Create database engine
+# Create database engine with improved settings for high load
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20
+    pool_size=50,  # Increased pool size for better concurrency
+    max_overflow=100,  # Increased overflow for peak loads
+    pool_recycle=3600,  # Recycle connections after 1 hour
+    pool_timeout=30,  # Timeout for getting connection from pool
+    connect_args={
+        "connect_timeout": 60,
+        "command_timeout": 60,
+        "options": "-c timezone=UTC"  # Ensure consistent timezone
+    }
 )
 
 # Create session factory
@@ -18,11 +25,18 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-# Dependency for getting database session
+# Dependency for getting database session with robust handling
 def get_db():
     db = SessionLocal()
     try:
         yield db
+        # Explicitly commit any pending changes before closing
+        db.commit()
+    except Exception:
+        # Rollback on any exception
+        db.rollback()
+        raise
     finally:
+        # Always close the connection
         db.close()
 

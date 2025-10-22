@@ -75,9 +75,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # PowerMTA Mode: ULTRA-MAXIMUM concurrency for instant parallel sending
-    # Each worker handles multiple senders simultaneously - USE ALL CPU/RAM
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=2000 --pool=threads --prefetch-multiplier=10000
+    # Optimized Mode: Reasonable concurrency for stable parallel sending
+    # Each worker handles multiple senders with proper resource management
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=50 --pool=threads --prefetch-multiplier=100 --max-tasks-per-child=1000
     restart: unless-stopped
 
   # Celery Beat (for scheduled tasks)

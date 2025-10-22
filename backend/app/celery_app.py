@@ -9,7 +9,7 @@ celery_app = Celery(
     include=['app.tasks', 'app.tasks_powermta', 'app.tasks_v2']
 )
 
-# Configure Celery for MAXIMUM PowerMTA-style performance - NO LIMITS
+# Configure Celery for optimal performance with reasonable limits
 celery_app.conf.update(
     task_serializer='json',
     accept_content=['json'],
@@ -17,21 +17,25 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
     task_track_started=True,
-    # REMOVED ALL TIME LIMITS - UNLIMITED EXECUTION
-    # (deduplicated in favor of higher values below)
+    # Set reasonable time limits for tasks
+    task_soft_time_limit=300,  # 5 minutes soft limit
+    task_time_limit=600,  # 10 minutes hard limit
     broker_connection_retry_on_startup=True,
-    # ULTRA-MAXIMUM PowerMTA optimization - NO DELAYS, NO LIMITS
-    task_acks_late=False,  # Acknowledge immediately for speed
-    task_reject_on_worker_lost=False,  # Don't reject for speed
-    task_compression=None,  # NO compression for speed
-    # ULTRA-MAXIMUM CONCURRENCY - USE ALL CPU/RAM
-    worker_prefetch_multiplier=10000,  # Fetch 10k tasks for instant execution
-    worker_concurrency=2000,  # 2000 concurrent workers (MAXIMUM)
-    worker_pool='threads',  # Use threads for maximum speed
-    worker_disable_rate_limits=True,  # DISABLE ALL RATE LIMITS
-    task_ignore_result=True,  # Ignore results for speed
-    task_store_eager_result=True,  # Store results immediately
-    worker_max_tasks_per_child=1000000,  # NO LIMIT on tasks per worker
+    # Optimized settings for high throughput
+    task_acks_late=True,  # Acknowledge after task completion
+    task_reject_on_worker_lost=True,  # Requeue if worker dies
+    task_compression='gzip',  # Use compression for large messages
+    # Optimized concurrency settings
+    worker_prefetch_multiplier=100,  # Reasonable prefetch
+    worker_concurrency=50,  # 50 concurrent workers (reasonable default)
+    worker_pool='threads',  # Use threads for I/O bound tasks
+    worker_disable_rate_limits=False,  # Enable rate limiting
+    task_ignore_result=False,  # Keep results for monitoring
+    task_store_eager_result=False,  # Don't store immediately
+    worker_max_tasks_per_child=1000,  # Restart worker after 1000 tasks
+    # Add monitoring settings
+    worker_send_task_events=True,  # Enable task events
+    task_send_sent_event=True,  # Track when tasks are sent
 )
 
 # Task routes
