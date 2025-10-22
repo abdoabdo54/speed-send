@@ -164,55 +164,17 @@ export default function AccountsPage() {
   };
 
   const handleSync = async (accountId: number) => {
-    // Find the account to get its name
     const account = accounts.find(acc => acc.id === accountId);
     if (!account) {
       alert('Account not found.');
       return;
     }
 
-    // First, try using the account name as admin email
-    const accountName = account.name;
-    console.log(`🔄 Attempting sync with account name as admin email: ${accountName}`);
-    
     try {
-      setLoading(true);
-      
-      // Try sync with account name first
-      const response = await serviceAccountsApi.sync(accountId, accountName);
-      alert(`✅ Successfully synced ${response.data.user_count || 0} users using account name as admin email!\n\nPlease refresh the Campaigns page to see the updated user list.`);
+      await serviceAccountsApi.sync(accountId, account.admin_email);
       loadAccounts();
-      return;
     } catch (error: any) {
-      console.log(`❌ Sync with account name failed: ${error.response?.data?.detail || error.message}`);
-      
-      // If that fails, prompt for manual admin email
-      const adminEmail = prompt(
-        `Automatic sync failed. Please enter admin email from your workspace:\n` +
-        `Account: ${accountName}\n` +
-        `Error: ${error.response?.data?.detail || error.message}\n\n` +
-        `Enter admin email (Example: admin@yourdomain.com):\n` +
-        `This email must have admin privileges.`
-      );
-      
-      if (!adminEmail || !adminEmail.includes('@')) {
-        alert('Please provide a valid admin email.');
-        return;
-      }
-      
-      try {
-        // Try sync with manually entered admin email
-        const response = await serviceAccountsApi.sync(accountId, adminEmail);
-        alert(`✅ Successfully synced ${response.data.user_count || 0} users with manual admin email!\n\nPlease refresh the Campaigns page to see the updated user list.`);
-        loadAccounts();
-      } catch (manualError: any) {
-        console.error('Manual sync also failed:', manualError);
-        alert(`❌ Sync failed with both methods:\n\n` +
-              `1. Account name (${accountName}): ${error.response?.data?.detail || error.message}\n` +
-              `2. Manual email (${adminEmail}): ${manualError.response?.data?.detail || manualError.message}`);
-      }
-    } finally {
-      setLoading(false);
+      alert('Failed to sync: ' + (error.response?.data?.detail || error.message));
     }
   };
 

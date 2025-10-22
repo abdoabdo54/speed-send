@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Optional
 
 from app.database import get_db
 from app.models import ServiceAccount, WorkspaceUser
@@ -16,6 +16,9 @@ async def list_service_accounts(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=ServiceAccountResponse)
 async def create_service_account(account: ServiceAccountCreate, db: Session = Depends(get_db)):
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         from app.encryption import EncryptionService
         
@@ -29,6 +32,7 @@ async def create_service_account(account: ServiceAccountCreate, db: Session = De
         encryption_service = EncryptionService()
         encrypted_json = encryption_service.encrypt(json_content)
         
+        # Create account
         db_account = ServiceAccount(
             name=account.name,
             client_email=account.client_email,
@@ -40,9 +44,11 @@ async def create_service_account(account: ServiceAccountCreate, db: Session = De
         db.commit()
         db.refresh(db_account)
         return db_account
+        
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Failed to create service account: {str(e)}")
+        raise HTTPException(status_code=422, detail=str(e))
 
 @router.get("/{account_id}", response_model=ServiceAccountResponse)
 async def get_service_account(account_id: int, db: Session = Depends(get_db)):
@@ -96,48 +102,38 @@ async def delete_service_account(account_id: int, db: Session = Depends(get_db))
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/{account_id}/sync")
-async def sync_service_account(account_id: int, admin_email: str = None, db: Session = Depends(get_db)):
-    """
-    Sync workspace users for a service account using Google Workspace API
-    """
+@router.post("/{account_id}/sync", response_model=List[WorkspaceUserResponse])
+async def sync_service_account(
+    account_id: int,
+    admin_email: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     import logging
     logger = logging.getLogger(__name__)
     
     try:
-        # Get the service account
         account = db.query(ServiceAccount).filter(ServiceAccount.id == account_id).first()
         if not account:
             raise HTTPException(status_code=404, detail="Service account not found")
+            
+        # Use provided admin_email or account's admin_email
+        admin = admin_email or account.admin_email
         
-        logger.info(f"🔄 Starting sync for account: {account.name}")
+        # Decrypt service account JSON
+        decrypted_json = account.get_json_content()
         
-        # Decrypt service account credentials
-        from app.encryption import EncryptionService
-        encryption_service = EncryptionService()
-        service_account_json = encryption_service.decrypt(account.encrypted_json)
-        
-        # Initialize Google Workspace Service
+        # Create Google service
         from app.google_api import GoogleWorkspaceService
-        google_service = GoogleWorkspaceService(service_account_json)
+        google_service = GoogleWorkspaceService(decrypted_json)
         
-        # Use admin_email if provided, otherwise use account admin_email
-        admin_email_to_use = admin_email or account.admin_email
-        if not admin_email_to_use:
-            raise HTTPException(status_code=400, detail="Admin email is required for syncing users")
-        
-        logger.info(f"🔍 Syncing users with admin email: {admin_email_to_use}")
-        
-        # Fetch workspace users
-        users = google_service.fetch_workspace_users(admin_email_to_use)
-        
-        logger.info(f"📊 Found {len(users)} users from Google Workspace")
+        # Get user list
+        users = google_service.fetch_workspace_users(admin)
         
         # Clear existing users for this account
         db.query(WorkspaceUser).filter(WorkspaceUser.service_account_id == account_id).delete()
         
-        # Add new users
-        synced_users = []
+        # Save users to database
+        saved_users = []
         for user_data in users:
             user = WorkspaceUser(
                 service_account_id=account_id,
@@ -150,28 +146,17 @@ async def sync_service_account(account_id: int, admin_email: str = None, db: Ses
                 emails_sent_today=0
             )
             db.add(user)
-            synced_users.append(user)
-        
+            saved_users.append(user)
+            
         # Update account total_users count
-        account.total_users = len(synced_users)
+        account.total_users = len(saved_users)
         
         db.commit()
         
-        logger.info(f"✅ Successfully synced {len(synced_users)} users")
-        
-        return {
-            "message": f"Successfully synced {len(synced_users)} users!",
-            "user_count": len(synced_users),
-            "admin_email_used": admin_email_to_use,
-            "users": [
-                {
-                    "email": user.email,
-                    "full_name": user.full_name,
-                    "is_active": user.is_active
-                } for user in synced_users
-            ]
-        }
+        logger.info(f"✅ Successfully synced {len(saved_users)} users")
+        return saved_users
         
     except Exception as e:
-        logger.error(f"❌ Sync failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to sync users: {str(e)}")
+        db.rollback()
+        logger.error(f"Failed to sync service account: {str(e)}")
+        raise HTTPException(status_code=422, detail=str(e))
