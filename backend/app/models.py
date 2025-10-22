@@ -1,9 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Date, JSON, ForeignKey, Enum, func
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 import enum
-
-Base = declarative_base()
+from app.database import Base
 
 # Enums
 class AccountStatus(str, enum.Enum):
