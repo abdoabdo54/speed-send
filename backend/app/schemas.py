@@ -33,7 +33,7 @@ class DraftStatus(str, Enum):
 # Service Account Schemas
 class ServiceAccountBase(BaseModel):
     name: str
-    client_email: str
+    client_email: Optional[str] = None
     domain: Optional[str] = None
     project_id: Optional[str] = None
     admin_email: Optional[str] = None

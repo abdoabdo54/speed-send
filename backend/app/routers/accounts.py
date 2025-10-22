@@ -54,6 +54,8 @@ async def create_service_account(account: ServiceAccountCreate, db: Session = De
         # Extract client_email and other fields from JSON if not provided
         parsed_json = json.loads(json_content) if isinstance(json_content, str) else json_content
         client_email = account.client_email or parsed_json.get('client_email', '')
+        if not client_email:
+            raise HTTPException(status_code=400, detail="client_email is required in JSON content")
         domain = account.domain or (client_email.split('@')[1] if '@' in client_email else '')
         project_id = account.project_id or parsed_json.get('project_id', '')
         
