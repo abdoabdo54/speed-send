@@ -93,7 +93,12 @@ export default function NewDraftPage() {
   const loadAccounts = async () => {
     try {
       console.log(' Loading Google Workspace accounts...');
-      const response = await serviceAccountsApi.list();
+      const response = await axios.get(`${API_URL}/api/v1/accounts/`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
 
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
@@ -126,7 +131,12 @@ export default function NewDraftPage() {
   const loadUsers = async () => {
     try {
       console.log(' Loading Google Workspace users...');
-      const response = await usersApi.list();
+      const response = await axios.get(`${API_URL}/api/v1/users/`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
 
       if (response.data && Array.isArray(response.data)) {
         setUsers(response.data);
@@ -145,7 +155,37 @@ export default function NewDraftPage() {
   const loadContactLists = async () => {
     try {
       console.log(' Loading contact lists...');
-      const response = await contactsApi.list();
+      // Try data-lists endpoint first (like campaigns/new)
+      try {
+        const response = await axios.get(`${API_URL}/api/v1/data-lists/`, {
+          timeout: 10000,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (response.data && Array.isArray(response.data)) {
+          // Convert data-lists format to contact lists format
+          const contactLists = response.data.map((list: any) => ({
+            id: list.id,
+            name: list.name,
+            contacts: list.recipients?.map((email: string) => ({ email })) || []
+          }));
+          setContactLists(contactLists);
+          console.log(' Contact lists loaded successfully from data-lists:', contactLists.length, 'lists');
+          return;
+        }
+      } catch (dataListsError) {
+        console.log(' data-lists endpoint not available, trying contacts endpoint...');
+      }
+
+      // Fallback to contacts endpoint
+      const response = await axios.get(`${API_URL}/api/v1/contacts/`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
       if (response.data && Array.isArray(response.data)) {
         setContactLists(response.data);
         console.log(' Contact lists loaded successfully:', response.data.length, 'lists');

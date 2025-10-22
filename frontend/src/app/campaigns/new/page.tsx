@@ -342,7 +342,12 @@ export default function NewCampaignPage() {
   const loadAccounts = async () => {
     try {
       console.log(' Loading Google Workspace accounts...');
-      const response = await serviceAccountsApi.list();
+      const response = await axios.get(`${API_URL}/api/v1/accounts/`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
 
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
@@ -484,10 +489,8 @@ export default function NewCampaignPage() {
 
   const loadRecipientLists = async () => {
     try {
-      const response = await contactsApi.list();
-      if (response.data && Array.isArray(response.data)) {
-        setRecipientLists(response.data);
-      }
+      const response = await dataListsApi.list();
+      setRecipientLists(response.data);
     } catch (error) {
       console.error('Failed to load recipient lists:', error);
       showNotification('Failed to load recipient lists.', 'error');

@@ -22,14 +22,14 @@ export default function AccountsPage() {
   }, []);
 
   const checkBackend = async () => {
-    console.log('🔍 检查后端服务状态...', API_URL);
+    console.log('Checking backend service status...', API_URL);
     const isHealthy = await healthCheck();
     setBackendStatus(isHealthy);
     if (!isHealthy) {
-      console.error('⚠️ 后端服务不可访问:', API_URL);
-      alert(`无法连接到后端服务: ${API_URL}\n\n请确保后端服务正在运行，并且网络连接正常。`);
+      console.error('Backend service not accessible:', API_URL);
+      alert(`Unable to connect to backend service: ${API_URL}\n\nPlease ensure the backend service is running and the network connection is normal.`);
     } else {
-      console.log('✅ 后端服务连接正常');
+      console.log('Backend service connection normal');
     }
   };
 
@@ -49,9 +49,9 @@ export default function AccountsPage() {
         url: error.config?.url
       });
       
-      // 显示更友好的错误消息
+      // Show more friendly error message
       const errorMsg = error.response?.data?.detail || error.message || 'Unknown error occurred';
-      alert(`无法加载服务账户: ${errorMsg}\n\n请检查后端服务是否正常运行。`);
+      alert(`Failed to load service accounts: ${errorMsg}\n\nPlease check if the backend service is running normally.`);
       
       setAccounts([]);
     } finally {
@@ -171,8 +171,8 @@ export default function AccountsPage() {
         url: error.config?.url
       });
       
-      const errorMessage = error.response?.data?.detail || error.message || '上传失败';
-      alert(`服务账户上传失败: ${errorMessage}\n\n请检查JSON文件格式和网络连接。`);
+      const errorMessage = error.response?.data?.detail || error.message || 'Upload failed';
+      alert(`Service account upload failed: ${errorMessage}\n\nPlease check JSON file format and network connection.`);
     }
   };
 
@@ -191,27 +191,27 @@ export default function AccountsPage() {
   const handleSync = async (accountId: number) => {
     const account = accounts.find(acc => acc.id === accountId);
     if (!account) {
-      alert('找不到此服务账户。');
+      alert('Service account not found.');
       return;
     }
 
     try {
-      console.log(`🔄 开始同步账户 ${accountId} 的用户数据...`);
+      console.log(`Starting to sync user data for account ${accountId}...`);
       await serviceAccountsApi.sync(accountId, account.admin_email);
-      console.log('✅ 同步成功，重新加载账户列表...');
+      console.log('Sync successful, reloading account list...');
       loadAccounts();
-      alert('用户数据同步成功！');
+      alert('User data sync successful!');
     } catch (error: any) {
-      console.error('❌ 同步失败:', error);
-      console.error('同步错误详情:', {
+      console.error('Sync failed:', error);
+      console.error('Sync error details:', {
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
         url: error.config?.url
       });
       
-      const errorMsg = error.response?.data?.detail || error.message || '同步失败';
-      alert(`用户数据同步失败: ${errorMsg}\n\n请检查管理员邮箱权限和域范围委托设置。`);
+      const errorMsg = error.response?.data?.detail || error.message || 'Sync failed';
+      alert(`User data sync failed: ${errorMsg}\n\nPlease check admin email permissions and domain-wide delegation settings.`);
     }
   };
 
