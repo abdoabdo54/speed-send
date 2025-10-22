@@ -27,6 +27,11 @@ async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Database tables created/verified")
+        
+        # Initialize sample data if database is empty
+        from app.init_data import init_sample_data
+        init_sample_data()
+        
     except Exception as e:
         if "already exists" in str(e) or "duplicate key" in str(e):
             logger.warning("⚠️ Some database objects already exist, continuing...")
