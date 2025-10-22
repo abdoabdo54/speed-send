@@ -341,6 +341,23 @@ class DashboardStats(BaseModel):
 class CampaignControl(BaseModel):
     action: str  # pause, resume, cancel
 
+# Draft Launch Response
+class DraftLaunchResponse(BaseModel):
+    success: bool
+    message: str
+    total_drafts: int
+    successful_drafts: int
+    failed_drafts: int
+    details: Optional[Dict[str, Any]] = None
+
+# Draft Upload Response
+class DraftUploadResponse(BaseModel):
+    success: bool
+    message: str
+    total_drafts: int
+    users_count: int
+    details: Optional[Dict[str, Any]] = None
+
 # Update forward references
 ContactListResponse.model_rebuild()
 ContactResponse.model_rebuild()
