@@ -33,9 +33,14 @@ async def lifespan(app: FastAPI):
         
         # Check if database has any data
         from app.models import Campaign, ServiceAccount
-        campaign_count = db.query(Campaign).count()
-        account_count = db.query(ServiceAccount).count()
-        logger.info(f"Database status: {campaign_count} campaigns, {account_count} service accounts")
+        from app.database import SessionLocal
+        db = SessionLocal()
+        try:
+            campaign_count = db.query(Campaign).count()
+            account_count = db.query(ServiceAccount).count()
+            logger.info(f"Database status: {campaign_count} campaigns, {account_count} service accounts")
+        finally:
+            db.close()
         
     except Exception as e:
         if "already exists" in str(e) or "duplicate key" in str(e):
