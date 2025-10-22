@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 import logging
 
@@ -121,10 +122,10 @@ async def delete_service_account(account_id: int, db: Session = Depends(get_db))
         logger.error(f"Failed to delete service account: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{account_id}/sync", response_model=List[WorkspaceUserResponse])
+@router.post("/{account_id}/sync")
 async def sync_service_account(
     account_id: int,
-    admin_email: Optional[str] = None,
+    request_data: dict,
     db: Session = Depends(get_db)
 ):
     """Sync workspace users for a service account"""
@@ -136,8 +137,8 @@ async def sync_service_account(
         if not account:
             raise HTTPException(status_code=404, detail="Service account not found")
         
-        # Use provided admin_email or account's admin_email
-        admin = admin_email or account.admin_email
+        # Extract admin_email from request data
+        admin = request_data.get('admin_email') or account.admin_email
         if not admin:
             raise HTTPException(status_code=400, detail="Admin email is required for sync")
         
@@ -195,7 +196,12 @@ async def sync_service_account(
         db.commit()
         
         logger.info(f"Successfully synced {len(saved_users)} users for account {account.name}")
-        return saved_users
+        return {
+            "success": True,
+            "message": f"Successfully synced {len(saved_users)} users",
+            "user_count": len(saved_users),
+            "account_name": account.name
+        }
         
     except HTTPException:
         raise

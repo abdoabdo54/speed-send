@@ -90,7 +90,7 @@ export const serviceAccountsApi = {
   create: (data: { name: string; json_content: string; admin_email?: string }) => api.post('/accounts/', data),
   update: (id: number, data: any) => api.put(`/accounts/${id}/`, data),
   delete: (id: number) => api.delete(`/accounts/${id}/`),
-  sync: (id: number, adminEmail: string) => api.post(`/accounts/${id}/sync/`, null, { params: { admin_email: adminEmail } }),
+  sync: (id: number, adminEmail: string) => api.post(`/accounts/${id}/sync/`, { admin_email: adminEmail }),
 };
 
 // Workspace Users
