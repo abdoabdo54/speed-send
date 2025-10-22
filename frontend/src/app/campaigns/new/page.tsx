@@ -205,7 +205,7 @@ export default function NewCampaignPage() {
       if (response.status === 200) {
         setBackendStatus('connected');
         setConnectionError(null);
-        console.log('✅ Backend health check passed');
+        console.log(' Backend health check passed');
         return true;
       } else {
         setBackendStatus('disconnected');
@@ -221,7 +221,7 @@ export default function NewCampaignPage() {
       } else {
         setConnectionError(`Backend connection failed: ${error.message}`);
       }
-      console.error('❌ Backend health check failed:', error);
+      console.error(' Backend health check failed:', error);
       return false;
     }
   };
@@ -268,7 +268,7 @@ export default function NewCampaignPage() {
                 if (Array.isArray(c.sender_accounts)) {
                   setSelectedAccounts(c.sender_accounts.map((a: any) => a.id).filter(Boolean));
                 }
-                appendLog(`✏️ Loaded campaign ${cid} for editing`);
+                appendLog(` Loaded campaign ${cid} for editing`);
               }
             }
           } catch (e) {
@@ -341,20 +341,20 @@ export default function NewCampaignPage() {
   // API Functions
   const loadAccounts = async () => {
     try {
-      console.log('🔄 Loading Google Workspace accounts...');
+      console.log(' Loading Google Workspace accounts...');
       const response = await serviceAccountsApi.list();
 
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
-        console.log('✅ Accounts loaded successfully:', response.data.length, 'accounts');
+        console.log(' Accounts loaded successfully:', response.data.length, 'accounts');
         showNotification(`Loaded ${response.data.length} Google Workspace accounts`, 'success');
       } else {
-        console.warn('⚠️ Invalid response format:', response.data);
+        console.warn(' Invalid response format:', response.data);
         setAccounts([]);
         showNotification('No accounts found. Please add Google Workspace service accounts first.', 'info');
       }
     } catch (error: any) {
-      console.error('❌ Failed to load accounts:', error);
+      console.error(' Failed to load accounts:', error);
       setAccounts([]);
 
       let errorMessage = 'Failed to load accounts';
@@ -374,8 +374,8 @@ export default function NewCampaignPage() {
 
   const loadUsers = async () => {
     try {
-      appendLog('🔄 Loading Google Workspace users...');
-      console.log('🔄 Loading Google Workspace users...');
+      appendLog(' Loading Google Workspace users...');
+      console.log(' Loading Google Workspace users...');
       const response = await axios.get(`${API_URL}/api/v1/users/`, {
         timeout: 10000,
         headers: {
@@ -425,12 +425,12 @@ export default function NewCampaignPage() {
         });
 
         setUsers(filteredUsers);
-        appendLog(`✅ Users loaded successfully: ${filteredUsers.length} users (${response.data.length - filteredUsers.length} admin users excluded)`);
-        console.log('✅ Users loaded successfully:', filteredUsers.length, 'users (admin users excluded)');
+        appendLog(` Users loaded successfully: ${filteredUsers.length} users (${response.data.length - filteredUsers.length} admin users excluded)`);
+        console.log(' Users loaded successfully:', filteredUsers.length, 'users (admin users excluded)');
         showNotification(`Loaded ${filteredUsers.length} Google Workspace users (admin users excluded)`, 'success');
       } else {
-        appendLog('⚠️ Invalid response format from users API');
-        console.warn('⚠️ Invalid response format:', response.data);
+        appendLog(' Invalid response format from users API');
+        console.warn(' Invalid response format:', response.data);
         setUsers([]);
         showNotification('No users found. Please sync accounts first.', 'info');
       }
@@ -442,7 +442,7 @@ export default function NewCampaignPage() {
         data: error?.response?.data || 'No response data'
       };
 
-      appendLog(`❌ Failed to load users:`);
+      appendLog(` Failed to load users:`);
       appendLog(`   Status: ${errorDetails.status}`);
       appendLog(`   Message: ${errorDetails.message}`);
       appendLog(`   URL: ${errorDetails.url}`);
@@ -450,7 +450,7 @@ export default function NewCampaignPage() {
         appendLog(`   Response Data: ${JSON.stringify(errorDetails.data)}`);
       }
 
-      console.error('❌ Failed to load users:', error);
+      console.error(' Failed to load users:', error);
       setUsers([]);
 
       let errorMessage = 'Failed to load users';
@@ -756,18 +756,18 @@ export default function NewCampaignPage() {
     appendLog('🧪 Starting test email process...');
 
     if (!testEmail.trim()) {
-      appendLog('❌ Test email address is required');
+      appendLog(' Test email address is required');
       showNotification('Please enter a test email address', 'error');
       return;
     }
 
     if (selectedTestUsers.length === 0) {
-      appendLog('❌ No users selected for test email');
+      appendLog(' No users selected for test email');
       showNotification('Please select at least one user to send from', 'error');
       return;
     }
 
-    appendLog(`📧 Sending test email to: ${testEmail} from ${selectedTestUsers.length} users`);
+    appendLog(` Sending test email to: ${testEmail} from ${selectedTestUsers.length} users`);
 
     if (!config.subject.trim()) {
       showNotification('Please enter a subject', 'error');
@@ -816,7 +816,7 @@ export default function NewCampaignPage() {
             data: error?.response?.data || 'No response data'
           };
 
-          appendLog(`❌ Test email failed for ${errorDetails.user}:`);
+          appendLog(` Test email failed for ${errorDetails.user}:`);
           appendLog(`   Status: ${errorDetails.status}`);
           appendLog(`   Message: ${errorDetails.message}`);
           appendLog(`   URL: ${errorDetails.url}`);
@@ -825,15 +825,15 @@ export default function NewCampaignPage() {
           }
         } else if (result.status === 'fulfilled') {
           const user = users.find(u => u.id === selectedTestUsers[index]);
-          appendLog(`✅ Test email sent successfully for ${user?.email || 'Unknown'}`);
+          appendLog(` Test email sent successfully for ${user?.email || 'Unknown'}`);
         }
       });
 
       if (successful > 0) {
-        appendLog(`✅ Test emails sent successfully: ${successful} successful, ${failed} failed`);
+        appendLog(` Test emails sent successfully: ${successful} successful, ${failed} failed`);
         showNotification(`Test emails sent: ${successful} successful, ${failed} failed`, 'success');
       } else {
-        appendLog(`❌ All test emails failed to send - see detailed errors above`);
+        appendLog(` All test emails failed to send - see detailed errors above`);
         showNotification('All test emails failed to send', 'error');
       }
 
@@ -846,7 +846,7 @@ export default function NewCampaignPage() {
         data: error?.response?.data || 'No response data'
       };
 
-      appendLog(`❌ Test email error: ${errorDetails.message}`);
+      appendLog(` Test email error: ${errorDetails.message}`);
       appendLog(`   Status: ${errorDetails.status}`);
       appendLog(`   URL: ${errorDetails.url}`);
       if (errorDetails.data && typeof errorDetails.data === 'object') {
@@ -909,7 +909,7 @@ export default function NewCampaignPage() {
         data: error?.response?.data || 'No response data'
       };
 
-      appendLog(`❌ Campaign creation failed:`);
+      appendLog(` Campaign creation failed:`);
       appendLog(`   Status: ${errorDetails.status}`);
       appendLog(`   Message: ${errorDetails.message}`);
       appendLog(`   URL: ${errorDetails.url}`);
@@ -978,7 +978,7 @@ export default function NewCampaignPage() {
               variant="outline"
               size="sm"
               onClick={async () => {
-                console.log('🔍 Running backend diagnostics...');
+                console.log(' Running backend diagnostics...');
                 showNotification('Running backend diagnostics...', 'info');
 
                 // Test multiple endpoints
@@ -991,16 +991,16 @@ export default function NewCampaignPage() {
                 for (const endpoint of endpoints) {
                   try {
                     const response = await axios.get(`${API_URL}${endpoint.url}`, { timeout: 5000 });
-                    console.log(`✅ ${endpoint.name}:`, response.status, response.data);
+                    console.log(` ${endpoint.name}:`, response.status, response.data);
                   } catch (error: any) {
-                    console.error(`❌ ${endpoint.name}:`, error.response?.status, error.message);
+                    console.error(` ${endpoint.name}:`, error.response?.status, error.message);
                   }
                 }
 
                 showNotification('Diagnostics complete. Check browser console for details.', 'info');
               }}
             >
-              🔍 Diagnose
+ Diagnose
             </Button>
           )}
         </div>

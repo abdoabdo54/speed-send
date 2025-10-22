@@ -13,7 +13,6 @@ engine = create_engine(
     pool_timeout=30,  # Timeout for getting connection from pool
     connect_args={
         "connect_timeout": 60,
-        "command_timeout": 60,
         "options": "-c timezone=UTC"  # Ensure consistent timezone
     }
 )

@@ -23,10 +23,10 @@ async def lifespan(app: FastAPI):
     Startup and shutdown events
     """
     # Startup: Create database tables
-    logger.info("🚀 Starting Gmail Bulk Sender SaaS...")
+    logger.info("Starting Gmail Bulk Sender SaaS...")
     try:
         Base.metadata.create_all(bind=engine)
-        logger.info("✅ Database tables created/verified")
+        logger.info("Database tables created/verified")
         
         # Initialize sample data if database is empty
         from app.init_data import init_sample_data
@@ -34,17 +34,17 @@ async def lifespan(app: FastAPI):
         
     except Exception as e:
         if "already exists" in str(e) or "duplicate key" in str(e):
-            logger.warning("⚠️ Some database objects already exist, continuing...")
+            logger.warning("Some database objects already exist, continuing...")
         else:
-            logger.error(f"❌ Database initialization failed: {e}")
+            logger.error(f"Database initialization failed: {e}")
             raise
-    logger.info(f"🌐 Environment: {settings.ENVIRONMENT}")
-    logger.info(f"📊 PowerMTA Mode: ENABLED (100 worker concurrency)")
+    logger.info(f"Environment: {settings.ENVIRONMENT}")
+    logger.info(f"PowerMTA Mode: ENABLED (100 worker concurrency)")
     
     yield
     
     # Shutdown
-    logger.info("👋 Shutting down")
+    logger.info("Shutting down")
 
 
 # Create FastAPI application
@@ -82,9 +82,9 @@ app.include_router(contacts.router, prefix=settings.API_V1_PREFIX)
 app.include_router(data_lists.router, prefix=settings.API_V1_PREFIX)
 app.include_router(drafts.router, prefix=settings.API_V1_PREFIX)
 
-logger.info(f"✅ All routers loaded")
-logger.info(f"📚 API Documentation: /docs (disabled in production)")
-logger.info(f"🔥 Ready to handle requests!")
+logger.info(f"All routers loaded")
+logger.info(f"API Documentation: /docs (disabled in production)")
+logger.info(f"Ready to handle requests!")
 
 
 @app.get("/")

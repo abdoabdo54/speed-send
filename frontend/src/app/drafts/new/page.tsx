@@ -92,20 +92,20 @@ export default function NewDraftPage() {
 
   const loadAccounts = async () => {
     try {
-      console.log('🔄 Loading Google Workspace accounts...');
+      console.log(' Loading Google Workspace accounts...');
       const response = await serviceAccountsApi.list();
 
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
-        console.log('✅ Accounts loaded successfully:', response.data.length, 'accounts');
+        console.log('Accounts loaded successfully:', response.data.length, 'accounts');
         showNotification(`Loaded ${response.data.length} Google Workspace accounts`, 'success');
       } else {
-        console.warn('⚠️ Invalid response format:', response.data);
+        console.warn(' Invalid response format:', response.data);
         setAccounts([]);
         showNotification('No accounts found. Please add Google Workspace service accounts first.', 'info');
       }
     } catch (error: any) {
-      console.error('❌ Failed to load accounts:', error);
+      console.error(' Failed to load accounts:', error);
       setAccounts([]);
 
       let errorMessage = 'Failed to load accounts';
@@ -125,18 +125,18 @@ export default function NewDraftPage() {
 
   const loadUsers = async () => {
     try {
-      console.log('🔄 Loading Google Workspace users...');
+      console.log(' Loading Google Workspace users...');
       const response = await usersApi.list();
 
       if (response.data && Array.isArray(response.data)) {
         setUsers(response.data);
-        console.log('✅ Users loaded successfully:', response.data.length, 'users');
+        console.log(' Users loaded successfully:', response.data.length, 'users');
       } else {
-        console.warn('⚠️ Invalid response format:', response.data);
+        console.warn(' Invalid response format:', response.data);
         setUsers([]);
       }
     } catch (error: any) {
-      console.error('❌ Failed to load users:', error);
+      console.error(' Failed to load users:', error);
       setUsers([]);
       showNotification('Failed to load users', 'error');
     }
@@ -144,11 +144,11 @@ export default function NewDraftPage() {
 
   const loadContactLists = async () => {
     try {
-      console.log('🔄 Loading contact lists...');
+      console.log(' Loading contact lists...');
       const response = await contactsApi.list();
       if (response.data && Array.isArray(response.data)) {
         setContactLists(response.data);
-        console.log('✅ Contact lists loaded successfully:', response.data.length, 'lists');
+        console.log(' Contact lists loaded successfully:', response.data.length, 'lists');
       }
     } catch (error) {
       console.error('Failed to load contact lists:', error);
