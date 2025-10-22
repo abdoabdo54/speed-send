@@ -87,6 +87,7 @@ export const serviceAccountsApi = {
   list: () => api.get('/accounts/'),
   get: (id: number) => api.get(`/accounts/${id}/`),
   create: (data: { name: string; json_content: string; admin_email?: string }) => api.post('/accounts/', data),
+  update: (id: number, data: any) => api.put(`/accounts/${id}/`, data),
   delete: (id: number) => api.delete(`/accounts/${id}/`),
   sync: (id: number, adminEmail: string) => api.post(`/accounts/${id}/sync/`, null, { params: { admin_email: adminEmail } }),
 };
@@ -103,6 +104,7 @@ export const contactsApi = {
   list: () => api.get('/contacts/'),
   get: (id: number) => api.get(`/contacts/${id}/`),
   create: (data: any) => api.post('/contacts/', data),
+  update: (id: number, data: any) => api.put(`/contacts/${id}/`, data),
   delete: (id: number) => api.delete(`/contacts/${id}/`),
 };
 

@@ -145,39 +145,15 @@ export default function NewDraftPage() {
   const loadContactLists = async () => {
     try {
       console.log('🔄 Loading contact lists...');
-      // Try data-lists endpoint first (like campaigns/new)
-      try {
-        const response = await dataListsApi.list();
-
-        if (response.data && Array.isArray(response.data)) {
-          // Convert data-lists format to contact lists format
-          const contactLists = response.data.map((list: any) => ({
-            id: list.id,
-            name: list.name,
-            contacts: list.recipients?.map((email: string) => ({ email })) || []
-          }));
-          setContactLists(contactLists);
-          console.log('✅ Contact lists loaded successfully from data-lists:', contactLists.length, 'lists');
-          return;
-        }
-      } catch (dataListsError) {
-        console.log('⚠️ data-lists endpoint not available, trying contacts endpoint...');
-      }
-
-      // Fallback to contacts endpoint
       const response = await contactsApi.list();
-
       if (response.data && Array.isArray(response.data)) {
         setContactLists(response.data);
-        console.log('✅ Contact lists loaded successfully from contacts:', response.data.length, 'lists');
-      } else {
-        console.warn('⚠️ Invalid response format:', response.data);
-        setContactLists([]);
+        console.log('✅ Contact lists loaded successfully:', response.data.length, 'lists');
       }
-    } catch (error: any) {
-      console.error('❌ Failed to load contact lists:', error);
+    } catch (error) {
+      console.error('Failed to load contact lists:', error);
+      showNotification('Failed to load contact lists.', 'error');
       setContactLists([]);
-      showNotification('Failed to load contact lists', 'error');
     }
   };
 
