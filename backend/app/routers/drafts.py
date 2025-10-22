@@ -206,7 +206,7 @@ def delete_draft_campaign(draft_id: int, db: Session = Depends(get_db)):
     
     return {"detail": f"Draft campaign '{campaign.name}' and all its associated data have been deleted."}
 
-@router.post("/drafts/{draft_id}/upload")
+@router.post("/drafts/{draft_id}/upload", response_model=schemas.DraftUploadResponse)
 def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     """
     Upload draft messages to selected users via Google Cloud API.
@@ -282,11 +282,16 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     campaign.status = 'uploaded'
     db.commit()
     
-    return {
-        "total_drafts": total_drafts_created,
-        "users_count": len(users),
-        "recipients_count": len(all_recipients)
-    }
+    return schemas.DraftUploadResponse(
+        success=True,
+        message=f"Successfully uploaded {total_drafts_created} drafts to {len(users)} users",
+        total_drafts=total_drafts_created,
+        users_count=len(users),
+        details={
+            "recipients_count": len(all_recipients),
+            "users": [user.email for user in users]
+        }
+    )
 
 def create_gmail_draft(user_id: int, subject: str, from_name: str, body_html: str, recipients: List[str], db: Session) -> str:
     """
