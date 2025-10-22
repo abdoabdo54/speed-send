@@ -39,7 +39,7 @@ export default function ContactsPage() {
   const loadLists = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/v1/contacts/`);
+      const response = await fetch(`${API_URL}/api/v1/contacts/lists`);
       if (!response.ok) {
         throw new Error('Failed to fetch contact lists');
       }
@@ -233,7 +233,7 @@ export default function ContactsPage() {
                     <div className="min-w-0">
                       <div className="font-medium truncate">{list.name}</div>
                       <div className="text-xs text-muted-foreground truncate">
-                        {list.contacts.length} contacts
+                        {list.contacts?.length || 0} contacts
                         {list.description && ` • ${list.description}`}
                       </div>
                     </div>
