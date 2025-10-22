@@ -213,7 +213,7 @@ def upload_drafts_to_users(draft_id: int, db: Session = Depends(get_db)):
     """
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"🚀 UPLOAD FUNCTION CALLED: Starting upload for draft {draft_id}")
+    logger.info(f"UPLOAD FUNCTION CALLED: Starting upload for draft {draft_id}")
     
     campaign = db.query(models.DraftCampaign).options(
         joinedload(models.DraftCampaign.selected_users).joinedload(models.DraftCampaignUser.user),
@@ -295,7 +295,7 @@ def create_gmail_draft(user_id: int, subject: str, from_name: str, body_html: st
     import logging
     logger = logging.getLogger(__name__)
     
-    logger.info(f"🚀 REAL GMAIL API: Starting draft creation for user {user_id}")
+    logger.info(f"REAL GMAIL API: Starting draft creation for user {user_id}")
     
     try:
         # Get user and their service account
@@ -303,26 +303,26 @@ def create_gmail_draft(user_id: int, subject: str, from_name: str, body_html: st
         if not user:
             raise Exception(f"User with ID {user_id} not found")
         
-        logger.info(f"🔍 Found user: {user.email}")
+        logger.info(f"Found user: {user.email}")
         
         service_account = user.service_account
         if not service_account:
             raise Exception(f"No service account found for user {user.email}")
         
-        logger.info(f"🔑 Found service account: {service_account.client_email}")
+        logger.info(f"Found service account: {service_account.client_email}")
         
         # Decrypt service account credentials
         from app.encryption import EncryptionService
         encryption_service = EncryptionService()
         service_account_json = encryption_service.decrypt(service_account.encrypted_json)
         
-        logger.info("🔓 Service account credentials decrypted successfully")
+        logger.info("Service account credentials decrypted successfully")
         
         # Initialize Google Workspace Service
         from app.google_api import GoogleWorkspaceService
         google_service = GoogleWorkspaceService(service_account_json)
         
-        logger.info("🌐 Google Workspace Service initialized")
+        logger.info("Google Workspace Service initialized")
         
         # Get delegated credentials for the user
         from app.config import settings
@@ -331,13 +331,13 @@ def create_gmail_draft(user_id: int, subject: str, from_name: str, body_html: st
             settings.GMAIL_SCOPES
         )
         
-        logger.info(f"🔐 Delegated credentials created for {user.email}")
+        logger.info(f"Delegated credentials created for {user.email}")
         
         # Build Gmail service
         from googleapiclient.discovery import build
         gmail_service = build('gmail', 'v1', credentials=credentials)
         
-        logger.info("📧 Gmail service built successfully")
+        logger.info("Gmail service built successfully")
         
         # Create the email message
         from email.mime.text import MIMEText
@@ -364,9 +364,9 @@ def create_gmail_draft(user_id: int, subject: str, from_name: str, body_html: st
             }
         }
         
-        logger.info(f"📝 Creating Gmail draft for user {user.email} with {len(recipients)} recipients")
-        logger.info(f"📧 Recipients: {recipients}")
-        logger.info(f"📋 Subject: {subject}")
+        logger.info(f"Creating Gmail draft for user {user.email} with {len(recipients)} recipients")
+        logger.info(f"Recipients: {recipients}")
+        logger.info(f"Subject: {subject}")
         
         result = gmail_service.users().drafts().create(
             userId='me',
@@ -374,15 +374,15 @@ def create_gmail_draft(user_id: int, subject: str, from_name: str, body_html: st
         ).execute()
         
         draft_id = result['id']
-        logger.info(f"✅ Gmail draft created successfully: {draft_id}")
-        logger.info(f"🎯 REAL GMAIL API: Draft creation completed for user {user.email}")
+        logger.info(f"Gmail draft created successfully: {draft_id}")
+        logger.info(f"REAL GMAIL API: Draft creation completed for user {user.email}")
         return draft_id
         
     except Exception as e:
-        logger.error(f"❌ REAL GMAIL API ERROR: Failed to create Gmail draft: {str(e)}")
-        logger.error(f"❌ Error type: {type(e).__name__}")
+        logger.error(f"REAL GMAIL API ERROR: Failed to create Gmail draft: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
         import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to create Gmail draft: {str(e)}")
 
 @router.post("/drafts/{draft_id}/launch")
