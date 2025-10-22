@@ -150,6 +150,12 @@ class GoogleWorkspaceService:
             logger.info(f"📋 Using scopes: {settings.ADMIN_SCOPES}")
             logger.info(f"🔑 Service account: {self.service_account_info.get('client_email')}")
             
+            # Check if service account has required fields
+            required_fields = ['client_email', 'private_key', 'token_uri']
+            missing_fields = [field for field in required_fields if not self.service_account_info.get(field)]
+            if missing_fields:
+                raise Exception(f"Service account JSON missing required fields: {missing_fields}")
+            
             credentials = self.get_delegated_credentials(admin_email, settings.ADMIN_SCOPES)
             
             logger.info("✅ Credentials created successfully")
@@ -158,22 +164,37 @@ class GoogleWorkspaceService:
             
             logger.info("🌐 Admin Directory service built, requesting users...")
             
+            # First, try to get domain info to verify access
+            try:
+                domain_info = service.domains().list(customer='my_customer').execute()
+                logger.info(f"🌐 Domain info: {domain_info}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not fetch domain info: {e}")
+            
             users = []
             page_token = None
             
             while True:
-                results = service.users().list(
-                    customer='my_customer',
-                    maxResults=500,
-                    orderBy='email',
-                    pageToken=page_token
-                ).execute()
-                
-                users.extend(results.get('users', []))
-                page_token = results.get('nextPageToken')
-                
-                if not page_token:
-                    break
+                try:
+                    results = service.users().list(
+                        customer='my_customer',
+                        maxResults=500,
+                        orderBy='email',
+                        pageToken=page_token
+                    ).execute()
+                    
+                    logger.info(f"📊 API Response: {results}")
+                    users.extend(results.get('users', []))
+                    page_token = results.get('nextPageToken')
+                    
+                    if not page_token:
+                        break
+                        
+                except HttpError as e:
+                    logger.error(f"❌ Google API Error: {e}")
+                    logger.error(f"Status: {e.resp.status if hasattr(e, 'resp') else 'N/A'}")
+                    logger.error(f"Content: {e.content if hasattr(e, 'content') else 'N/A'}")
+                    raise Exception(f"Google API Error: {e}")
             
             logger.info(f"✅ Successfully fetched {len(users)} users from Google Workspace")
             

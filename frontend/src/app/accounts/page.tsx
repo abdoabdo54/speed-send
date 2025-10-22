@@ -91,6 +91,9 @@ export default function AccountsPage() {
       
       const accountId = response.data.id;
       
+      // Refresh the accounts list to show the newly created account
+      await loadAccounts();
+      
       // Use the same admin email for sync
       if (adminEmail && adminEmail.includes('@')) {
         try {
@@ -102,6 +105,9 @@ export default function AccountsPage() {
             `Admin email used: ${adminEmail}${useAccountName ? ' (auto-detected from account name)' : ' (manually entered)'}\n\n` +
             'Please refresh the Campaigns page to see the updated user list.'
           );
+          
+          // Refresh the accounts list to show the newly created account
+          await loadAccounts();
         } catch (syncError: any) {
           console.error('Sync error:', syncError);
           const errorMsg = syncError.response?.data?.detail || syncError.message || 'Unknown error';
@@ -127,6 +133,9 @@ export default function AccountsPage() {
                   `Admin email used: ${manualAdminEmail} (manually entered)\n\n` +
                   'Please refresh the Campaigns page to see the updated user list.'
                 );
+                
+                // Refresh the accounts list to show the newly created account
+                await loadAccounts();
                 return;
               } catch (manualSyncError: any) {
                 console.error('Manual sync also failed:', manualSyncError);
