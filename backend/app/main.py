@@ -31,6 +31,12 @@ async def lifespan(app: FastAPI):
         # Database tables created successfully
         logger.info("Database tables created successfully")
         
+        # Check if database has any data
+        from app.models import Campaign, ServiceAccount
+        campaign_count = db.query(Campaign).count()
+        account_count = db.query(ServiceAccount).count()
+        logger.info(f"Database status: {campaign_count} campaigns, {account_count} service accounts")
+        
     except Exception as e:
         if "already exists" in str(e) or "duplicate key" in str(e):
             logger.warning("Some database objects already exist, continuing...")
