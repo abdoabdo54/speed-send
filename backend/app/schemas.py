@@ -1,167 +1,149 @@
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Literal
-from datetime import datetime
+from pydantic import BaseModel, EmailStr
+from typing import List, Optional, Dict, Any
+from datetime import datetime, date
 from enum import Enum
 
-class EmailStatus(str, Enum):
-    PENDING = 'pending'
-    SENT = 'sent'
-    FAILED = 'failed'
-    OPENED = 'opened'
-    CLICKED = 'clicked'
+# Enums
+class AccountStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    SUSPENDED = "suspended"
 
-class DraftStatus(str, Enum):
-    CREATED = "created"
-    SENT = "sent"
-    DELETED = "deleted"
+class CampaignStatus(str, Enum):
+    DRAFT = "draft"
+    PREPARING = "preparing"
+    READY = "ready"
+    SENDING = "sending"
+    PAUSED = "paused"
+    COMPLETED = "completed"
     FAILED = "failed"
 
-class WorkspaceUserBase(BaseModel):
-    email: str
-    full_name: Optional[str] = None
-    is_active: bool = True
+class EmailStatus(str, Enum):
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+    BOUNCED = "bounced"
 
-class WorkspaceUserCreate(WorkspaceUserBase):
-    service_account_id: int
+class DraftStatus(str, Enum):
+    DRAFT = "draft"
+    UPLOADED = "uploaded"
+    LAUNCHED = "launched"
+    FAILED = "failed"
 
-class WorkspaceUserResponse(WorkspaceUserBase):
-    id: int
-    service_account_id: int
-
-    class Config:
-        from_attributes = True
-
+# Service Account Schemas
 class ServiceAccountBase(BaseModel):
     name: str
     client_email: str
     domain: Optional[str] = None
+    project_id: Optional[str] = None
+    admin_email: Optional[str] = None
 
 class ServiceAccountCreate(ServiceAccountBase):
-    json_content: Dict
+    json_content: Dict[str, Any]
+
+class ServiceAccountUpdate(BaseModel):
+    name: Optional[str] = None
+    domain: Optional[str] = None
     admin_email: Optional[str] = None
+    status: Optional[AccountStatus] = None
+    daily_limit: Optional[int] = None
+    quota_limit: Optional[int] = None
 
 class ServiceAccountResponse(ServiceAccountBase):
     id: int
     status: str
     total_users: int
-    quota_used_today: int
+    daily_limit: int
+    daily_sent: int
     quota_limit: int
+    quota_used_today: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
     last_synced: Optional[datetime] = None
-    workspace_users: List[WorkspaceUserResponse] = []
 
     class Config:
         from_attributes = True
 
-class Recipient(BaseModel):
+# Workspace User Schemas
+class WorkspaceUserBase(BaseModel):
     email: str
-    variables: Optional[Dict[str, str]] = {}
+    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_active: bool = True
 
-class CampaignBase(BaseModel):
-    name: str
-    subject: str
-    body_html: str
-    from_name: Optional[str] = None
+class WorkspaceUserCreate(WorkspaceUserBase):
+    service_account_id: int
+    quota_limit: int = 100
 
-class CampaignCreate(CampaignBase):
-    recipients: List[Recipient]
-    sender_account_ids: List[int]
-    status: Optional[str] = 'draft'
-    sender_rotation: Optional[str] = 'round_robin'
-    custom_headers: Optional[Dict[str, str]] = {}
-    attachments: Optional[List[str]] = []
-    rate_limit: Optional[int] = 2000
-    concurrency: Optional[int] = 6
-    test_after_email: Optional[str] = None
-    test_after_count: Optional[int] = 0
-    body_plain: Optional[str] = None
+class WorkspaceUserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    is_active: Optional[bool] = None
+    quota_limit: Optional[int] = None
 
-class CampaignUpdate(BaseModel):
-    name: Optional[str] = None
-    subject: Optional[str] = None
-    body_html: Optional[str] = None
-    from_name: Optional[str] = None
-    recipients: Optional[List[Recipient]] = None
-    sender_account_ids: Optional[List[int]] = None
-    status: Optional[str] = None
-    body_plain: Optional[str] = None
-
-class CampaignResponse(CampaignBase):
+class WorkspaceUserResponse(WorkspaceUserBase):
     id: int
-    status: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class CampaignControl(BaseModel):
-    action: Literal['pause', 'resume', 'cancel']
-
-class EmailLogResponse(BaseModel):
-    id: int
-    campaign_id: int
-    recipient_email: str
-    status: EmailStatus
-    created_at: datetime
-    error_message: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-class TestEmailSchema(BaseModel):
-    recipient_email: str
-    subject: str
-    body_html: str
-    from_name: str
-    sender_account_id: int
-
-class DashboardStats(BaseModel):
-    total_campaigns: int
-    active_campaigns: int
-    completed_campaigns: int
-    total_service_accounts: int
-    total_users: int
+    service_account_id: int
     emails_sent_today: int
-    emails_failed_today: int
+    quota_limit: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    last_used: Optional[datetime] = None
 
-# --- New Contact List Schemas ---
+    class Config:
+        from_attributes = True
 
+# Contact List Schemas
+class ContactListBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class ContactListCreate(ContactListBase):
+    pass
+
+class ContactListUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class ContactListResponse(ContactListBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    contacts: List['ContactResponse'] = []
+
+    class Config:
+        from_attributes = True
+
+# Contact Schemas
 class ContactBase(BaseModel):
     email: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
 
 class ContactCreate(ContactBase):
-    pass
+    contact_list_id: int
+
+class ContactUpdate(BaseModel):
+    email: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
 
 class ContactResponse(ContactBase):
     id: int
     contact_list_id: int
-
-    class Config:
-        from_attributes = True
-
-class ContactListBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-class ContactListCreate(ContactListBase):
-    contacts: List[ContactBase]
-
-class ContactListResponse(ContactListBase):
-    id: int
     created_at: datetime
-    updated_at: datetime
-    contacts: List[ContactResponse] = []
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
-# Data Lists Schemas
+# Data List Schemas
 class DataListBase(BaseModel):
     name: str
     description: Optional[str] = None
     recipients: List[str] = []
-    geo_filter: Optional[str] = None
     list_type: str = 'custom'
 
 class DataListCreate(DataListBase):
@@ -171,71 +153,196 @@ class DataListUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     recipients: Optional[List[str]] = None
-    geo_filter: Optional[str] = None
     list_type: Optional[str] = None
 
 class DataListResponse(DataListBase):
     id: int
     total_recipients: int
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
-# --- New Draft System Schemas ---
-
-class GmailDraftResponse(BaseModel):
-    id: int
-    gmail_draft_id: str
-    status: DraftStatus
-    recipients: List[str]
-    user_email: str # Derived from the user relationship
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class DraftCampaignCreate(BaseModel):
+# Campaign Schemas
+class CampaignBase(BaseModel):
     name: str
     subject: str
+    body_html: Optional[str] = None
+    body_plain: Optional[str] = None
     from_name: Optional[str] = None
-    body_html: str
-    selected_account_ids: List[int] = []
-    selected_user_ids: List[int] = []
-    selected_contact_list_ids: List[int] = []
+    from_email: Optional[str] = None
+    reply_to: Optional[str] = None
+    return_path: Optional[str] = None
+
+class CampaignCreate(CampaignBase):
+    sender_account_ids: List[int]
+    recipients: List[Dict[str, Any]]
+    sender_rotation: str = "round_robin"
+    use_ip_pool: bool = False
+    ip_pool: Optional[List[str]] = None
+    custom_headers: Optional[Dict[str, str]] = None
+    attachments: Optional[List[Dict[str, Any]]] = None
+    rate_limit: int = 500
+    concurrency: int = 5
+    is_test: bool = False
+    test_recipients: Optional[List[Dict[str, Any]]] = None
+    test_after_email: Optional[str] = None
+    test_after_count: int = 0
+
+class CampaignUpdate(BaseModel):
+    name: Optional[str] = None
+    subject: Optional[str] = None
+    body_html: Optional[str] = None
+    body_plain: Optional[str] = None
+    from_name: Optional[str] = None
+    from_email: Optional[str] = None
+    reply_to: Optional[str] = None
+    return_path: Optional[str] = None
+    sender_account_ids: Optional[List[int]] = None
+    recipients: Optional[List[Dict[str, Any]]] = None
+    sender_rotation: Optional[str] = None
+    use_ip_pool: Optional[bool] = None
+    ip_pool: Optional[List[str]] = None
+    custom_headers: Optional[Dict[str, str]] = None
+    attachments: Optional[List[Dict[str, Any]]] = None
+    rate_limit: Optional[int] = None
+    concurrency: Optional[int] = None
+    is_test: Optional[bool] = None
+    test_recipients: Optional[List[Dict[str, Any]]] = None
+    test_after_email: Optional[str] = None
+    test_after_count: Optional[int] = None
+
+class CampaignResponse(CampaignBase):
+    id: int
+    status: str
+    total_recipients: int
+    sent_count: int
+    failed_count: int
+    pending_count: int
+    rate_limit: int
+    concurrency: int
+    is_test: bool
+    test_after_email: Optional[str] = None
+    test_after_count: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    prepared_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    paused_at: Optional[datetime] = None
+    sender_accounts: List[ServiceAccountResponse] = []
+
+    class Config:
+        from_attributes = True
+
+# Draft Campaign Schemas
+class DraftCampaignBase(BaseModel):
+    name: str
+    from_name: Optional[str] = None
+    subject: str
+    body_html: Optional[str] = None
     emails_per_user: int = 1
+
+class DraftCampaignCreate(DraftCampaignBase):
+    selected_account_ids: List[int]
+    selected_user_ids: List[int]
+    selected_contact_list_ids: List[int]
 
 class DraftCampaignUpdate(BaseModel):
     name: Optional[str] = None
+    from_name: Optional[str] = None
     subject: Optional[str] = None
-    from_name: Optional[str] = None
     body_html: Optional[str] = None
+    emails_per_user: Optional[int] = None
+    selected_account_ids: Optional[List[int]] = None
+    selected_user_ids: Optional[List[int]] = None
+    selected_contact_list_ids: Optional[List[int]] = None
 
-class DraftUploadRequest(BaseModel):
-    user_ids: List[int]
-    contact_list_ids: List[int]
-    emails_per_user: int
-
-class DraftCampaignResponse(BaseModel):
+class DraftCampaignResponse(DraftCampaignBase):
     id: int
-    name: str
-    subject: str
-    from_name: Optional[str] = None
-    created_at: datetime
-    total_drafts: int
-    drafts_by_user: Dict[str, int]
     status: str
-    recipients_count: int
-    users_count: int
-    emails_per_user: int
+    created_at: datetime
+    selected_accounts: List[ServiceAccountResponse] = []
+    selected_users: List[WorkspaceUserResponse] = []
+    selected_contacts: List[ContactListResponse] = []
 
     class Config:
         from_attributes = True
 
-class DraftLaunchResponse(BaseModel):
-    total_launched: int
-    total_failed: int
-    details: List[Dict[str, str]]
+# Email Log Schemas
+class EmailLogBase(BaseModel):
+    sender_email: str
+    recipient_email: str
+    subject: Optional[str] = None
+    status: EmailStatus = EmailStatus.PENDING
+    error_message: Optional[str] = None
 
-# --- End New Draft System Schemas ---
+class EmailLogCreate(EmailLogBase):
+    campaign_id: int
+    service_account_id: int
+
+class EmailLogResponse(EmailLogBase):
+    id: int
+    campaign_id: int
+    service_account_id: int
+    created_at: datetime
+    sent_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Gmail Draft Schemas
+class GmailDraftBase(BaseModel):
+    gmail_draft_id: Optional[str] = None
+    gmail_message_id: Optional[str] = None
+    status: str = 'created'
+    recipients: Optional[List[str]] = None
+
+class GmailDraftCreate(GmailDraftBase):
+    draft_campaign_id: int
+    user_id: int
+
+class GmailDraftResponse(GmailDraftBase):
+    id: int
+    draft_campaign_id: int
+    user_id: int
+    created_at: datetime
+    sent_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Test Email Schemas
+class TestEmailRequest(BaseModel):
+    sender_account_id: int
+    sender_user_id: Optional[int] = None
+    recipient_email: str
+    subject: str
+    body_html: Optional[str] = None
+    body_plain: Optional[str] = None
+
+class TestEmailResponse(BaseModel):
+    success: bool
+    message: str
+    details: Optional[Dict[str, Any]] = None
+
+# Dashboard Schemas
+class DashboardStats(BaseModel):
+    total_campaigns: int
+    active_campaigns: int
+    total_emails_sent: int
+    emails_sent_today: int
+    emails_failed_today: int
+    success_rate: float
+    quota_usage: Dict[str, Any]
+
+# Campaign Control Schemas
+class CampaignControl(BaseModel):
+    action: str  # pause, resume, cancel
+
+# Update forward references
+ContactListResponse.model_rebuild()
+ContactResponse.model_rebuild()
+ServiceAccountResponse.model_rebuild()
+WorkspaceUserResponse.model_rebuild()
