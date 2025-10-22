@@ -22,19 +22,37 @@ export default function AccountsPage() {
   }, []);
 
   const checkBackend = async () => {
+    console.log('🔍 检查后端服务状态...', API_URL);
     const isHealthy = await healthCheck();
     setBackendStatus(isHealthy);
     if (!isHealthy) {
-      console.error('⚠️ Backend is not accessible at:', API_URL);
+      console.error('⚠️ 后端服务不可访问:', API_URL);
+      alert(`无法连接到后端服务: ${API_URL}\n\n请确保后端服务正在运行，并且网络连接正常。`);
+    } else {
+      console.log('✅ 后端服务连接正常');
     }
   };
 
   const loadAccounts = async () => {
     try {
+      console.log('🔄 Loading accounts from API...');
       const response = await serviceAccountsApi.list();
+      console.log('✅ API Response:', response);
       setAccounts(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error('Failed to load accounts:', error);
+      console.log(`✅ Loaded ${response.data?.length || 0} accounts`);
+    } catch (error: any) {
+      console.error('❌ Failed to load accounts:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+      
+      // 显示更友好的错误消息
+      const errorMsg = error.response?.data?.detail || error.message || 'Unknown error occurred';
+      alert(`无法加载服务账户: ${errorMsg}\n\n请检查后端服务是否正常运行。`);
+      
       setAccounts([]);
     } finally {
       setLoading(false);
@@ -145,9 +163,16 @@ export default function AccountsPage() {
       setUploadData({ name: '', json: '' });
       loadAccounts();
     } catch (error: any) {
-      console.error('Upload error:', error);
-      const errorMessage = error.message || error.response?.data?.detail || 'Failed to upload';
-      alert('Failed to upload: ' + errorMessage);
+      console.error('❌ Upload error:', error);
+      console.error('Upload error details:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+      
+      const errorMessage = error.response?.data?.detail || error.message || '上传失败';
+      alert(`服务账户上传失败: ${errorMessage}\n\n请检查JSON文件格式和网络连接。`);
     }
   };
 
@@ -166,15 +191,27 @@ export default function AccountsPage() {
   const handleSync = async (accountId: number) => {
     const account = accounts.find(acc => acc.id === accountId);
     if (!account) {
-      alert('Account not found.');
+      alert('找不到此服务账户。');
       return;
     }
 
     try {
+      console.log(`🔄 开始同步账户 ${accountId} 的用户数据...`);
       await serviceAccountsApi.sync(accountId, account.admin_email);
+      console.log('✅ 同步成功，重新加载账户列表...');
       loadAccounts();
+      alert('用户数据同步成功！');
     } catch (error: any) {
-      alert('Failed to sync: ' + (error.response?.data?.detail || error.message));
+      console.error('❌ 同步失败:', error);
+      console.error('同步错误详情:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+      
+      const errorMsg = error.response?.data?.detail || error.message || '同步失败';
+      alert(`用户数据同步失败: ${errorMsg}\n\n请检查管理员邮箱权限和域范围委托设置。`);
     }
   };
 

@@ -15,6 +15,7 @@ function getApiUrl(): string {
   const protocol = window.location.protocol;
   
   // If accessing via IP or domain, use that IP/domain with port 8000
+  // 生产环境可能需要使用固定地址，例如您的Ubuntu服务器地址
   const apiUrl = `${protocol}//${hostname}:8000`;
   
   console.log('🌐 API URL Detection:', {
