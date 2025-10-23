@@ -202,12 +202,16 @@ const DraftsPage: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-500">Recipients:</span>
-                      <span className="ml-1 font-medium">{campaign.recipients_count}</span>
+                      <span className="ml-1 font-medium">{campaign.recipients_count || 0}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Users:</span>
-                      <span className="ml-1 font-medium">{campaign.users_count}</span>
+                      <span className="ml-1 font-medium">{campaign.users_count || 0}</span>
                     </div>
+                  </div>
+                  {/* Debug info */}
+                  <div className="text-xs text-gray-400">
+                    Debug: recipients_count={campaign.recipients_count}, users_count={campaign.users_count}
                   </div>
 
                   {campaign.drafts_by_user && Object.keys(campaign.drafts_by_user).length > 0 && (

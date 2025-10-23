@@ -104,6 +104,13 @@ def get_draft_campaigns(db: Session = Depends(get_db)):
                 logger.info(f"Contact list {contact_assoc.contact_list.name} has {len(contacts_in_list)} contacts")
         
         logger.info(f"Campaign {campaign.name}: {recipients_count} recipients, {len(campaign.selected_users)} users")
+        logger.info(f"Selected contacts: {len(campaign.selected_contacts)}")
+        logger.info(f"Selected users: {len(campaign.selected_users)}")
+        for contact_assoc in campaign.selected_contacts:
+            if contact_assoc.contact_list:
+                logger.info(f"Contact list: {contact_assoc.contact_list.name}, contacts: {len(contact_assoc.contact_list.contacts or [])}")
+            else:
+                logger.info(f"Contact association has no contact_list")
         
         response.append(schemas.DraftCampaignResponse(
             id=campaign.id,
