@@ -27,9 +27,9 @@ celery_app.conf.update(
     task_compression='gzip',  # Use compression for large messages
     # Optimized concurrency settings
     worker_prefetch_multiplier=100,  # Reasonable prefetch
-    worker_concurrency=50,  # 50 concurrent workers (reasonable default)
+    worker_concurrency=100,  # 100 concurrent workers for maximum speed
     worker_pool='threads',  # Use threads for I/O bound tasks
-    worker_disable_rate_limits=False,  # Enable rate limiting
+    worker_disable_rate_limits=True,  # DISABLE rate limiting for maximum speed
     task_ignore_result=False,  # Keep results for monitoring
     task_store_eager_result=False,  # Don't store immediately
     worker_max_tasks_per_child=1000,  # Restart worker after 1000 tasks

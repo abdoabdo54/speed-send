@@ -451,8 +451,8 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
     tasks = batch_data['tasks']
     sender_email = sender['user_email']
     
-    # Configurable micro-delay (in seconds)
-    MICRO_DELAY = 0.005  # 5ms between sends per user
+    # NO DELAY - Send emails instantly
+    MICRO_DELAY = 0.0  # ZERO delay - send ALL emails instantly
     
     try:
         logger.info(f"[{request_id}] 👤 Sender {sender_email}: Executing {len(tasks)} tasks")
@@ -579,24 +579,24 @@ def send_prerendered_email(
     google_service: GoogleWorkspaceService,
     sender_email: str,
     task: Dict,
-    micro_delay: float = 0.005
+    micro_delay: float = 0.0
 ) -> tuple:
     """
     Send a pre-rendered email (no variable substitution needed)
+    NO DELAYS - Send instantly
     
     Args:
         google_service: Initialized Google API service
         sender_email: Sender email
         task: Pre-rendered task dict
-        micro_delay: Optional delay between sends (seconds)
+        micro_delay: NO DELAY - always 0.0 for instant sending
     
     Returns:
         (success: bool, message_id: str, error: str)
     """
     try:
-        # Apply micro-delay if configured
-        if micro_delay > 0:
-            time.sleep(micro_delay)
+        # NO DELAY - Send emails instantly
+        # Removed time.sleep() completely for maximum speed
         
         # Send (everything is already prepared)
         message_id = google_service.send_email(
