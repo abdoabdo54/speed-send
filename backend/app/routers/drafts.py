@@ -34,7 +34,7 @@ def create_draft_campaign(draft_data: schemas.DraftCampaignCreate, db: Session =
     for account_id in draft_data.selected_account_ids:
         draft_account = models.DraftCampaignAccount(
             draft_campaign_id=new_draft_campaign.id,
-            account_id=account_id
+            service_account_id=account_id
         )
         db.add(draft_account)
     
@@ -77,7 +77,7 @@ def get_draft_campaigns(db: Session = Depends(get_db)):
     Get all draft campaigns with their associations.
     """
     draft_campaigns = db.query(models.DraftCampaign).options(
-        joinedload(models.DraftCampaign.selected_accounts).joinedload(models.DraftCampaignAccount.account),
+        joinedload(models.DraftCampaign.selected_accounts).joinedload(models.DraftCampaignAccount.service_account),
         joinedload(models.DraftCampaign.selected_users).joinedload(models.DraftCampaignUser.user),
         joinedload(models.DraftCampaign.selected_contacts).joinedload(models.DraftCampaignContact.contact_list),
         joinedload(models.DraftCampaign.gmail_drafts).joinedload(models.GmailDraft.user)
