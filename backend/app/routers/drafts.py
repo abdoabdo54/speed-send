@@ -8,6 +8,9 @@ from datetime import datetime
 import asyncio
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import logging
+
+logger = logging.getLogger(__name__)
 from googleapiclient.errors import HttpError
 import json
 
@@ -79,7 +82,7 @@ def get_draft_campaigns(db: Session = Depends(get_db)):
     draft_campaigns = db.query(models.DraftCampaign).options(
         joinedload(models.DraftCampaign.selected_accounts).joinedload(models.DraftCampaignAccount.service_account),
         joinedload(models.DraftCampaign.selected_users).joinedload(models.DraftCampaignUser.user),
-        joinedload(models.DraftCampaign.selected_contacts).joinedload(models.DraftCampaignContact.contact_list),
+        joinedload(models.DraftCampaign.selected_contacts).joinedload(models.DraftCampaignContact.contact_list).joinedload(models.ContactList.contacts),
         joinedload(models.DraftCampaign.gmail_drafts).joinedload(models.GmailDraft.user)
     ).all()
     
@@ -96,7 +99,11 @@ def get_draft_campaigns(db: Session = Depends(get_db)):
         recipients_count = 0
         for contact_assoc in campaign.selected_contacts:
             if contact_assoc.contact_list:
-                recipients_count += len(contact_assoc.contact_list.contacts)
+                contacts_in_list = contact_assoc.contact_list.contacts or []
+                recipients_count += len(contacts_in_list)
+                logger.info(f"Contact list {contact_assoc.contact_list.name} has {len(contacts_in_list)} contacts")
+        
+        logger.info(f"Campaign {campaign.name}: {recipients_count} recipients, {len(campaign.selected_users)} users")
         
         response.append(schemas.DraftCampaignResponse(
             id=campaign.id,
