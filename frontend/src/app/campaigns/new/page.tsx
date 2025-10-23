@@ -489,9 +489,22 @@ export default function NewCampaignPage() {
 
   const loadRecipientLists = async () => {
     try {
-      const response = await dataListsApi.list();
-      setRecipientLists(response.data);
-    } catch (error) {
+      // Use the correct contacts/lists endpoint instead of data-lists
+      const response = await axios.get(`${API_URL}/api/v1/contacts/lists`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.data && Array.isArray(response.data)) {
+        setRecipientLists(response.data);
+        console.log('Contact lists loaded successfully:', response.data.length, 'lists');
+      } else {
+        console.warn('Invalid response format:', response.data);
+        setRecipientLists([]);
+      }
+    } catch (error: any) {
       console.error('Failed to load recipient lists:', error);
       showNotification('Failed to load recipient lists.', 'error');
       setRecipientLists([]);
