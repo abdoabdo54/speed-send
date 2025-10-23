@@ -21,6 +21,10 @@ def create_draft_campaign(draft_data: schemas.DraftCampaignCreate, db: Session =
     """
     Creates a new Draft Campaign with selected accounts, users, and contacts.
     """
+    logger.info(f"Creating draft campaign: {draft_data.name}")
+    logger.info(f"Selected accounts: {draft_data.selected_account_ids}")
+    logger.info(f"Selected users: {draft_data.selected_user_ids}")
+    logger.info(f"Selected contact lists: {draft_data.selected_contact_list_ids}")
     # Create the draft campaign
     new_draft_campaign = models.DraftCampaign(
         name=draft_data.name,
@@ -59,6 +63,12 @@ def create_draft_campaign(draft_data: schemas.DraftCampaignCreate, db: Session =
 
     db.commit()
     db.refresh(new_draft_campaign)
+    
+    # Debug: Check what was actually saved
+    logger.info(f"Created draft campaign ID: {new_draft_campaign.id}")
+    logger.info(f"Saved {len(draft_data.selected_account_ids)} accounts")
+    logger.info(f"Saved {len(draft_data.selected_user_ids)} users") 
+    logger.info(f"Saved {len(draft_data.selected_contact_list_ids)} contact lists")
 
     return schemas.DraftCampaignResponse(
         id=new_draft_campaign.id,
@@ -82,9 +92,20 @@ def get_draft_campaigns(db: Session = Depends(get_db)):
     draft_campaigns = db.query(models.DraftCampaign).options(
         joinedload(models.DraftCampaign.selected_accounts).joinedload(models.DraftCampaignAccount.service_account),
         joinedload(models.DraftCampaign.selected_users).joinedload(models.DraftCampaignUser.user),
-        joinedload(models.DraftCampaign.selected_contacts).joinedload(models.DraftCampaignContact.contact_list).joinedload(models.ContactList.contacts),
+        joinedload(models.DraftCampaign.selected_contacts).joinedload(models.DraftCampaignContact.contact_list),
         joinedload(models.DraftCampaign.gmail_drafts).joinedload(models.GmailDraft.user)
     ).all()
+    
+    # Load contacts separately to avoid complex joins
+    for campaign in draft_campaigns:
+        for contact_assoc in campaign.selected_contacts:
+            if contact_assoc.contact_list:
+                # Load contacts for this contact list
+                contact_list = db.query(models.ContactList).options(
+                    joinedload(models.ContactList.contacts)
+                ).filter(models.ContactList.id == contact_assoc.contact_list.id).first()
+                if contact_list:
+                    contact_assoc.contact_list.contacts = contact_list.contacts
     
     response = []
     for campaign in draft_campaigns:
