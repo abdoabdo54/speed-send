@@ -155,45 +155,35 @@ export default function NewDraftPage() {
   const loadContactLists = async () => {
     try {
       console.log(' Loading contact lists...');
-      // Try data-lists endpoint first (like campaigns/new)
-      try {
-        const response = await axios.get(`${API_URL}/api/v1/data-lists/`, {
-          timeout: 10000,
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (response.data && Array.isArray(response.data)) {
-          // Convert data-lists format to contact lists format
-          const contactLists = response.data.map((list: any) => ({
-            id: list.id,
-            name: list.name,
-            contacts: list.recipients?.map((email: string) => ({ email })) || []
-          }));
-          setContactLists(contactLists);
-          console.log(' Contact lists loaded successfully from data-lists:', contactLists.length, 'lists');
-          return;
-        }
-      } catch (dataListsError) {
-        console.log(' data-lists endpoint not available, trying contacts endpoint...');
-      }
-
-      // Fallback to contacts endpoint
-      const response = await axios.get(`${API_URL}/api/v1/contacts/`, {
+      // Use the correct contacts/lists endpoint
+      const response = await axios.get(`${API_URL}/api/v1/contacts/lists`, {
         timeout: 10000,
         headers: {
           'Content-Type': 'application/json',
         }
       });
+
       if (response.data && Array.isArray(response.data)) {
         setContactLists(response.data);
         console.log(' Contact lists loaded successfully:', response.data.length, 'lists');
+      } else {
+        console.warn(' Invalid response format:', response.data);
+        setContactLists([]);
       }
-    } catch (error) {
-      console.error('Failed to load contact lists:', error);
-      showNotification('Failed to load contact lists.', 'error');
+    } catch (error: any) {
+      console.error(' Failed to load contact lists:', error);
       setContactLists([]);
+      let errorMessage = 'Failed to load contact lists';
+      if (error.response?.status === 404) {
+        errorMessage = 'Backend API not found. Please check if the server is running.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Backend server error. Please check server logs.';
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = 'Cannot connect to backend server. Please check if the server is running on port 8000.';
+      } else if (error.message) {
+        errorMessage = `Failed to load contact lists: ${error.message}`;
+      }
+      showNotification(errorMessage, 'error');
     }
   };
 
