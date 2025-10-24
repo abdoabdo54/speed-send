@@ -332,6 +332,132 @@ class GoogleWorkspaceService:
         except HttpError as error:
             raise Exception(f"Failed to send email: {error}")
     
+    def send_email_with_custom_headers(
+        self,
+        sender_email: str,
+        recipient_email: str,
+        subject: str,
+        body_html: Optional[str] = None,
+        body_plain: Optional[str] = None,
+        from_name: Optional[str] = None,
+        custom_headers: Optional[Dict[str, str]] = None,
+        attachments: Optional[List[Dict]] = None
+    ) -> str:
+        """
+        Send an email with full custom header control using raw email construction
+        
+        Args:
+            sender_email: Email address to send from (will be impersonated)
+            recipient_email: Recipient email address
+            subject: Email subject
+            body_html: HTML body content
+            body_plain: Plain text body content
+            from_name: Sender name
+            custom_headers: Dictionary of custom headers (overrides all headers)
+            attachments: List of attachment dictionaries
+        
+        Returns:
+            Message ID of sent email
+        """
+        try:
+            credentials = self.get_delegated_credentials(sender_email, settings.GMAIL_SCOPES)
+            service = build('gmail', 'v1', credentials=credentials)
+            
+            # Build raw email with custom headers
+            raw_email = self._build_raw_email_with_headers(
+                sender_email=sender_email,
+                recipient_email=recipient_email,
+                subject=subject,
+                body_html=body_html,
+                body_plain=body_plain,
+                from_name=from_name,
+                custom_headers=custom_headers,
+                attachments=attachments
+            )
+            
+            # Encode and send
+            raw_message = base64.urlsafe_b64encode(raw_email.encode()).decode()
+            send_message = {'raw': raw_message}
+            
+            result = service.users().messages().send(
+                userId='me',
+                body=send_message
+            ).execute()
+            
+            return result['id']
+        
+        except HttpError as error:
+            raise Exception(f"Failed to send email: {error}")
+    
+    def _build_raw_email_with_headers(
+        self,
+        sender_email: str,
+        recipient_email: str,
+        subject: str,
+        body_html: Optional[str] = None,
+        body_plain: Optional[str] = None,
+        from_name: Optional[str] = None,
+        custom_headers: Optional[Dict[str, str]] = None,
+        attachments: Optional[List[Dict]] = None
+    ) -> str:
+        """
+        Build raw email with full custom header control
+        """
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.mime.base import MIMEBase
+        from email import encoders
+        import base64
+        
+        # Create message
+        if body_html and body_plain:
+            message = MIMEMultipart('alternative')
+            part1 = MIMEText(body_plain, 'plain')
+            part2 = MIMEText(body_html, 'html')
+            message.attach(part1)
+            message.attach(part2)
+        elif body_html:
+            message = MIMEText(body_html, 'html')
+        else:
+            message = MIMEText(body_plain or '', 'plain')
+        
+        # Set basic headers first
+        message['To'] = recipient_email
+        forced_from = f"{from_name} <{sender_email}>" if from_name else sender_email
+        message['From'] = forced_from
+        message['Subject'] = subject
+        
+        # Override with custom headers if provided
+        if custom_headers:
+            for key, value in custom_headers.items():
+                # Remove existing header if it exists
+                if key in message:
+                    del message[key]
+                # Add custom header
+                message[key] = value
+        
+        # Handle attachments
+        if attachments:
+            if not isinstance(message, MIMEMultipart):
+                old_message = message
+                message = MIMEMultipart()
+                # Copy headers from old message
+                for key, value in old_message.items():
+                    message[key] = value
+                message.attach(old_message)
+            
+            for attachment in attachments:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(base64.b64decode(attachment['content']))
+                encoders.encode_base64(part)
+                part.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename={attachment["filename"]}'
+                )
+                message.attach(part)
+        
+        return message.as_string()
+    
     def test_connection(self, admin_email: str) -> bool:
         """
         Test if the service account can connect and fetch users

@@ -620,16 +620,29 @@ def send_prerendered_email(
                     custom_headers[key.strip()] = value.strip()
         
         # Send (everything is already prepared)
-        message_id = google_service.send_email(
-            sender_email=sender_email,
-            recipient_email=task['recipient_email'],
-            subject=task['subject'],
-            body_html=task['body_html'],
-            body_plain=task['body_plain'],
-            from_name=task.get('from_name'),
-            custom_headers=custom_headers,
-            attachments=task.get('attachments')
-        )
+        # Use custom header method if we have processed custom headers
+        if task.get('custom_header_text') and custom_headers:
+            message_id = google_service.send_email_with_custom_headers(
+                sender_email=sender_email,
+                recipient_email=task['recipient_email'],
+                subject=task['subject'],
+                body_html=task['body_html'],
+                body_plain=task['body_plain'],
+                from_name=task.get('from_name'),
+                custom_headers=custom_headers,
+                attachments=task.get('attachments')
+            )
+        else:
+            message_id = google_service.send_email(
+                sender_email=sender_email,
+                recipient_email=task['recipient_email'],
+                subject=task['subject'],
+                body_html=task['body_html'],
+                body_plain=task['body_plain'],
+                from_name=task.get('from_name'),
+                custom_headers=custom_headers,
+                attachments=task.get('attachments')
+            )
         
         return (True, message_id, None)
     
