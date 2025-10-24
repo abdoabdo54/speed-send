@@ -70,7 +70,8 @@ async def create_campaign(
             recipients=[r.dict() for r in campaign.recipients],
             total_recipients=len(campaign.recipients),
             pending_count=len(campaign.recipients),
-            status=CampaignStatus.DRAFT
+            status=CampaignStatus.DRAFT,
+            header_type=campaign.header_type
         )
         db.add(new_campaign)
         db.flush()

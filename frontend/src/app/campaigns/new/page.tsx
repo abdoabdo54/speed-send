@@ -75,6 +75,7 @@ export default function NewCampaignPage() {
     delay_ms: 0,
     test_after_email: '',
     test_after_count: 0,
+    header_type: 'existing', // 'existing' or '100_percent'
   });
   const [testEmail, setTestEmail] = useState('');
   const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
@@ -899,7 +900,8 @@ export default function NewCampaignPage() {
         rate_limit: config.daily_limit,
         concurrency: config.workers,
         test_after_email: config.test_after_email,
-        test_after_count: config.test_after_count
+        test_after_count: config.test_after_count,
+        header_type: config.header_type
       };
       if (editingId) {
         const url = `${API_URL}/api/v1/campaigns/${editingId}/`;
@@ -1353,6 +1355,26 @@ export default function NewCampaignPage() {
                     onChange={(e) => setConfig(prev => ({ ...prev, delay_ms: parseInt(e.target.value) || 0 }))}
                   />
                 </div>
+              </div>
+
+              {/* Header Type Selection */}
+              <div>
+                <Label htmlFor="header-type">Header Type</Label>
+                <select 
+                  id="header-type"
+                  className="w-full p-2 border rounded-md"
+                  value={config.header_type}
+                  onChange={(e) => setConfig(prev => ({ ...prev, header_type: e.target.value }))}
+                >
+                  <option value="existing">Existing Header</option>
+                  <option value="100_percent">100% Header</option>
+                </select>
+                <p className="text-sm text-gray-500 mt-1">
+                  {config.header_type === 'existing' 
+                    ? 'Uses the standard email header format'
+                    : 'Uses the new 100% optimized header format'
+                  }
+                </p>
               </div>
 
               {/* Google Workspace Specific Options */}

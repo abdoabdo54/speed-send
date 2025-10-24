@@ -189,6 +189,7 @@ class CampaignCreate(CampaignBase):
     test_recipients: Optional[List[Dict[str, Any]]] = None
     test_after_email: Optional[str] = None
     test_after_count: int = 0
+    header_type: str = "existing"  # "existing" or "100_percent"
 
 class CampaignUpdate(BaseModel):
     name: Optional[str] = None

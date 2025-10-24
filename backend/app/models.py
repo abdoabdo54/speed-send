@@ -172,6 +172,7 @@ class Campaign(Base):
     ip_pool = Column(JSON)
     custom_headers = Column(JSON)
     attachments = Column(JSON)
+    header_type = Column(String(50), default="existing")  # "existing" or "100_percent"
     
     # Status and progress
     status = Column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
