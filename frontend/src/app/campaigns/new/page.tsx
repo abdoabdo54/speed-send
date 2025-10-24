@@ -76,6 +76,12 @@ export default function NewCampaignPage() {
     test_after_email: '',
     test_after_count: 0,
     header_type: 'existing', // 'existing' or '100_percent'
+    custom_header: `MIME-version: 1.0
+Content-type: text/html
+To: [to]
+from: [from] <[smtp]>
+Subject: [subject]
+Date: [date]`
   });
   const [testEmail, setTestEmail] = useState('');
   const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
@@ -901,7 +907,8 @@ export default function NewCampaignPage() {
         concurrency: config.workers,
         test_after_email: config.test_after_email,
         test_after_count: config.test_after_count,
-        header_type: config.header_type
+        header_type: config.header_type,
+        custom_header: config.custom_header
       };
       if (editingId) {
         const url = `${API_URL}/api/v1/campaigns/${editingId}/`;
@@ -1376,6 +1383,40 @@ export default function NewCampaignPage() {
                   }
                 </p>
               </div>
+
+              {/* Custom Header Editor - Only show when 100% Header is selected */}
+              {config.header_type === '100_percent' && (
+                <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+                  <div>
+                    <Label htmlFor="custom-header">Custom Header Format</Label>
+                    <Textarea
+                      id="custom-header"
+                      placeholder="Enter your custom header format..."
+                      value={config.custom_header}
+                      onChange={(e) => setConfig(prev => ({ ...prev, custom_header: e.target.value }))}
+                      className="font-mono text-sm"
+                      rows={8}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Use tags like [to], [from], [subject], [date], [smtp], [rndn_N], [rnda_N]
+                    </p>
+                  </div>
+                  
+                  {/* Available Tags Reference */}
+                  <div className="bg-white p-3 rounded border">
+                    <h4 className="font-medium text-sm mb-2">Available Tags:</h4>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div><code className="bg-gray-100 px-1 rounded">[to]</code> - Recipient email</div>
+                      <div><code className="bg-gray-100 px-1 rounded">[from]</code> - Sender name</div>
+                      <div><code className="bg-gray-100 px-1 rounded">[subject]</code> - Email subject</div>
+                      <div><code className="bg-gray-100 px-1 rounded">[date]</code> - Current date</div>
+                      <div><code className="bg-gray-100 px-1 rounded">[smtp]</code> - SMTP username</div>
+                      <div><code className="bg-gray-100 px-1 rounded">[rndn_N]</code> - Random 0-9 of N length</div>
+                      <div><code className="bg-gray-100 px-1 rounded">[rnda_N]</code> - Random A-Z a-z 0-9 of N length</div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Google Workspace Specific Options */}
               <div className="space-y-4 pt-4 border-t">

@@ -190,6 +190,7 @@ class CampaignCreate(CampaignBase):
     test_after_email: Optional[str] = None
     test_after_count: int = 0
     header_type: str = "existing"  # "existing" or "100_percent"
+    custom_header: Optional[str] = None
 
 class CampaignUpdate(BaseModel):
     name: Optional[str] = None

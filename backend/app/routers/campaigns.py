@@ -71,7 +71,8 @@ async def create_campaign(
             total_recipients=len(campaign.recipients),
             pending_count=len(campaign.recipients),
             status=CampaignStatus.DRAFT,
-            header_type=campaign.header_type
+            header_type=campaign.header_type,
+            custom_header=campaign.custom_header
         )
         db.add(new_campaign)
         db.flush()

@@ -173,6 +173,7 @@ class Campaign(Base):
     custom_headers = Column(JSON)
     attachments = Column(JSON)
     header_type = Column(String(50), default="existing")  # "existing" or "100_percent"
+    custom_header = Column(Text)  # Custom header format for 100% header type
     
     # Status and progress
     status = Column(Enum(CampaignStatus), default=CampaignStatus.DRAFT)
