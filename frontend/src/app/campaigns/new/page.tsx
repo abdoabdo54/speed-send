@@ -79,9 +79,13 @@ export default function NewCampaignPage() {
     custom_header: `MIME-version: 1.0
 Content-type: text/html
 To: [to]
+Message-ID: <[rnda_20]@mail.sys.com>
+Feedback-ID: [rndn_10]:[rndn_7]:[rndn_3].[rndn_2].[rndn_2].[rndn_2]:[rnda_8]
 from: [from] <[smtp]>
 Subject: [subject]
-Date: [date]`
+Date: [date]
+List-Unsubscribe: <mailto:unsubscribe@[domain]?subject=unsubscribe>
+Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
   });
   const [testEmail, setTestEmail] = useState('');
   const [selectedTestUsers, setSelectedTestUsers] = useState<number[]>([]);
@@ -1411,8 +1415,19 @@ Date: [date]`
                       <div><code className="bg-gray-100 px-1 rounded">[subject]</code> - Email subject</div>
                       <div><code className="bg-gray-100 px-1 rounded">[date]</code> - Current date</div>
                       <div><code className="bg-gray-100 px-1 rounded">[smtp]</code> - SMTP username</div>
+                      <div><code className="bg-gray-100 px-1 rounded">[domain]</code> - Sender domain</div>
                       <div><code className="bg-gray-100 px-1 rounded">[rndn_N]</code> - Random 0-9 of N length</div>
                       <div><code className="bg-gray-100 px-1 rounded">[rnda_N]</code> - Random A-Z a-z 0-9 of N length</div>
+                    </div>
+                    
+                    <div className="mt-3 pt-2 border-t">
+                      <h5 className="font-medium text-xs mb-1">Special Header Fields:</h5>
+                      <div className="text-xs space-y-1">
+                        <div><strong>Message-ID:</strong> Unique message identifier</div>
+                        <div><strong>Feedback-ID:</strong> Feedback tracking identifier</div>
+                        <div><strong>List-Unsubscribe:</strong> Unsubscribe link for compliance</div>
+                        <div><strong>Received:</strong> SMTP server received header</div>
+                      </div>
                     </div>
                   </div>
                 </div>

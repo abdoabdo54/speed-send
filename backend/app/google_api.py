@@ -366,3 +366,59 @@ def substitute_variables(text: str, variables: Dict[str, str]) -> str:
         result = result.replace(placeholder, str(value))
     return result
 
+
+def process_custom_header_tags(header_text: str, recipient_email: str, sender_name: str, subject: str, smtp_username: str, domain: str = None) -> str:
+    """
+    Process custom header tags like [to], [from], [subject], [date], [smtp], [domain], [rndn_N], [rnda_N]
+    
+    Args:
+        header_text: Custom header text with tags
+        recipient_email: Recipient email address
+        sender_name: Sender name
+        subject: Email subject
+        smtp_username: SMTP username
+        domain: Sender domain (optional)
+    
+    Returns:
+        Processed header text with tags replaced
+    """
+    import re
+    import random
+    import string
+    from datetime import datetime
+    
+    result = header_text
+    
+    # Basic tags
+    result = result.replace('[to]', recipient_email)
+    result = result.replace('[from]', sender_name)
+    result = result.replace('[subject]', subject)
+    result = result.replace('[smtp]', smtp_username)
+    result = result.replace('[date]', datetime.now().strftime('%a, %d %b %Y %H:%M:%S %z'))
+    
+    # Domain tag
+    if domain:
+        result = result.replace('[domain]', domain)
+    else:
+        # Extract domain from smtp_username if not provided
+        if '@' in smtp_username:
+            domain = smtp_username.split('@')[1]
+            result = result.replace('[domain]', domain)
+    
+    # Random number tags [rndn_N] - N digits
+    rndn_pattern = r'\[rndn_(\d+)\]'
+    def replace_rndn(match):
+        length = int(match.group(1))
+        return ''.join(random.choices('0123456789', k=length))
+    result = re.sub(rndn_pattern, replace_rndn, result)
+    
+    # Random alphanumeric tags [rnda_N] - N characters (A-Z, a-z, 0-9)
+    rnda_pattern = r'\[rnda_(\d+)\]'
+    def replace_rnda(match):
+        length = int(match.group(1))
+        chars = string.ascii_letters + string.digits
+        return ''.join(random.choices(chars, k=length))
+    result = re.sub(rnda_pattern, replace_rnda, result)
+    
+    return result
+

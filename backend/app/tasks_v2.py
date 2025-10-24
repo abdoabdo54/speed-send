@@ -6,7 +6,7 @@ Implements the full V2 architecture with preparation phase and instant sending.
 from app.celery_app import celery_app
 from app.database import SessionLocal
 from app.models import Campaign, EmailLog, WorkspaceUser, ServiceAccount, CampaignStatus, EmailStatus
-from app.google_api import GoogleWorkspaceService, substitute_variables
+from app.google_api import GoogleWorkspaceService, substitute_variables, process_custom_header_tags
 from app.encryption import encryption_service
 from datetime import datetime
 import logging
@@ -234,6 +234,7 @@ def prepare_campaign_redis(campaign_id: int):
                 'from_name': campaign.from_name,
                 'custom_headers': campaign.custom_headers,
                 'attachments': campaign.attachments,
+                'custom_header_text': campaign.custom_header if campaign.header_type == '100_percent' else None,
             }
             
             sender_batches[sender_email]['tasks'].append(task)
@@ -598,6 +599,26 @@ def send_prerendered_email(
         # NO DELAY - Send emails instantly
         # Removed time.sleep() completely for maximum speed
         
+        # Process custom headers if needed
+        custom_headers = task.get('custom_headers', {})
+        if task.get('custom_header_text'):
+            # Process custom header tags for 100% header type
+            processed_header = process_custom_header_tags(
+                header_text=task['custom_header_text'],
+                recipient_email=task['recipient_email'],
+                sender_name=task.get('from_name', ''),
+                subject=task['subject'],
+                smtp_username=sender_email,
+                domain=sender_email.split('@')[1] if '@' in sender_email else None
+            )
+            
+            # Parse the processed header into individual headers
+            header_lines = processed_header.strip().split('\n')
+            for line in header_lines:
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    custom_headers[key.strip()] = value.strip()
+        
         # Send (everything is already prepared)
         message_id = google_service.send_email(
             sender_email=sender_email,
@@ -606,7 +627,7 @@ def send_prerendered_email(
             body_html=task['body_html'],
             body_plain=task['body_plain'],
             from_name=task.get('from_name'),
-            custom_headers=task.get('custom_headers'),
+            custom_headers=custom_headers,
             attachments=task.get('attachments')
         )
         
