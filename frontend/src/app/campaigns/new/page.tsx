@@ -134,13 +134,13 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
   const [userSearch, setUserSearch] = useState('');
   const filteredSelectedUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
-    const base = users.filter(u => selectedAccounts.includes(u.service_account_id));
+    const base = (users || []).filter(u => selectedAccounts.includes(u.service_account_id));
     return q ? base.filter(u => (u.email || '').toLowerCase().includes(q)) : base;
   }, [users, selectedAccounts, userSearch]);
 
   // Derived collections
   const selectedUsers = useMemo(() => {
-    return users.filter(u => selectedAccounts.includes(u.service_account_id));
+    return (users || []).filter(u => selectedAccounts.includes(u.service_account_id));
   }, [users, selectedAccounts]);
 
   // Debug logging helpers
@@ -1948,7 +1948,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                         </span>
                       </label>
                     ))}
-                    {selectedUsers.length === 0 && (
+                    {(selectedUsers || []).length === 0 && (
                       <div className="text-sm text-gray-500">No users available. Select accounts first.</div>
                     )}
                   </div>
@@ -1995,7 +1995,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
             <h3 className="text-lg font-semibold mb-4">Load Template</h3>
             <div className="space-y-4">
               <div className="max-h-64 overflow-y-auto">
-                {templates.map(template => (
+                {(templates || []).map(template => (
                   <div key={template.id} className="flex items-center justify-between p-3 border rounded mb-2">
                     <div>
                       <div className="font-medium">{template.name}</div>
@@ -2019,7 +2019,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     </div>
                   </div>
                 ))}
-                {templates.length === 0 && (
+                {(templates || []).length === 0 && (
                   <div className="text-center py-4 text-gray-500">
                     No templates saved yet
                   </div>
