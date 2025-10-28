@@ -106,6 +106,16 @@ def prepare_campaign_redis(campaign_id: int):
         
         # Get sender accounts
         sender_accounts = campaign.sender_accounts
+        logger.info(f"[{request_id}] 🔍 Sender accounts found: {len(sender_accounts) if sender_accounts else 0}")
+        if not sender_accounts:
+            # Try to get sender accounts from CampaignSender table
+            campaign_senders = db.query(CampaignSender).filter(CampaignSender.campaign_id == campaign_id).all()
+            logger.info(f"[{request_id}] 🔍 CampaignSender records: {len(campaign_senders)}")
+            if campaign_senders:
+                sender_accounts = [db.query(ServiceAccount).filter(ServiceAccount.id == cs.service_account_id).first() for cs in campaign_senders]
+                sender_accounts = [sa for sa in sender_accounts if sa]  # Filter out None values
+                logger.info(f"[{request_id}] 🔍 Sender accounts from CampaignSender: {len(sender_accounts)}")
+        
         if not sender_accounts:
             raise Exception("No sender accounts configured")
         
