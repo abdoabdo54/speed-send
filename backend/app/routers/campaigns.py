@@ -55,9 +55,11 @@ async def create_campaign(
     db: Session = Depends(get_db)
 ):
     try:
+        logger.info(f"🔍 Creating campaign with sender_account_ids: {campaign.sender_account_ids}")
         sender_accounts = db.query(ServiceAccount).filter(
             ServiceAccount.id.in_(campaign.sender_account_ids)
         ).all()
+        logger.info(f"🔍 Found {len(sender_accounts)} sender accounts")
         if not sender_accounts:
             raise HTTPException(status_code=400, detail="No sender accounts found")
         
@@ -80,6 +82,7 @@ async def create_campaign(
         for account in sender_accounts:
             association = CampaignSender(campaign_id=new_campaign.id, service_account_id=account.id)
             db.add(association)
+            logger.info(f"🔍 Created CampaignSender association: campaign_id={new_campaign.id}, service_account_id={account.id}")
         
         db.commit()
         db.refresh(new_campaign)

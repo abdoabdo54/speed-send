@@ -121,14 +121,23 @@ def prepare_campaign_redis(campaign_id: int):
         
         # Build sender pool
         sender_pool = []
+        logger.info(f"[{request_id}] 🔍 Building sender pool from {len(sender_accounts)} accounts")
+        
         for account in sender_accounts:
+            logger.info(f"[{request_id}] 🔍 Processing account: {account.name} (ID: {account.id})")
             users = db.query(WorkspaceUser).filter(
                 WorkspaceUser.service_account_id == account.id,
                 WorkspaceUser.is_active == True
             ).all()
+            logger.info(f"[{request_id}] 🔍 Found {len(users)} active users for account {account.name}")
             
             # Decrypt once during preparation
-            decrypted_json = encryption_service.decrypt(account.encrypted_json)
+            try:
+                decrypted_json = encryption_service.decrypt(account.encrypted_json)
+                logger.info(f"[{request_id}] 🔍 Successfully decrypted JSON for account {account.name}")
+            except Exception as e:
+                logger.error(f"[{request_id}] ❌ Failed to decrypt JSON for account {account.name}: {e}")
+                continue
             
             for user in users:
                 # Skip admin addresses (must not be used as senders)
@@ -141,6 +150,7 @@ def prepare_campaign_redis(campaign_id: int):
                     'user_id': user.id
                 })
         
+        logger.info(f"[{request_id}] 🔍 Total sender pool size: {len(sender_pool)}")
         if not sender_pool:
             raise Exception("No active users available")
         
