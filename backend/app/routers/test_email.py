@@ -91,9 +91,11 @@ async def send_test_email(
             logger.error(f"❌ Failed to create Google service: {e}")
             raise HTTPException(status_code=500, detail="Failed to initialize Google Workspace service")
         
-        # Send email directly
+        # Send email directly with custom headers if available
         logger.info("📤 Sending test email...")
         try:
+            # Check if we should use custom headers (for testing)
+            # For now, use regular send_email for test endpoint
             message_id = google_service.send_email(
                 sender_email=user.email,
                 recipient_email=request.recipient_email,

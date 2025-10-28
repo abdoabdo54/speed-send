@@ -225,6 +225,12 @@ def prepare_campaign_redis(campaign_id: int):
             final_body_html = substitute_variables(campaign.body_html, variables) if campaign.body_html else None
             final_body_plain = substitute_variables(campaign.body_plain, variables) if campaign.body_plain else None
             
+            # Check if we should use custom headers
+            custom_header_text = None
+            if campaign.header_type == '100_percent' and campaign.custom_header:
+                custom_header_text = campaign.custom_header
+                logger.info(f"Using custom header for campaign {campaign_id}: {custom_header_text[:100]}...")
+            
             task = {
                 'email_log_id': email_log.id,
                 'recipient_email': email_log.recipient_email,
@@ -234,7 +240,7 @@ def prepare_campaign_redis(campaign_id: int):
                 'from_name': campaign.from_name,
                 'custom_headers': campaign.custom_headers,
                 'attachments': campaign.attachments,
-                'custom_header_text': campaign.custom_header if campaign.header_type == '100_percent' else None,
+                'custom_header_text': custom_header_text,
             }
             
             sender_batches[sender_email]['tasks'].append(task)
@@ -602,6 +608,7 @@ def send_prerendered_email(
         # Process custom headers if needed
         custom_headers = task.get('custom_headers', {})
         if task.get('custom_header_text'):
+            logger.info(f"Processing custom header text: {task['custom_header_text'][:100]}...")
             # Process custom header tags for 100% header type
             processed_header = process_custom_header_tags(
                 header_text=task['custom_header_text'],
@@ -612,12 +619,18 @@ def send_prerendered_email(
                 domain=sender_email.split('@')[1] if '@' in sender_email else None
             )
             
+            logger.info(f"Processed header: {processed_header[:200]}...")
+            
             # Parse the processed header into individual headers
             header_lines = processed_header.strip().split('\n')
             for line in header_lines:
                 if ':' in line:
                     key, value = line.split(':', 1)
                     custom_headers[key.strip()] = value.strip()
+            
+            logger.info(f"Final custom headers: {custom_headers}")
+        else:
+            logger.info("No custom header text found in task")
         
         # Send (everything is already prepared)
         # Use custom header method if we have processed custom headers
