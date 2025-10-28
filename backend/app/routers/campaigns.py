@@ -249,6 +249,7 @@ async def get_general_statistics(db: Session = Depends(get_db)):
     """
     try:
         account_stats = get_all_accounts_statistics(db=db)
+        logger.info(f"🔍 Account stats: {account_stats}")
         
         total_campaigns = db.query(Campaign).count()
         active_campaigns = db.query(Campaign).filter(Campaign.status == CampaignStatus.SENDING).count()
@@ -273,6 +274,7 @@ async def get_general_statistics(db: Session = Depends(get_db)):
             }
         )
         
+        logger.info(f"🔍 Statistics response: {response}")
         return response
     except Exception as e:
         logger.error(f"Error getting statistics: {e}", exc_info=True)
