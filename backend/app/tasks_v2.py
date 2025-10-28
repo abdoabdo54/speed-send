@@ -625,9 +625,9 @@ def send_prerendered_email(
             logger.info("No custom header text found in task")
         
         # Send (everything is already prepared)
-        # Use custom header method if we have processed custom headers
-        if task.get('custom_header_text') and custom_headers:
-            logger.info(f"Using send_email_with_custom_headers method")
+        # Use custom header method if we have custom_header_text
+        if task.get('custom_header_text'):
+            logger.info(f"Using send_email_with_custom_headers method - custom_headers: {custom_headers}")
             message_id = google_service.send_email_with_custom_headers(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
@@ -639,7 +639,7 @@ def send_prerendered_email(
                 attachments=task.get('attachments')
             )
         else:
-            logger.info(f"Using regular send_email method - custom_header_text: {task.get('custom_header_text')}, custom_headers: {custom_headers}")
+            logger.info(f"Using regular send_email method - no custom_header_text")
             message_id = google_service.send_email(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
