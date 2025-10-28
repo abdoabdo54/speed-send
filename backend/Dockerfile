@@ -2,23 +2,31 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies in one layer and clean up immediately
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/cache/apt/archives/*
 
-# Copy requirements
+# Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with no cache
+RUN pip install --no-cache-dir --no-deps -r requirements.txt \
+    && pip cache purge
 
 # Copy application code
 COPY . .
 
 # Create service accounts directory
 RUN mkdir -p /app/service_accounts
+
+# Clean up any temporary files
+RUN find /app -name "*.pyc" -delete \
+    && find /app -name "__pycache__" -type d -exec rm -rf {} + \
+    || true
 
 EXPOSE 8000
 

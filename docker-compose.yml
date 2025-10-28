@@ -38,6 +38,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: gmail_saas_backend
+    image: speed-send-backend
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-gmailsaas}:${POSTGRES_PASSWORD:-gmailsaas123}@postgres:5432/${POSTGRES_DB:-gmail_saas}
       REDIS_URL: redis://redis:6379/0
@@ -58,9 +59,7 @@ services:
 
   # Celery Worker (PowerMTA Mode - High Concurrency)
   celery_worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: speed-send-backend
     container_name: gmail_saas_celery_worker
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-gmailsaas}:${POSTGRES_PASSWORD:-gmailsaas123}@postgres:5432/${POSTGRES_DB:-gmail_saas}
@@ -82,9 +81,7 @@ services:
 
   # Celery Beat (for scheduled tasks)
   celery_beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: speed-send-backend
     container_name: gmail_saas_celery_beat
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-gmailsaas}:${POSTGRES_PASSWORD:-gmailsaas123}@postgres:5432/${POSTGRES_DB:-gmail_saas}
