@@ -49,6 +49,7 @@ export default function NewCampaignPage() {
   const router = useRouter();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [hasError, setHasError] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<string>('');
 
   // State
   const [loading, setLoading] = useState(false);
@@ -305,6 +306,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       } catch (error) {
         console.error('Failed to initialize data:', error);
         setHasError(true);
+        setErrorDetails(error instanceof Error ? error.message : 'Unknown error');
         showNotification('Failed to load initial data', 'error');
         // Set safe defaults to prevent crashes
         setAccounts([]);
@@ -1010,10 +1012,16 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <p className="text-red-600 mb-4">
                 There was an error loading the campaign page. This might be due to a backend connection issue.
               </p>
+              {errorDetails && (
+                <div className="bg-red-100 border border-red-300 rounded p-3 mb-4">
+                  <p className="text-sm text-red-700 font-mono">{errorDetails}</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Button 
                   onClick={() => {
                     setHasError(false);
+                    setErrorDetails('');
                     window.location.reload();
                   }}
                   className="bg-red-600 hover:bg-red-700"
@@ -1035,11 +1043,12 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
     );
   }
 
-  return (
-    <div 
-      className="flex h-screen bg-background"
-      onContextMenu={handleContextMenu}
-    >
+  try {
+    return (
+      <div 
+        className="flex h-screen bg-background"
+        onContextMenu={handleContextMenu}
+      >
       <Sidebar />
 
       <div className="flex-1 overflow-auto">
@@ -2338,4 +2347,35 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       )}
     </div>
   );
+  } catch (error) {
+    console.error('Component render error:', error);
+    setHasError(true);
+    setErrorDetails(error instanceof Error ? error.message : 'Render error');
+    return (
+      <div className="flex h-screen bg-background">
+        <Sidebar />
+        <div className="flex-1 p-8">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-red-800 mb-4">Render Error</h2>
+              <p className="text-red-600 mb-4">
+                There was an error rendering the component.
+              </p>
+              {errorDetails && (
+                <div className="bg-red-100 border border-red-300 rounded p-3 mb-4">
+                  <p className="text-sm text-red-700 font-mono">{errorDetails}</p>
+                </div>
+              )}
+              <Button 
+                onClick={() => window.location.reload()}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Reload Page
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }
