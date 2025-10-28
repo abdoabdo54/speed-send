@@ -588,7 +588,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
         createdAt: new Date().toISOString()
       };
 
-      const updatedTemplates = [...templates, newTemplate];
+      const updatedTemplates = [...(templates || []), newTemplate];
       setTemplates(updatedTemplates);
 
       if (typeof window !== 'undefined') {
@@ -614,7 +614,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
 
   const deleteTemplate = (templateId: string) => {
     if (confirm('Are you sure you want to delete this template?')) {
-      const updatedTemplates = templates.filter(t => t.id !== templateId);
+      const updatedTemplates = (templates || []).filter(t => t.id !== templateId);
       setTemplates(updatedTemplates);
 
       if (typeof window !== 'undefined') {
@@ -879,7 +879,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       // Log detailed failure reasons
       results.forEach((result, index) => {
         if (result.status === 'rejected') {
-          const user = users.find(u => u.id === selectedTestUsers[index]);
+          const user = (users || []).find(u => u.id === selectedTestUsers[index]);
           const error = result.reason;
           const errorDetails = {
             user: user?.email || 'Unknown',
@@ -897,7 +897,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
             appendLog(`   Response Data: ${JSON.stringify(errorDetails.data)}`);
           }
         } else if (result.status === 'fulfilled') {
-          const user = users.find(u => u.id === selectedTestUsers[index]);
+          const user = (users || []).find(u => u.id === selectedTestUsers[index]);
           appendLog(` Test email sent successfully for ${user?.email || 'Unknown'}`);
         }
       });
@@ -1139,7 +1139,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       )}
 
       {/* Notifications */}
-      {notifications.map(notification => (
+      {(notifications || []).map(notification => (
         <Alert key={notification.id} className={`mb-4 ${
           notification.type === 'success' ? 'border-green-200 bg-green-50' :
           notification.type === 'error' ? 'border-red-200 bg-red-50' :
@@ -2189,7 +2189,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                 'max-w-sm'
               }`}>
                 <div className="p-4 border-b bg-gray-50">
-                  <div className="text-sm text-gray-600 mb-1">From: {config.from_name} &lt;{selectedAccounts.length > 0 ? users.find(u => selectedAccounts.includes(u.service_account_id))?.email || 'sender@example.com' : 'sender@example.com'}&gt;</div>
+                  <div className="text-sm text-gray-600 mb-1">From: {config.from_name} &lt;{selectedAccounts.length > 0 ? (users || []).find(u => selectedAccounts.includes(u.service_account_id))?.email || 'sender@example.com' : 'sender@example.com'}&gt;</div>
                   <div className="text-sm text-gray-600 mb-1">To: john@example.com</div>
                   <div className="font-medium">{generatePreview().subject}</div>
                 </div>
