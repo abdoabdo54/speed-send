@@ -112,6 +112,7 @@ class ContactListResponse(ContactListBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     contacts: List['ContactResponse'] = []
+    recipients: List[str] = []  # Extracted emails from contacts
 
     class Config:
         from_attributes = True

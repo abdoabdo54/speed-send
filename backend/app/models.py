@@ -111,6 +111,11 @@ class ContactList(Base):
     
     # Relationships
     contacts = relationship("Contact", back_populates="contact_list", cascade="all, delete-orphan")
+    
+    @property
+    def recipients(self):
+        """Extract email addresses from contacts for frontend compatibility"""
+        return [contact.email for contact in self.contacts] if self.contacts else []
 
 # Contacts
 class Contact(Base):

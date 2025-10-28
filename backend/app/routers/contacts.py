@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import logging
 
@@ -19,7 +19,7 @@ async def list_contact_lists(db: Session = Depends(get_db)):
     """List all contact lists"""
     try:
         logger.info("Fetching contact lists...")
-        contact_lists = db.query(ContactList).all()
+        contact_lists = db.query(ContactList).options(joinedload(ContactList.contacts)).all()
         logger.info(f"Found {len(contact_lists)} contact lists")
         return contact_lists
     except Exception as e:
