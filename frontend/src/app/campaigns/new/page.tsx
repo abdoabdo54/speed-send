@@ -45,20 +45,20 @@ interface Account {
   quota_limit?: number;
 }
 
-// Safe array access helper
-const safeArray = (arr: any) => Array.isArray(arr) ? arr : [];
+// Safe array access helper with proper typing
+const safeArray = <T>(arr: T[] | undefined | null): T[] => Array.isArray(arr) ? arr : [];
 
 // Safe length access helper
-const safeLength = (arr: any) => safeArray(arr).length;
+const safeLength = <T>(arr: T[] | undefined | null): number => safeArray(arr).length;
 
 // Safe map helper
-const safeMap = (arr: any, fn: any) => safeArray(arr).map(fn);
+const safeMap = <T, U>(arr: T[] | undefined | null, fn: (item: T) => U): U[] => safeArray(arr).map(fn);
 
 // Safe filter helper
-const safeFilter = (arr: any, fn: any) => safeArray(arr).filter(fn);
+const safeFilter = <T>(arr: T[] | undefined | null, fn: (item: T) => boolean): T[] => safeArray(arr).filter(fn);
 
 // Safe find helper
-const safeFind = (arr: any, fn: any) => safeArray(arr).find(fn);
+const safeFind = <T>(arr: T[] | undefined | null, fn: (item: T) => boolean): T | undefined => safeArray(arr).find(fn);
 
 export default function NewCampaignPage() {
   const router = useRouter();
@@ -150,13 +150,13 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
   const [userSearch, setUserSearch] = useState('');
   const filteredSelectedUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
-    const base = safeFilter(users, (u: any) => selectedAccounts.includes(u.service_account_id));
-    return q ? safeFilter(base, (u: any) => (u.email || '').toLowerCase().includes(q)) : base;
+    const base = safeFilter(users, (u) => selectedAccounts.includes(u.service_account_id));
+    return q ? safeFilter(base, (u) => (u.email || '').toLowerCase().includes(q)) : base;
   }, [users, selectedAccounts, userSearch]);
 
   // Derived collections
   const selectedUsers = useMemo(() => {
-    return safeFilter(users, (u: any) => selectedAccounts.includes(u.service_account_id));
+    return safeFilter(users, (u) => selectedAccounts.includes(u.service_account_id));
   }, [users, selectedAccounts]);
 
   // Debug logging helpers
@@ -215,7 +215,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
 
   // Derived state
   const recipients = safeFilter(recipientsText.split('\n'), (email: string) => email.trim() && email.includes('@'));
-  const totalSenders = safeLength(safeFilter(users, (u: any) => selectedAccounts.includes(u.service_account_id)));
+  const totalSenders = safeLength(safeFilter(users, (u) => selectedAccounts.includes(u.service_account_id)));
   const queuedCount = safeLength(recipients);
   const estDuration = Math.ceil(queuedCount / (config.workers * 10));
 
@@ -631,7 +631,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
 
   const deleteTemplate = (templateId: string) => {
     if (confirm('Are you sure you want to delete this template?')) {
-      const updatedTemplates = safeFilter(templates, (t: any) => t.id !== templateId);
+      const updatedTemplates = safeFilter(templates, (t) => t.id !== templateId);
       setTemplates(updatedTemplates);
 
       if (typeof window !== 'undefined') {
@@ -650,7 +650,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
     }
 
     try {
-      const existingByName = safeFind(recipientLists, (l: any) => l.name === effectiveName);
+      const existingByName = safeFind(recipientLists, (l) => l.name === effectiveName);
 
       if (existingByName) {
         // Update existing list
@@ -838,7 +838,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
     if (selectedAccounts.length === safeLength(accounts)) {
       setSelectedAccounts([]);
     } else {
-      setSelectedAccounts(safeMap(accounts, (a: any) => a.id));
+      setSelectedAccounts(safeMap(accounts, (a: Account) => a.id));
     }
   };
 
@@ -873,7 +873,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
     try {
       // Send test emails from all selected users
       const testPromises = selectedTestUsers.map(async (userId) => {
-        const user = safeFind(users, (u: any) => u.id === userId);
+        const user = safeFind(users, (u) => u.id === userId);
         if (!user) return null;
 
         return axios.post(`${API_URL}/api/v1/test-email/`, {
@@ -896,7 +896,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       // Log detailed failure reasons
       results.forEach((result, index) => {
         if (result.status === 'rejected') {
-          const user = safeFind(users, (u: any) => u.id === selectedTestUsers[index]);
+          const user = safeFind(users, (u) => u.id === selectedTestUsers[index]);
           const error = result.reason;
           const errorDetails = {
             user: user?.email || 'Unknown',
@@ -914,7 +914,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
             appendLog(`   Response Data: ${JSON.stringify(errorDetails.data)}`);
           }
         } else if (result.status === 'fulfilled') {
-          const user = safeFind(users, (u: any) => u.id === selectedTestUsers[index]);
+          const user = safeFind(users, (u) => u.id === selectedTestUsers[index]);
           appendLog(` Test email sent successfully for ${user?.email || 'Unknown'}`);
         }
       });
@@ -1163,7 +1163,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       )}
 
       {/* Notifications */}
-      {safeMap(notifications, (notification: any) => (
+      {safeMap(notifications, (notification) => (
         <Alert key={notification.id} className={`mb-4 ${
           notification.type === 'success' ? 'border-green-200 bg-green-50' :
           notification.type === 'error' ? 'border-red-200 bg-red-50' :
@@ -1231,7 +1231,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {safeMap(accounts, (account: any) => (
+                {safeMap(accounts, (account) => (
                   <div key={account.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                     <Checkbox
                       checked={selectedAccounts.includes(account.id)}
@@ -1331,7 +1331,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     />
                     <span className="text-xs text-muted-foreground whitespace-nowrap">{safeLength(filteredSelectedUsers)} found</span>
                   </div>
-                  {safeMap(safeArray(filteredSelectedUsers).slice(0, 300), (u: any) => (
+                  {safeMap(safeArray(filteredSelectedUsers).slice(0, 300), (u) => (
                     <div key={`${u.service_account_id}-${u.email}`} className="px-3 py-2 text-sm flex items-center justify-between">
                       <span className="truncate">{u.email}</span>
                       <span className={"text-xs " + (u.is_active ? 'text-green-600' : 'text-red-600')}>{u.is_active ? 'active' : 'inactive'}</span>
@@ -1939,7 +1939,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setSelectedTestUsers(safeMap(selectedUsers, (u: any) => u.id))}
+                      onClick={() => setSelectedTestUsers(safeMap(selectedUsers, (u) => u.id))}
                     >
                       Select All ({safeLength(selectedUsers)})
                     </Button>
@@ -1953,7 +1953,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                   </div>
 
                   <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
-                    {safeMap(selectedUsers, (user: any) => (
+                    {safeMap(selectedUsers, (user) => (
                       <label key={user.id} className="flex items-center gap-2 text-sm">
                         <input
                           type="checkbox"
@@ -2019,7 +2019,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
             <h3 className="text-lg font-semibold mb-4">Load Template</h3>
             <div className="space-y-4">
               <div className="max-h-64 overflow-y-auto">
-                {safeMap(templates, (template: any) => (
+                {safeMap(templates, (template) => (
                   <div key={template.id} className="flex items-center justify-between p-3 border rounded mb-2">
                     <div>
                       <div className="font-medium">{template.name}</div>
@@ -2088,7 +2088,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <div>
                 <h4 className="font-medium mb-2">Load Existing Lists</h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {safeMap(recipientLists, (list: any) => (
+                  {safeMap(recipientLists, (list) => (
                     <div key={list.id} className="flex items-center justify-between p-2 border rounded">
                       <div>
                         <div className="font-medium">{list.name}</div>
@@ -2213,7 +2213,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                 'max-w-sm'
               }`}>
                 <div className="p-4 border-b bg-gray-50">
-                  <div className="text-sm text-gray-600 mb-1">From: {config.from_name} &lt;{selectedAccounts.length > 0 ? safeFind(users, (u: any) => selectedAccounts.includes(u.service_account_id))?.email || 'sender@example.com' : 'sender@example.com'}&gt;</div>
+                  <div className="text-sm text-gray-600 mb-1">From: {config.from_name} &lt;{selectedAccounts.length > 0 ? safeFind(users, (u) => selectedAccounts.includes(u.service_account_id))?.email || 'sender@example.com' : 'sender@example.com'}&gt;</div>
                   <div className="text-sm text-gray-600 mb-1">To: john@example.com</div>
                   <div className="font-medium">{generatePreview().subject}</div>
                 </div>
