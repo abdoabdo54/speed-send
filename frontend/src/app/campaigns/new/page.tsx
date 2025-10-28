@@ -63,6 +63,7 @@ export default function NewCampaignPage() {
     full_name?: string;
   }>>([]);
   const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [recipientsText, setRecipientsText] = useState('');
   const [config, setConfig] = useState({
     name: '',
@@ -1224,9 +1225,47 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     />
                     <span className="text-xs text-muted-foreground whitespace-nowrap">{(filteredSelectedUsers || []).length} found</span>
                   </div>
+                  <div className="p-2 border-b flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const allUserIds = (filteredSelectedUsers || []).map(u => u.id);
+                        setSelectedUserIds(allUserIds);
+                      }}
+                      className="text-xs"
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedUserIds([])}
+                      className="text-xs"
+                    >
+                      Deselect All
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {selectedUserIds.length} selected
+                    </span>
+                  </div>
                   {(filteredSelectedUsers || []).slice(0, 300).map(u => (
-                    <div key={`${u.service_account_id}-${u.email}`} className="px-3 py-2 text-sm flex items-center justify-between">
-                      <span className="truncate">{u.email}</span>
+                    <div key={`${u.service_account_id}-${u.email}`} className="px-3 py-2 text-sm flex items-center justify-between hover:bg-gray-50">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.includes(u.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedUserIds([...selectedUserIds, u.id]);
+                            } else {
+                              setSelectedUserIds(selectedUserIds.filter(id => id !== u.id));
+                            }
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="truncate">{u.email}</span>
+                      </div>
                       <span className={"text-xs " + (u.is_active ? 'text-green-600' : 'text-red-600')}>{u.is_active ? 'active' : 'inactive'}</span>
                     </div>
                   ))}
