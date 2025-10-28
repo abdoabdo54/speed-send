@@ -514,7 +514,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
     }
   };
 
-  const loadTemplates = () => {
+  const loadTemplates = async () => {
     try {
       if (typeof window !== 'undefined') {
         const savedTemplates = localStorage.getItem('email_templates');
