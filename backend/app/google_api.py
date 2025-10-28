@@ -375,13 +375,26 @@ class GoogleWorkspaceService:
                 attachments=attachments
             )
             
-            # Encode and send
-            raw_message = base64.urlsafe_b64encode(raw_email.encode()).decode()
-            send_message = {'raw': raw_message}
+            # Debug: Log the raw email headers
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"🔍 RAW EMAIL HEADERS:")
+            logger.info(f"📧 Raw email preview: {raw_email[:500]}...")
+            if custom_headers:
+                logger.info(f"🎯 Custom headers being sent: {custom_headers}")
             
-            result = service.users().messages().send(
+            # Encode and send using insert method to bypass Gmail's header processing
+            raw_message = base64.urlsafe_b64encode(raw_email.encode()).decode()
+            
+            # Use insert method instead of send to bypass automatic header processing
+            insert_message = {
+                'raw': raw_message,
+                'labelIds': ['SENT']  # Mark as sent
+            }
+            
+            result = service.users().messages().insert(
                 userId='me',
-                body=send_message
+                body=insert_message
             ).execute()
             
             return result['id']
@@ -401,15 +414,15 @@ class GoogleWorkspaceService:
         attachments: Optional[List[Dict]] = None
     ) -> str:
         """
-        Build raw email with full custom header control
+        Build raw email with full custom header control - completely manual construction
         """
+        import base64
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
         from email.mime.base import MIMEBase
         from email import encoders
-        import base64
         
-        # Create message
+        # Start with completely empty message
         if body_html and body_plain:
             message = MIMEMultipart('alternative')
             part1 = MIMEText(body_plain, 'plain')
@@ -421,20 +434,19 @@ class GoogleWorkspaceService:
         else:
             message = MIMEText(body_plain or '', 'plain')
         
-        # Set basic headers first
-        message['To'] = recipient_email
-        forced_from = f"{from_name} <{sender_email}>" if from_name else sender_email
-        message['From'] = forced_from
-        message['Subject'] = subject
+        # Clear all default headers first
+        message._headers = []
         
-        # Override with custom headers if provided
+        # Add ONLY the custom headers - no defaults
         if custom_headers:
             for key, value in custom_headers.items():
-                # Remove existing header if it exists
-                if key in message:
-                    del message[key]
-                # Add custom header
                 message[key] = value
+        else:
+            # Fallback to basic headers only if no custom headers
+            message['To'] = recipient_email
+            forced_from = f"{from_name} <{sender_email}>" if from_name else sender_email
+            message['From'] = forced_from
+            message['Subject'] = subject
         
         # Handle attachments
         if attachments:
