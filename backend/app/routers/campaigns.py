@@ -67,7 +67,7 @@ async def create_campaign(
             body_html=campaign.body_html,
             body_plain=campaign.body_plain,
             from_name=campaign.from_name,
-            recipients=[r.dict() for r in campaign.recipients],
+            recipients=campaign.recipients,
             total_recipients=len(campaign.recipients),
             pending_count=len(campaign.recipients),
             status=CampaignStatus.DRAFT,
