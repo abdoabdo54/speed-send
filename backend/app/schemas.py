@@ -344,6 +344,12 @@ class DashboardStats(BaseModel):
 class CampaignControl(BaseModel):
     action: str  # pause, resume, cancel
 
+class CampaignStatistics(BaseModel):
+    accounts: List[dict] = []
+    campaigns: dict = {}
+    emails: dict = {}
+    daily_limits: dict = {}
+
 # Draft Launch Response
 class DraftLaunchResponse(BaseModel):
     success: bool

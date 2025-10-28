@@ -13,7 +13,7 @@ from app.models import (
 )
 from app.schemas import (
     CampaignCreate, CampaignUpdate, CampaignResponse,
-    CampaignControl, EmailLogResponse
+    CampaignControl, EmailLogResponse, CampaignStatistics
 )
 from app.tasks import send_campaign_emails
 from fastapi import Response, Request
@@ -193,7 +193,53 @@ async def resume_campaign_endpoint(
         logger.error(f"Failed to resume campaign: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to resume: {str(e)}")
 
-@router.get("/statistics/")
+@router.post("/{campaign_id}/duplicate/", response_model=CampaignResponse)
+async def duplicate_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db)
+):
+    """Duplicate an existing campaign"""
+    try:
+        original_campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+        if not original_campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        # Create new campaign with same data but new name
+        new_campaign = Campaign(
+            name=f"{original_campaign.name} (Copy)",
+            subject=original_campaign.subject,
+            body_html=original_campaign.body_html,
+            body_plain=original_campaign.body_plain,
+            from_name=original_campaign.from_name,
+            recipients=original_campaign.recipients,
+            total_recipients=original_campaign.total_recipients,
+            pending_count=original_campaign.pending_count,
+            status=CampaignStatus.DRAFT,
+            header_type=original_campaign.header_type,
+            custom_header=original_campaign.custom_header
+        )
+        
+        db.add(new_campaign)
+        db.flush()
+        
+        # Copy sender accounts
+        original_senders = db.query(CampaignSender).filter(CampaignSender.campaign_id == campaign_id).all()
+        for sender in original_senders:
+            new_sender = CampaignSender(campaign_id=new_campaign.id, service_account_id=sender.service_account_id)
+            db.add(new_sender)
+        
+        db.commit()
+        db.refresh(new_campaign)
+        
+        logger.info(f"Campaign {campaign_id} duplicated as {new_campaign.id}")
+        return new_campaign
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to duplicate campaign: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to duplicate campaign: {str(e)}")
+
+@router.get("/statistics/", response_model=CampaignStatistics)
 async def get_general_statistics(db: Session = Depends(get_db)):
     """
     Get comprehensive campaign and account statistics using a single DB session.
