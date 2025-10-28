@@ -365,8 +365,12 @@ def resume_campaign_instant(campaign_id: int):
         if not campaign:
             raise Exception(f"Campaign {campaign_id} not found")
         
-        if campaign.status not in [CampaignStatus.READY, CampaignStatus.PAUSED]:
-            raise Exception(f"Campaign must be READY or PAUSED. Current: {campaign.status}")
+        if campaign.status not in [CampaignStatus.READY, CampaignStatus.PAUSED, CampaignStatus.SENDING]:
+            raise Exception(f"Campaign must be READY, PAUSED, or SENDING. Current: {campaign.status}")
+        
+        # If already SENDING, just continue with the existing process
+        if campaign.status == CampaignStatus.SENDING:
+            logger.info(f"[{request_id}] ⚠️ Campaign already SENDING, continuing with existing process...")
         
         campaign.status = CampaignStatus.SENDING
         campaign.started_at = datetime.utcnow()
@@ -397,16 +401,12 @@ def resume_campaign_instant(campaign_id: int):
         job = group(celery_tasks)
         result = job.apply_async()
         
+        # Dispatch tasks and let them run asynchronously
         logger.info(f"[{request_id}] ✅ All batches dispatched in {time.time() - start_time:.2f}s")
+        logger.info(f"[{request_id}] 🎉 V2 RESUME COMPLETE - Tasks dispatched asynchronously")
         
-        # Wait for completion - NO TIMEOUT LIMIT
-        try:
-            logger.info(f"[{request_id}] ⏳ Waiting for {len(task_batches)} sender batches to complete...")
-            result.get(timeout=None)  # NO TIMEOUT - wait until ALL emails are sent
-            elapsed = time.time() - start_time
-            logger.info(f"[{request_id}] 🎉 V2 RESUME COMPLETE in {elapsed:.2f}s")
-        except Exception as e:
-            logger.error(f"[{request_id}] ⚠️ Some tasks failed: {e}")
+        # Note: We don't wait for completion here to avoid Celery anti-pattern
+        # The individual tasks will update the campaign status when they complete
         
         # Update final campaign status based on actual results
         db.refresh(campaign)
