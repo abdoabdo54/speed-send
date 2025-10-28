@@ -48,6 +48,7 @@ interface Account {
 export default function NewCampaignPage() {
   const router = useRouter();
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [hasError, setHasError] = useState(false);
 
   // State
   const [loading, setLoading] = useState(false);
@@ -245,11 +246,24 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
         const isHealthy = await checkBackendHealth();
 
         if (isHealthy) {
+          setHasError(false);
           await Promise.all([
-            loadAccounts(),
-            loadUsers(),
-            loadTemplates(),
-            loadRecipientLists()
+            loadAccounts().catch(err => {
+              console.error('Failed to load accounts:', err);
+              setAccounts([]);
+            }),
+            loadUsers().catch(err => {
+              console.error('Failed to load users:', err);
+              setUsers([]);
+            }),
+            loadTemplates().catch(err => {
+              console.error('Failed to load templates:', err);
+              setTemplates([]);
+            }),
+            loadRecipientLists().catch(err => {
+              console.error('Failed to load recipient lists:', err);
+              setRecipientLists([]);
+            })
           ]);
 
           // If an id query param exists, load campaign for editing
@@ -290,7 +304,13 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
         }
       } catch (error) {
         console.error('Failed to initialize data:', error);
+        setHasError(true);
         showNotification('Failed to load initial data', 'error');
+        // Set safe defaults to prevent crashes
+        setAccounts([]);
+        setUsers([]);
+        setRecipientLists([]);
+        setTemplates([]);
       }
     };
 
@@ -300,10 +320,18 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
   // Refresh lists whenever the Manage Lists modal opens
   useEffect(() => {
     if (showRecipientModal) {
-      loadRecipientLists();
-      // Prefill list name from campaign name when opening the modal
-      const defaultName = (config.name && config.name.trim()) ? config.name.trim() : `List ${new Date().toLocaleDateString()}`;
-      setNewListName(defaultName);
+      try {
+        loadRecipientLists().catch(err => {
+          console.error('Failed to load recipient lists in modal:', err);
+          setRecipientLists([]);
+        });
+        // Prefill list name from campaign name when opening the modal
+        const defaultName = (config.name && config.name.trim()) ? config.name.trim() : `List ${new Date().toLocaleDateString()}`;
+        setNewListName(defaultName);
+      } catch (error) {
+        console.error('Error opening recipient modal:', error);
+        setRecipientLists([]);
+      }
     }
   }, [showRecipientModal, config.name]);
 
@@ -500,6 +528,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
 
   const loadRecipientLists = async () => {
     try {
+      console.log('Loading recipient lists...');
       // Use the correct contacts/lists endpoint instead of data-lists
       const response = await axios.get(`${API_URL}/api/v1/contacts/lists`, {
         timeout: 10000,
@@ -508,16 +537,33 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
         }
       });
 
+      console.log('Recipient lists response:', response.data);
+      
       if (response.data && Array.isArray(response.data)) {
-        setRecipientLists(response.data);
-        console.log('Contact lists loaded successfully:', response.data.length, 'lists');
+        // Ensure each item has the expected structure
+        const safeLists = response.data.map((item: any) => ({
+          id: item.id || 0,
+          name: item.name || 'Unnamed List',
+          recipients: Array.isArray(item.recipients) ? item.recipients : [],
+          created_at: item.created_at || new Date().toISOString(),
+          geo_filter: item.geo_filter || '',
+          list_type: item.list_type || 'custom'
+        }));
+        
+        setRecipientLists(safeLists);
+        console.log('Contact lists loaded successfully:', safeLists.length, 'lists');
+        showNotification(`Loaded ${safeLists.length} recipient lists`, 'success');
       } else {
         console.warn('Invalid response format:', response.data);
         setRecipientLists([]);
+        showNotification('No recipient lists found', 'info');
       }
     } catch (error: any) {
       console.error('Failed to load recipient lists:', error);
-      showNotification('Failed to load recipient lists.', 'error');
+      const errorMessage = error.response?.status === 404 
+        ? 'Recipient lists endpoint not found' 
+        : 'Failed to load recipient lists';
+      showNotification(errorMessage, 'error');
       setRecipientLists([]);
     }
   };
@@ -951,6 +997,43 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       setLoading(false);
     }
   };
+
+  // Error boundary - if there's an error, show a simple recovery interface
+  if (hasError) {
+    return (
+      <div className="flex h-screen bg-background">
+        <Sidebar />
+        <div className="flex-1 p-8">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-red-800 mb-4">Something went wrong</h2>
+              <p className="text-red-600 mb-4">
+                There was an error loading the campaign page. This might be due to a backend connection issue.
+              </p>
+              <div className="space-y-2">
+                <Button 
+                  onClick={() => {
+                    setHasError(false);
+                    window.location.reload();
+                  }}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Try Again
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => router.push('/campaigns')}
+                  className="ml-2"
+                >
+                  Back to Campaigns
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -1981,11 +2064,11 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <div>
                 <h4 className="font-medium mb-2">Load Existing Lists</h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {recipientLists.map(list => (
+                  {(recipientLists || []).map(list => (
                     <div key={list.id} className="flex items-center justify-between p-2 border rounded">
                       <div>
                         <div className="font-medium">{list.name}</div>
-                        <div className="text-sm text-gray-500">{list.recipients.length} recipients</div>
+                        <div className="text-sm text-gray-500">{(list.recipients || []).length} recipients</div>
                       </div>
                       <div className="flex gap-2">
                         <Button
@@ -2017,7 +2100,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                       </div>
                     </div>
                   ))}
-                {recipientLists.length === 0 && (
+                {(recipientLists || []).length === 0 && (
                   <div className="text-center py-4 text-gray-500">
                     No saved lists
                   </div>
