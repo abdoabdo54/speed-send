@@ -227,9 +227,12 @@ def prepare_campaign_redis(campaign_id: int):
             
             # Check if we should use custom headers
             custom_header_text = None
+            logger.info(f"Campaign {campaign_id} - header_type: {campaign.header_type}, custom_header: {campaign.custom_header[:100] if campaign.custom_header else 'None'}...")
             if campaign.header_type == '100_percent' and campaign.custom_header:
                 custom_header_text = campaign.custom_header
                 logger.info(f"Using custom header for campaign {campaign_id}: {custom_header_text[:100]}...")
+            else:
+                logger.info(f"Not using custom headers - header_type: {campaign.header_type}, has_custom_header: {bool(campaign.custom_header)}")
             
             task = {
                 'email_log_id': email_log.id,
@@ -635,6 +638,7 @@ def send_prerendered_email(
         # Send (everything is already prepared)
         # Use custom header method if we have processed custom headers
         if task.get('custom_header_text') and custom_headers:
+            logger.info(f"Using send_email_with_custom_headers method")
             message_id = google_service.send_email_with_custom_headers(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
@@ -646,6 +650,7 @@ def send_prerendered_email(
                 attachments=task.get('attachments')
             )
         else:
+            logger.info(f"Using regular send_email method - custom_header_text: {task.get('custom_header_text')}, custom_headers: {custom_headers}")
             message_id = google_service.send_email(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
