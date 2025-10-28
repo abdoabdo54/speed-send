@@ -198,7 +198,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
 
   // Derived state
   const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
-  const totalSenders = users.filter(u => selectedAccounts.includes(u.service_account_id)).length;
+  const totalSenders = (users || []).filter(u => selectedAccounts.includes(u.service_account_id)).length;
   const queuedCount = recipients.length;
   const estDuration = Math.ceil(queuedCount / (config.workers * 10));
 
@@ -772,10 +772,10 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
   };
 
   const handleSelectAllAccounts = () => {
-    if (selectedAccounts.length === accounts.length) {
+    if (selectedAccounts.length === (accounts || []).length) {
       setSelectedAccounts([]);
     } else {
-      setSelectedAccounts(accounts.map(a => a.id));
+      setSelectedAccounts((accounts || []).map(a => a.id));
     }
   };
 
@@ -810,7 +810,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
     try {
       // Send test emails from all selected users
       const testPromises = selectedTestUsers.map(async (userId) => {
-        const user = users.find(u => u.id === userId);
+        const user = (users || []).find(u => u.id === userId);
         if (!user) return null;
 
         return axios.post(`${API_URL}/api/v1/test-email/`, {
@@ -983,7 +983,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
           </div>
 
           <div className="text-sm text-gray-600">
-            Active accounts <span className="font-semibold text-blue-600">{accounts.length}</span>
+            Active accounts <span className="font-semibold text-blue-600">{(accounts || []).length}</span>
           </div>
           <div className="text-xs text-gray-500 hidden md:block">
             Shortcuts: Ctrl+S (Save), Ctrl+P (Preview), Ctrl+T (Test), Ctrl+Enter (Create)
@@ -1109,7 +1109,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
-                  Google Workspace Accounts ({accounts.length})
+                  Google Workspace Accounts ({(accounts || []).length})
                 </CardTitle>
                 <div className="flex gap-2">
                   <Button
@@ -1117,14 +1117,14 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     variant="outline"
                     onClick={handleSelectAllAccounts}
                   >
-                    {selectedAccounts.length === accounts.length ? 'Deselect All' : 'Select All'}
+                    {selectedAccounts.length === (accounts || []).length ? 'Deselect All' : 'Select All'}
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {accounts.map(account => (
+                {(accounts || []).map(account => (
                   <div key={account.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                     <Checkbox
                       checked={selectedAccounts.includes(account.id)}
@@ -1156,7 +1156,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     </div>
                   </div>
                 ))}
-                {accounts.length === 0 && (
+                {(accounts || []).length === 0 && (
                   <div className="text-center py-4">
                     {backendStatus === 'disconnected' ? (
                       <div className="text-red-600">
@@ -1191,7 +1191,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-indigo-600" />
-                  Users of Selected Accounts ({filteredSelectedUsers.length})
+                  Users of Selected Accounts ({(filteredSelectedUsers || []).length})
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button
@@ -1205,13 +1205,13 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     Refresh
                   </Button>
                   <div className="text-xs text-muted-foreground">
-                    Total loaded: {users.length}
+                    Total loaded: {(users || []).length}
                   </div>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {selectedUsers.length === 0 ? (
+              {(selectedUsers || []).length === 0 ? (
                 <div className="text-sm text-gray-500">Select one or more accounts to see their users.</div>
               ) : (
                 <div className="max-h-48 overflow-auto divide-y rounded border">
@@ -1222,16 +1222,16 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                       value={userSearch}
                       onChange={(e)=>setUserSearch(e.target.value)}
                     />
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">{filteredSelectedUsers.length} found</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{(filteredSelectedUsers || []).length} found</span>
                   </div>
-                  {filteredSelectedUsers.slice(0, 300).map(u => (
+                  {(filteredSelectedUsers || []).slice(0, 300).map(u => (
                     <div key={`${u.service_account_id}-${u.email}`} className="px-3 py-2 text-sm flex items-center justify-between">
                       <span className="truncate">{u.email}</span>
                       <span className={"text-xs " + (u.is_active ? 'text-green-600' : 'text-red-600')}>{u.is_active ? 'active' : 'inactive'}</span>
                     </div>
                   ))}
-                  {filteredSelectedUsers.length > 300 && (
-                    <div className="px-3 py-2 text-xs text-muted-foreground">+{filteredSelectedUsers.length - 300} more...</div>
+                  {(filteredSelectedUsers || []).length > 300 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">+{(filteredSelectedUsers || []).length - 300} more...</div>
                   )}
                 </div>
               )}
@@ -1832,9 +1832,9 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setSelectedTestUsers(selectedUsers.map(u => u.id))}
+                      onClick={() => setSelectedTestUsers((selectedUsers || []).map(u => u.id))}
                     >
-                      Select All ({selectedUsers.length})
+                      Select All ({(selectedUsers || []).length})
                     </Button>
                     <Button
                       size="sm"
@@ -1846,7 +1846,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                   </div>
 
                   <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
-                    {selectedUsers.map(user => (
+                    {(selectedUsers || []).map(user => (
                       <label key={user.id} className="flex items-center gap-2 text-sm">
                         <input
                           type="checkbox"

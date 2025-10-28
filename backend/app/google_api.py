@@ -468,7 +468,14 @@ class GoogleWorkspaceService:
                 )
                 message.attach(part)
         
-        return message.as_string()
+        # Debug: Log the final raw email
+        raw_email = message.as_string()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 FINAL RAW EMAIL:")
+        logger.info(f"📧 Raw email headers: {raw_email[:1000]}...")
+        
+        return raw_email
     
     def test_connection(self, admin_email: str) -> bool:
         """
