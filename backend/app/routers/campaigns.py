@@ -258,16 +258,19 @@ async def get_general_statistics(db: Session = Depends(get_db)):
         total_daily_limit = sum(acc.get('daily_limit', 0) for acc in account_stats)
         total_sent_today = sum(acc.get('daily_sent', 0) for acc in account_stats)
 
-        return {
-            "accounts": account_stats,
-            "campaigns": {"total": total_campaigns, "active": active_campaigns, "completed": completed_campaigns},
-            "emails": {"sent_today": today_sent, "sent_all_time": total_sent},
-            "daily_limits": {
+        # Create response object that matches the schema
+        response = CampaignStatistics(
+            accounts=account_stats,
+            campaigns={"total": total_campaigns, "active": active_campaigns, "completed": completed_campaigns},
+            emails={"sent_today": today_sent, "sent_all_time": total_sent},
+            daily_limits={
                 "total_daily_limit": total_daily_limit,
                 "total_sent_today": total_sent_today,
                 "total_remaining": total_daily_limit - total_sent_today
             }
-        }
+        )
+        
+        return response
     except Exception as e:
         logger.error(f"Error getting statistics: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get statistics: {str(e)}")
