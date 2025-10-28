@@ -45,6 +45,21 @@ interface Account {
   quota_limit?: number;
 }
 
+// Safe array access helper
+const safeArray = (arr: any) => Array.isArray(arr) ? arr : [];
+
+// Safe length access helper
+const safeLength = (arr: any) => safeArray(arr).length;
+
+// Safe map helper
+const safeMap = (arr: any, fn: any) => safeArray(arr).map(fn);
+
+// Safe filter helper
+const safeFilter = (arr: any, fn: any) => safeArray(arr).filter(fn);
+
+// Safe find helper
+const safeFind = (arr: any, fn: any) => safeArray(arr).find(fn);
+
 export default function NewCampaignPage() {
   const router = useRouter();
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -135,13 +150,13 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
   const [userSearch, setUserSearch] = useState('');
   const filteredSelectedUsers = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
-    const base = (users || []).filter(u => selectedAccounts.includes(u.service_account_id));
-    return q ? base.filter(u => (u.email || '').toLowerCase().includes(q)) : base;
+    const base = safeFilter(users, (u: any) => selectedAccounts.includes(u.service_account_id));
+    return q ? safeFilter(base, (u: any) => (u.email || '').toLowerCase().includes(q)) : base;
   }, [users, selectedAccounts, userSearch]);
 
   // Derived collections
   const selectedUsers = useMemo(() => {
-    return (users || []).filter(u => selectedAccounts.includes(u.service_account_id));
+    return safeFilter(users, (u: any) => selectedAccounts.includes(u.service_account_id));
   }, [users, selectedAccounts]);
 
   // Debug logging helpers
@@ -199,9 +214,9 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
   };
 
   // Derived state
-  const recipients = recipientsText.split('\n').filter(email => email.trim() && email.includes('@'));
-  const totalSenders = (users || []).filter(u => selectedAccounts.includes(u.service_account_id)).length;
-  const queuedCount = recipients.length;
+  const recipients = safeFilter(recipientsText.split('\n'), (email: string) => email.trim() && email.includes('@'));
+  const totalSenders = safeLength(safeFilter(users, (u: any) => selectedAccounts.includes(u.service_account_id)));
+  const queuedCount = safeLength(recipients);
   const estDuration = Math.ceil(queuedCount / (config.workers * 10));
 
   // Backend health check
@@ -590,7 +605,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
         createdAt: new Date().toISOString()
       };
 
-      const updatedTemplates = [...(templates || []), newTemplate];
+      const updatedTemplates = [...safeArray(templates), newTemplate];
       setTemplates(updatedTemplates);
 
       if (typeof window !== 'undefined') {
@@ -616,7 +631,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
 
   const deleteTemplate = (templateId: string) => {
     if (confirm('Are you sure you want to delete this template?')) {
-      const updatedTemplates = (templates || []).filter(t => t.id !== templateId);
+      const updatedTemplates = safeFilter(templates, (t: any) => t.id !== templateId);
       setTemplates(updatedTemplates);
 
       if (typeof window !== 'undefined') {
@@ -635,7 +650,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
     }
 
     try {
-      const existingByName = recipientLists.find(l => l.name === effectiveName);
+      const existingByName = safeFind(recipientLists, (l: any) => l.name === effectiveName);
 
       if (existingByName) {
         // Update existing list
@@ -820,10 +835,10 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
   };
 
   const handleSelectAllAccounts = () => {
-    if (selectedAccounts.length === (accounts || []).length) {
+    if (selectedAccounts.length === safeLength(accounts)) {
       setSelectedAccounts([]);
     } else {
-      setSelectedAccounts((accounts || []).map(a => a.id));
+      setSelectedAccounts(safeMap(accounts, (a: any) => a.id));
     }
   };
 
@@ -858,7 +873,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
     try {
       // Send test emails from all selected users
       const testPromises = selectedTestUsers.map(async (userId) => {
-        const user = (users || []).find(u => u.id === userId);
+        const user = safeFind(users, (u: any) => u.id === userId);
         if (!user) return null;
 
         return axios.post(`${API_URL}/api/v1/test-email/`, {
@@ -881,7 +896,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       // Log detailed failure reasons
       results.forEach((result, index) => {
         if (result.status === 'rejected') {
-          const user = (users || []).find(u => u.id === selectedTestUsers[index]);
+          const user = safeFind(users, (u: any) => u.id === selectedTestUsers[index]);
           const error = result.reason;
           const errorDetails = {
             user: user?.email || 'Unknown',
@@ -899,7 +914,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
             appendLog(`   Response Data: ${JSON.stringify(errorDetails.data)}`);
           }
         } else if (result.status === 'fulfilled') {
-          const user = (users || []).find(u => u.id === selectedTestUsers[index]);
+          const user = safeFind(users, (u: any) => u.id === selectedTestUsers[index]);
           appendLog(` Test email sent successfully for ${user?.email || 'Unknown'}`);
         }
       });
@@ -1075,7 +1090,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
           </div>
 
           <div className="text-sm text-gray-600">
-            Active accounts <span className="font-semibold text-blue-600">{(accounts || []).length}</span>
+            Active accounts <span className="font-semibold text-blue-600">{safeLength(accounts)}</span>
           </div>
           <div className="text-xs text-gray-500 hidden md:block">
             Shortcuts: Ctrl+S (Save), Ctrl+P (Preview), Ctrl+T (Test), Ctrl+Enter (Create)
@@ -1148,7 +1163,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       )}
 
       {/* Notifications */}
-      {(notifications || []).map(notification => (
+      {safeMap(notifications, (notification: any) => (
         <Alert key={notification.id} className={`mb-4 ${
           notification.type === 'success' ? 'border-green-200 bg-green-50' :
           notification.type === 'error' ? 'border-red-200 bg-red-50' :
@@ -1201,7 +1216,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
-                  Google Workspace Accounts ({(accounts || []).length})
+                  Google Workspace Accounts ({safeLength(accounts)})
                 </CardTitle>
                 <div className="flex gap-2">
                   <Button
@@ -1209,14 +1224,14 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     variant="outline"
                     onClick={handleSelectAllAccounts}
                   >
-                    {selectedAccounts.length === (accounts || []).length ? 'Deselect All' : 'Select All'}
+                    {selectedAccounts.length === safeLength(accounts) ? 'Deselect All' : 'Select All'}
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-64 overflow-y-auto">
-                {(accounts || []).map(account => (
+                {safeMap(accounts, (account: any) => (
                   <div key={account.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                     <Checkbox
                       checked={selectedAccounts.includes(account.id)}
@@ -1248,7 +1263,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     </div>
                   </div>
                 ))}
-                {(accounts || []).length === 0 && (
+                {safeLength(accounts) === 0 && (
                   <div className="text-center py-4">
                     {backendStatus === 'disconnected' ? (
                       <div className="text-red-600">
@@ -1283,7 +1298,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-indigo-600" />
-                  Users of Selected Accounts ({(filteredSelectedUsers || []).length})
+                  Users of Selected Accounts ({safeLength(filteredSelectedUsers)})
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <Button
@@ -1297,13 +1312,13 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     Refresh
                   </Button>
                   <div className="text-xs text-muted-foreground">
-                    Total loaded: {(users || []).length}
+                    Total loaded: {safeLength(users)}
                   </div>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {(selectedUsers || []).length === 0 ? (
+              {safeLength(selectedUsers) === 0 ? (
                 <div className="text-sm text-gray-500">Select one or more accounts to see their users.</div>
               ) : (
                 <div className="max-h-48 overflow-auto divide-y rounded border">
@@ -1314,16 +1329,16 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                       value={userSearch}
                       onChange={(e)=>setUserSearch(e.target.value)}
                     />
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">{(filteredSelectedUsers || []).length} found</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">{safeLength(filteredSelectedUsers)} found</span>
                   </div>
-                  {(filteredSelectedUsers || []).slice(0, 300).map(u => (
+                  {safeMap(safeArray(filteredSelectedUsers).slice(0, 300), (u: any) => (
                     <div key={`${u.service_account_id}-${u.email}`} className="px-3 py-2 text-sm flex items-center justify-between">
                       <span className="truncate">{u.email}</span>
                       <span className={"text-xs " + (u.is_active ? 'text-green-600' : 'text-red-600')}>{u.is_active ? 'active' : 'inactive'}</span>
                     </div>
                   ))}
-                  {(filteredSelectedUsers || []).length > 300 && (
-                    <div className="px-3 py-2 text-xs text-muted-foreground">+{(filteredSelectedUsers || []).length - 300} more...</div>
+                  {safeLength(filteredSelectedUsers) > 300 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">+{safeLength(filteredSelectedUsers) - 300} more...</div>
                   )}
                 </div>
               )}
@@ -1717,7 +1732,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Mail className="h-5 w-5" />
-                  Recipients ({recipients.length})
+                  Recipients ({safeLength(recipients)})
                 </CardTitle>
                 <Button
                   size="sm"
@@ -1752,10 +1767,10 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                 </p>
               </div>
 
-              {recipients.length > 0 && (
+              {safeLength(recipients) > 0 && (
                 <div className="text-sm text-gray-600">
-                  <p>Valid recipients: {recipients.length}</p>
-                  <p>Invalid entries: {recipientsText.split('\n').length - recipients.length}</p>
+                  <p>Valid recipients: {safeLength(recipients)}</p>
+                  <p>Invalid entries: {safeLength(recipientsText.split('\n')) - safeLength(recipients)}</p>
                 </div>
               )}
             </CardContent>
@@ -1875,7 +1890,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <Button
                 onClick={handleCreateCampaign}
                 className="w-full bg-blue-600 hover:bg-blue-700"
-                disabled={loading || selectedAccounts.length === 0 || recipients.length === 0}
+                disabled={loading || selectedAccounts.length === 0 || safeLength(recipients) === 0}
               >
                 {loading ? (
                   <>
@@ -1924,9 +1939,9 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setSelectedTestUsers((selectedUsers || []).map(u => u.id))}
+                      onClick={() => setSelectedTestUsers(safeMap(selectedUsers, (u: any) => u.id))}
                     >
-                      Select All ({(selectedUsers || []).length})
+                      Select All ({safeLength(selectedUsers)})
                     </Button>
                     <Button
                       size="sm"
@@ -1938,7 +1953,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                   </div>
 
                   <div className="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
-                    {(selectedUsers || []).map(user => (
+                    {safeMap(selectedUsers, (user: any) => (
                       <label key={user.id} className="flex items-center gap-2 text-sm">
                         <input
                           type="checkbox"
@@ -1957,7 +1972,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                         </span>
                       </label>
                     ))}
-                    {(selectedUsers || []).length === 0 && (
+                    {safeLength(selectedUsers) === 0 && (
                       <div className="text-sm text-gray-500">No users available. Select accounts first.</div>
                     )}
                   </div>
@@ -2004,7 +2019,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
             <h3 className="text-lg font-semibold mb-4">Load Template</h3>
             <div className="space-y-4">
               <div className="max-h-64 overflow-y-auto">
-                {(templates || []).map(template => (
+                {safeMap(templates, (template: any) => (
                   <div key={template.id} className="flex items-center justify-between p-3 border rounded mb-2">
                     <div>
                       <div className="font-medium">{template.name}</div>
@@ -2028,7 +2043,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     </div>
                   </div>
                 ))}
-                {(templates || []).length === 0 && (
+                {safeLength(templates) === 0 && (
                   <div className="text-center py-4 text-gray-500">
                     No templates saved yet
                   </div>
@@ -2073,11 +2088,11 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
               <div>
                 <h4 className="font-medium mb-2">Load Existing Lists</h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {(recipientLists || []).map(list => (
+                  {safeMap(recipientLists, (list: any) => (
                     <div key={list.id} className="flex items-center justify-between p-2 border rounded">
                       <div>
                         <div className="font-medium">{list.name}</div>
-                        <div className="text-sm text-gray-500">{(list.recipients || []).length} recipients</div>
+                        <div className="text-sm text-gray-500">{safeLength(list.recipients)} recipients</div>
                       </div>
                       <div className="flex gap-2">
                         <Button
@@ -2109,7 +2124,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                       </div>
                     </div>
                   ))}
-                {(recipientLists || []).length === 0 && (
+                {safeLength(recipientLists) === 0 && (
                   <div className="text-center py-4 text-gray-500">
                     No saved lists
                   </div>
@@ -2198,7 +2213,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                 'max-w-sm'
               }`}>
                 <div className="p-4 border-b bg-gray-50">
-                  <div className="text-sm text-gray-600 mb-1">From: {config.from_name} &lt;{selectedAccounts.length > 0 ? (users || []).find(u => selectedAccounts.includes(u.service_account_id))?.email || 'sender@example.com' : 'sender@example.com'}&gt;</div>
+                  <div className="text-sm text-gray-600 mb-1">From: {config.from_name} &lt;{selectedAccounts.length > 0 ? safeFind(users, (u: any) => selectedAccounts.includes(u.service_account_id))?.email || 'sender@example.com' : 'sender@example.com'}&gt;</div>
                   <div className="text-sm text-gray-600 mb-1">To: john@example.com</div>
                   <div className="font-medium">{generatePreview().subject}</div>
                 </div>
