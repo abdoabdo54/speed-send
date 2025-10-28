@@ -228,6 +228,7 @@ class EmailLog(Base):
     service_account_id = Column(Integer, ForeignKey("service_accounts.id"), nullable=False)
     sender_email = Column(String(255), nullable=False)
     recipient_email = Column(String(255), nullable=False)
+    recipient_name = Column(String(255))
     
     # Email details
     subject = Column(String(998))
