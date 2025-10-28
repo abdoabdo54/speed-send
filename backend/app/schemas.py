@@ -349,6 +349,9 @@ class CampaignStatistics(BaseModel):
     campaigns: dict = {}
     emails: dict = {}
     daily_limits: dict = {}
+    
+    class Config:
+        extra = "allow"  # Allow additional fields
 
 # Draft Launch Response
 class DraftLaunchResponse(BaseModel):
