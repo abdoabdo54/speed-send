@@ -407,45 +407,7 @@ def resume_campaign_instant(campaign_id: int):
         
         # Note: We don't wait for completion here to avoid Celery anti-pattern
         # The individual tasks will update the campaign status when they complete
-        
-        # Update final campaign status based on actual results
-        db.refresh(campaign)
-        if campaign.status == CampaignStatus.SENDING:
-            # Refresh stats from database to get accurate counts
-            from app.models import EmailLog, EmailStatus
-            actual_sent = db.query(EmailLog).filter(
-                EmailLog.campaign_id == campaign_id,
-                EmailLog.status == EmailStatus.SENT
-            ).count()
-            actual_failed = db.query(EmailLog).filter(
-                EmailLog.campaign_id == campaign_id,
-                EmailLog.status == EmailStatus.FAILED
-            ).count()
-            
-            # Update campaign with actual counts
-            campaign.sent_count = actual_sent
-            campaign.failed_count = actual_failed
-            campaign.pending_count = max(0, campaign.total_recipients - actual_sent - actual_failed)
-            
-            total_emails = actual_sent + actual_failed
-            if total_emails > 0:
-                success_rate = actual_sent / total_emails
-                # If no emails failed, campaign is successful regardless of success rate
-                if actual_failed == 0:
-                    campaign.status = CampaignStatus.COMPLETED
-                    logger.info(f"[{request_id}] ✅ Campaign completed successfully: {actual_sent}/{total_emails} sent (100% success - no failures)")
-                elif success_rate >= 0.5:  # 50% success rate threshold for campaigns with some failures
-                    campaign.status = CampaignStatus.COMPLETED
-                    logger.info(f"[{request_id}] ✅ Campaign completed successfully: {actual_sent}/{total_emails} sent ({success_rate:.1%})")
-                else:
-                    campaign.status = CampaignStatus.FAILED
-                    logger.warning(f"[{request_id}] ❌ Campaign failed: {actual_sent}/{total_emails} sent ({success_rate:.1%})")
-            else:
-                campaign.status = CampaignStatus.FAILED
-                logger.error(f"[{request_id}] ❌ Campaign failed: No emails processed")
-            
-            campaign.completed_at = datetime.utcnow()
-            db.commit()
+        # We don't check email status here because the tasks are still running asynchronously
         
         return {
             'campaign_id': campaign_id,
@@ -555,6 +517,13 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
             campaign.sent_count += sent
             campaign.failed_count += failed
             campaign.pending_count = max(0, campaign.pending_count - len(results))
+            
+            # Check if campaign is complete (no more pending emails)
+            if campaign.pending_count == 0:
+                # All emails have been processed, mark campaign as completed
+                campaign.status = CampaignStatus.COMPLETED
+                campaign.completed_at = datetime.utcnow()
+                logger.info(f"[{request_id}] 🎉 Campaign {campaign_id} completed: {campaign.sent_count} sent, {campaign.failed_count} failed")
         
         # Update user stats
         user = db.query(WorkspaceUser).filter(
