@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 
 # Install Python dependencies with no cache
-RUN pip install --no-cache-dir --no-deps -r requirements.txt \
+RUN pip install --no-cache-dir -r requirements.txt \
     && pip cache purge
 
 # Copy application code
