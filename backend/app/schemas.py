@@ -345,10 +345,10 @@ class CampaignControl(BaseModel):
     action: str  # pause, resume, cancel
 
 class CampaignStatistics(BaseModel):
-    accounts: List[dict] = []
-    campaigns: dict = {}
-    emails: dict = {}
-    daily_limits: dict = {}
+    accounts: List[Dict[str, Any]] = []
+    campaigns: Dict[str, Any] = {}
+    emails: Dict[str, Any] = {}
+    daily_limits: Dict[str, Any] = {}
     
     class Config:
         extra = "allow"  # Allow additional fields

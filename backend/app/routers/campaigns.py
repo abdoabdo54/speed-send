@@ -263,19 +263,35 @@ async def get_general_statistics(db: Session = Depends(get_db)):
         total_sent_today = sum(acc.get('daily_sent', 0) for acc in account_stats)
 
         # Create response object that matches the schema
-        response = CampaignStatistics(
-            accounts=account_stats,
-            campaigns={"total": total_campaigns, "active": active_campaigns, "completed": completed_campaigns},
-            emails={"sent_today": today_sent, "sent_all_time": total_sent},
-            daily_limits={
-                "total_daily_limit": total_daily_limit,
-                "total_sent_today": total_sent_today,
-                "total_remaining": total_daily_limit - total_sent_today
-            }
-        )
-        
-        logger.info(f"🔍 Statistics response: {response}")
-        return response
+        try:
+            response = CampaignStatistics(
+                accounts=account_stats or [],
+                campaigns={"total": total_campaigns, "active": active_campaigns, "completed": completed_campaigns},
+                emails={"sent_today": today_sent, "sent_all_time": total_sent},
+                daily_limits={
+                    "total_daily_limit": total_daily_limit,
+                    "total_sent_today": total_sent_today,
+                    "total_remaining": total_daily_limit - total_sent_today
+                }
+            )
+            
+            logger.info(f"🔍 Statistics response created successfully")
+            return response
+        except Exception as validation_error:
+            logger.error(f"❌ Pydantic validation error: {validation_error}")
+            logger.error(f"❌ Account stats type: {type(account_stats)}, value: {account_stats}")
+            # Return a safe default response
+            safe_response = CampaignStatistics(
+                accounts=[],
+                campaigns={"total": total_campaigns, "active": active_campaigns, "completed": completed_campaigns},
+                emails={"sent_today": today_sent, "sent_all_time": total_sent},
+                daily_limits={
+                    "total_daily_limit": total_daily_limit,
+                    "total_sent_today": total_sent_today,
+                    "total_remaining": total_daily_limit - total_sent_today
+                }
+            )
+            return safe_response
     except Exception as e:
         logger.error(f"Error getting statistics: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get statistics: {str(e)}")
