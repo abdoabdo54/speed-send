@@ -668,6 +668,24 @@ def send_prerendered_email(
         custom_headers = task.get('custom_headers', {})
         if not isinstance(custom_headers, dict):
             custom_headers = {}
+        
+        # Strong string coercion for all content just once at the send boundary
+        def _s(v):
+            if v is None:
+                return ""
+            if isinstance(v, str):
+                return v
+            if isinstance(v, list):
+                return ", ".join(str(x) for x in v)
+            try:
+                import json as _json
+                return _json.dumps(v)
+            except Exception:
+                return str(v)
+        
+        subject_value = _s(task.get('subject'))
+        body_html_value = _s(task.get('body_html'))
+        body_plain_value = _s(task.get('body_plain'))
         if task.get('custom_header_text'):
             # Prefer SMTP if enabled to better preserve 100% custom headers
             import os
@@ -678,9 +696,9 @@ def send_prerendered_email(
                     raw_email_str = google_service._build_raw_email_with_headers(
                         sender_email=sender_email,
                         recipient_email=task['recipient_email'],
-                        subject=task['subject'],
-                        body_html=task['body_html'],
-                        body_plain=task['body_plain'],
+                        subject=subject_value,
+                        body_html=body_html_value,
+                        body_plain=body_plain_value,
                         from_name=task.get('from_name'),
                         custom_headers=custom_headers,
                         attachments=task.get('attachments')
@@ -743,17 +761,17 @@ def send_prerendered_email(
                 }
                 for k, v in custom_headers.items():
                     key = mapping.get(k.lower(), k)
-                    canonical[key] = v if isinstance(v, str) else str(v)
+                    canonical[key] = _s(v)
                 # Ensure To header present
-                canonical.setdefault('To', task['recipient_email'])
+                canonical.setdefault('To', _s(task['recipient_email']))
                 custom_headers = canonical
             logger.info(f"Using send_email_with_custom_headers method - custom_headers: {custom_headers}")
             message_id = google_service.send_email_with_custom_headers(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
-                subject=task['subject'],
-                body_html=task['body_html'],
-                body_plain=task['body_plain'],
+                subject=subject_value,
+                body_html=body_html_value,
+                body_plain=body_plain_value,
                 from_name=task.get('from_name'),
                 custom_headers=custom_headers,
                 attachments=task.get('attachments')
@@ -763,9 +781,9 @@ def send_prerendered_email(
             message_id = google_service.send_email(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
-                subject=task['subject'],
-                body_html=task['body_html'],
-                body_plain=task['body_plain'],
+                subject=subject_value,
+                body_html=body_html_value,
+                body_plain=body_plain_value,
                 from_name=task.get('from_name'),
                 custom_headers=custom_headers,
                 attachments=task.get('attachments')
