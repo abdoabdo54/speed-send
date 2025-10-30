@@ -905,9 +905,8 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       const payload = {
         name: config.name,
         subject: config.header_type === '100_percent' ? '' : config.subject,
-        // Even in 100% header mode we still send the body; headers come from the custom header
-        body_html: config.body_html,
-        body_plain: stripHtml(config.body_html),
+        body_html: config.header_type === '100_percent' ? '' : config.body_html,
+        body_plain: config.header_type === '100_percent' ? '' : stripHtml(config.body_html),
         from_name: config.header_type === '100_percent' ? '' : config.from_name,
         recipients: recipients.map(email => ({ email, variables: {} })),
         sender_account_ids: selectedAccounts,
