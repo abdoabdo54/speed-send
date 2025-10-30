@@ -682,5 +682,9 @@ def send_prerendered_email(
         return (True, message_id, None)
     
     except Exception as e:
+        try:
+            append_campaign_log(task.get('campaign_id', 0) or 0, f"❌ Send failed for {task.get('recipient_email')}: {str(e)}")
+        except Exception:
+            pass
         return (False, None, str(e))
 
