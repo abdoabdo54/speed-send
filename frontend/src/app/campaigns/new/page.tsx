@@ -650,12 +650,17 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       errors.push('Campaign name is required');
     }
 
-    if (!config.subject.trim()) {
-      errors.push('Email subject is required');
-    }
-
-    if (!config.body_html.trim()) {
-      errors.push('Email body is required');
+    if (config.header_type !== '100_percent') {
+      if (!config.subject.trim()) {
+        errors.push('Email subject is required');
+      }
+      if (!config.body_html.trim()) {
+        errors.push('Email body is required');
+      }
+    } else {
+      if (!config.custom_header.trim()) {
+        errors.push('Custom Header is required in 100% Header mode');
+      }
     }
 
     if (selectedAccounts.length === 0) {

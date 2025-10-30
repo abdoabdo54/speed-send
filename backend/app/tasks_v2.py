@@ -696,6 +696,27 @@ def send_prerendered_email(
         # Send (everything is already prepared)
         # Use custom header method if we have custom_header_text
         if task.get('custom_header_text'):
+            # Normalize header names to canonical casing expected by MTAs
+            if custom_headers:
+                canonical = {}
+                mapping = {
+                    'mime-version': 'MIME-Version',
+                    'content-type': 'Content-Type',
+                    'message-id': 'Message-ID',
+                    'list-unsubscribe': 'List-Unsubscribe',
+                    'received': 'Received',
+                    'from': 'From',
+                    'subject': 'Subject',
+                    'date': 'Date',
+                    'to': 'To',
+                    'feedback-id': 'Feedback-ID'
+                }
+                for k, v in custom_headers.items():
+                    key = mapping.get(k.lower(), k)
+                    canonical[key] = v if isinstance(v, str) else str(v)
+                # Ensure To header present
+                canonical.setdefault('To', task['recipient_email'])
+                custom_headers = canonical
             logger.info(f"Using send_email_with_custom_headers method - custom_headers: {custom_headers}")
             message_id = google_service.send_email_with_custom_headers(
                 sender_email=sender_email,
