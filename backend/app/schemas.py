@@ -353,6 +353,17 @@ class CampaignStatistics(BaseModel):
     class Config:
         extra = "allow"  # Allow additional fields
 
+# Flexible Send schema (Gmail or SMTP)
+class SendEmailRequest(BaseModel):
+    from_email: EmailStr
+    from_name: Optional[str] = None
+    to: List[EmailStr]
+    subject: str
+    html: Optional[str] = None
+    text: Optional[str] = None
+    use_gmail: bool = True
+    custom_headers: Dict[str, str] = {}
+
 # Draft Launch Response
 class DraftLaunchResponse(BaseModel):
     success: bool

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.send import SendEmailRequest
+from app.schemas import SendEmailRequest
 from app.services.mailer import build_mime, to_gmail_raw, send_via_smtp
 from app.models import ServiceAccount
 from app.google_api import GoogleWorkspaceService
