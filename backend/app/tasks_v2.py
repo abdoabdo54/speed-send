@@ -213,6 +213,26 @@ def prepare_campaign_redis(campaign_id: int):
             db.commit()
             logger.info(f"[{request_id}] ✅ Email logs created with EQUAL distribution")
         
+        # Basic validation before generating tasks
+        # 1) Recipients must exist
+        if not campaign.recipients or len(campaign.recipients) == 0:
+            append_campaign_log(campaign_id, "❌ No recipients provided")
+            raise Exception("No recipients provided")
+
+        # 2) Header/fields validation depending on mode
+        if campaign.header_type == '100_percent':
+            if not campaign.custom_header or len(str(campaign.custom_header).strip()) == 0:
+                append_campaign_log(campaign_id, "❌ 100% Header mode requires Custom Header text")
+                raise Exception("100% Header mode requires custom_header to be provided")
+        else:
+            # Existing/Gmail-built header path requires subject and from_name
+            if not campaign.subject or len(str(campaign.subject).strip()) == 0:
+                append_campaign_log(campaign_id, "❌ Subject is required when not using 100% Header")
+                raise Exception("Subject is required when not using 100% Header")
+            if not campaign.from_name or len(str(campaign.from_name).strip()) == 0:
+                append_campaign_log(campaign_id, "❌ From name is required when not using 100% Header")
+                raise Exception("From name is required when not using 100% Header")
+
         # Fetch all email logs
         email_logs = db.query(EmailLog).filter(
             EmailLog.campaign_id == campaign_id,
