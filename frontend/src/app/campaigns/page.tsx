@@ -147,6 +147,11 @@ export default function CampaignsPage() {
 
   const handleResume = async (campaignId: number) => {
     try {
+      // Auto-open live logs panel for this campaign
+      setExpandedLogs(prev => ({ ...prev, [campaignId]: true }));
+      setLiveLogs(prev => ({ ...prev, [campaignId]: prev[campaignId] || { items: [], next: 0 } }));
+      // kick off polling immediately
+      setTimeout(() => pollLogs(campaignId), 100);
       // Get campaign to show stats
       const campaign = campaigns.find((c: any) => c.id === campaignId);
       const totalEmails = campaign?.total_recipients || 0;
