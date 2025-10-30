@@ -487,6 +487,7 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
                     google_service,
                     sender_email,
                     task,
+                    campaign_id,
                     MICRO_DELAY
                 )
                 futures.append((future, task))
@@ -531,6 +532,10 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
                     email_log.error_message = result['error']
                     email_log.failed_at = datetime.utcnow()
                     failed += 1
+                    try:
+                        append_campaign_log(campaign_id, f"❌ Send failed for {task.get('recipient_email')}: {result['error']}")
+                    except Exception:
+                        pass
         
         # Update campaign counters
         campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
@@ -601,6 +606,7 @@ def send_prerendered_email(
     google_service: GoogleWorkspaceService,
     sender_email: str,
     task: Dict,
+    campaign_id: int,
     micro_delay: float = 0.0
 ) -> tuple:
     """
@@ -619,7 +625,7 @@ def send_prerendered_email(
     try:
         # Skip if Gmail not enabled for this user
         if not google_service.is_gmail_enabled(sender_email):
-            append_campaign_log(task.get('campaign_id', 0) or 0, f"⚠️ Gmail disabled for {sender_email} - skipping")
+            append_campaign_log(campaign_id, f"⚠️ Gmail disabled for {sender_email} - skipping")
             return False, None, "Gmail service not enabled for this user"
         
         # NO DELAY - Send emails instantly
@@ -683,7 +689,7 @@ def send_prerendered_email(
     
     except Exception as e:
         try:
-            append_campaign_log(task.get('campaign_id', 0) or 0, f"❌ Send failed for {task.get('recipient_email')}: {str(e)}")
+            append_campaign_log(campaign_id, f"❌ Send failed for {task.get('recipient_email')}: {str(e)}")
         except Exception:
             pass
         return (False, None, str(e))
