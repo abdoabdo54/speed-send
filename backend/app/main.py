@@ -7,6 +7,7 @@ import logging
 from app.config import settings
 from app.database import engine, Base
 from app.routers import accounts, users, campaigns, dashboard, test_email, drafts, contacts, data_lists
+from app.routers import send as send_router
 from app.middleware import PerformanceMiddleware
 
 # Configure logging
@@ -98,6 +99,7 @@ app.include_router(test_email.router, prefix=settings.API_V1_PREFIX)
 app.include_router(contacts.router, prefix=settings.API_V1_PREFIX)
 app.include_router(data_lists.router, prefix=settings.API_V1_PREFIX)
 app.include_router(drafts.router, prefix=settings.API_V1_PREFIX)
+app.include_router(send_router.router, prefix=settings.API_V1_PREFIX)
 
 logger.info(f"All routers loaded")
 logger.info(f"API Documentation: /docs (disabled in production)")

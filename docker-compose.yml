@@ -45,6 +45,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-bytes-long}
       ENVIRONMENT: production
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      MESSAGE_ID_DOMAIN: ${MESSAGE_ID_DOMAIN:-example.local}
     volumes:
       - service_accounts:/app/service_accounts
     ports:
@@ -67,6 +74,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-bytes-long}
       ENVIRONMENT: production
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      MESSAGE_ID_DOMAIN: ${MESSAGE_ID_DOMAIN:-example.local}
     volumes:
       - service_accounts:/app/service_accounts
     depends_on:
@@ -89,6 +103,13 @@ services:
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-bytes-long}
       ENVIRONMENT: production
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      MESSAGE_ID_DOMAIN: ${MESSAGE_ID_DOMAIN:-example.local}
     volumes:
       - service_accounts:/app/service_accounts
     depends_on:
