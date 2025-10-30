@@ -422,7 +422,7 @@ def resume_campaign_instant(campaign_id: int):
         
         # Dispatch tasks and let them run asynchronously
         logger.info(f"[{request_id}] ✅ All batches dispatched in {time.time() - start_time:.2f}s")
-        append_campaign_log(campaign_id, "✅ All batches dispatched")
+        append_campaign_log(campaign_id, f"✅ Dispatched {len(celery_tasks)} sender batches")
         logger.info(f"[{request_id}] 🎉 V2 RESUME COMPLETE - Tasks dispatched asynchronously")
         
         # Note: We don't wait for completion here to avoid Celery anti-pattern
@@ -468,6 +468,7 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
     
     try:
         logger.info(f"[{request_id}] 👤 Sender {sender_email}: Executing {len(tasks)} tasks")
+        append_campaign_log(campaign_id, f"👤 Sender {sender_email}: executing {len(tasks)} tasks")
         start_time = time.time()
         
         # Initialize Google service once
@@ -544,6 +545,7 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
                 campaign.status = CampaignStatus.COMPLETED
                 campaign.completed_at = datetime.utcnow()
                 logger.info(f"[{request_id}] 🎉 Campaign {campaign_id} completed: {campaign.sent_count} sent, {campaign.failed_count} failed")
+                append_campaign_log(campaign_id, f"🎉 Campaign completed: {campaign.sent_count} sent, {campaign.failed_count} failed")
         
         # Update user stats
         user = db.query(WorkspaceUser).filter(
@@ -565,7 +567,8 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
         # Log results with test_after info
         test_after_info = f", {test_after_sent} test_after" if test_after_sent > 0 else ""
         logger.info(f"[{request_id}] ✅ Sender {sender_email}: {len(tasks)} tasks in {elapsed:.2f}s ({len(tasks)/elapsed:.1f}/sec){test_after_info}")
-        
+        append_campaign_log(campaign_id, f"✅ Sender {sender_email}: sent {sent}, failed {failed}")
+
         # Note: Test After emails are already included in the task queue during preparation
         # No need to send additional test emails during execution
         
@@ -616,6 +619,7 @@ def send_prerendered_email(
     try:
         # Skip if Gmail not enabled for this user
         if not google_service.is_gmail_enabled(sender_email):
+            append_campaign_log(task.get('campaign_id', 0) or 0, f"⚠️ Gmail disabled for {sender_email} - skipping")
             return False, None, "Gmail service not enabled for this user"
         
         # NO DELAY - Send emails instantly
