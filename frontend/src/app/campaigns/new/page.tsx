@@ -899,10 +899,10 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
     try {
       const payload = {
         name: config.name,
-        subject: config.subject,
-        body_html: config.body_html,
-        body_plain: stripHtml(config.body_html),
-        from_name: config.from_name,
+        subject: config.header_type === '100_percent' ? '' : config.subject,
+        body_html: config.header_type === '100_percent' ? '' : config.body_html,
+        body_plain: config.header_type === '100_percent' ? '' : stripHtml(config.body_html),
+        from_name: config.header_type === '100_percent' ? '' : config.from_name,
         recipients: recipients.map(email => ({ email, variables: {} })),
         sender_account_ids: selectedAccounts,
         sender_rotation: 'round_robin',
@@ -1363,6 +1363,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                     placeholder="Enter sender name"
                     value={config.from_name}
                     onChange={(e) => setConfig(prev => ({ ...prev, from_name: e.target.value }))}
+                    disabled={config.header_type === '100_percent'}
                   />
                 </div>
               </div>
@@ -1374,6 +1375,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
                   placeholder="Enter email subject"
                   value={config.subject}
                   onChange={(e) => setConfig(prev => ({ ...prev, subject: e.target.value }))}
+                  disabled={config.header_type === '100_percent'}
                 />
               </div>
 
