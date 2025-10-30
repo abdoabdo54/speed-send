@@ -20,11 +20,20 @@ from fastapi import Response, Request
 from fastapi.responses import StreamingResponse
 # Correctly import the updated functions
 from app.daily_limits import get_all_accounts_statistics, get_account_statistics
+from app.tasks_v2 import get_campaign_progress_key
+import redis
+import json
 
 router = APIRouter(prefix="/campaigns")
 
 # Module logger
 logger = logging.getLogger(__name__)
+
+# Redis connection (read-only usage here)
+redis_client = redis.from_url("redis://redis:6379/0", decode_responses=True)
+
+def _logs_key(campaign_id: int) -> str:
+    return f"campaign:{campaign_id}:logs"
 
 @router.get("/", response_model=List[CampaignResponse])
 async def list_campaigns(
@@ -285,8 +294,50 @@ async def get_campaign_progress(
     campaign_id: int,
     db: Session = Depends(get_db)
 ):
-    # Logic for campaign progress
-    pass # Add logic as needed
+    """Return current progress counters and status.
+    Combines Redis progress hash with DB campaign status.
+    """
+    campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
+    progress = redis_client.hgetall(get_campaign_progress_key(campaign_id)) or {}
+    # cast numbers safely
+    def to_int(v):
+        try:
+            return int(v)
+        except Exception:
+            return 0
+    response = {
+        "status": campaign.status if campaign else None,
+        "total": to_int(progress.get("total")),
+        "sent": to_int(progress.get("sent")),
+        "failed": to_int(progress.get("failed")),
+        "pending": to_int(progress.get("pending")),
+    }
+    return response
+
+@router.get("/{campaign_id}/logs/live")
+async def get_campaign_logs_live(
+    campaign_id: int,
+    offset: int = 0,
+    limit: int = 200
+):
+    """Return log lines from Redis list with pagination by offset.
+    Client can poll with the returned next_offset.
+    """
+    key = _logs_key(campaign_id)
+    length = redis_client.llen(key)
+    if offset < 0:
+        offset = 0
+    if offset >= length:
+        return {"items": [], "next_offset": length}
+    end = min(length - 1, offset + limit - 1)
+    raw_items = redis_client.lrange(key, offset, end) or []
+    items = []
+    for raw in raw_items:
+        try:
+            items.append(json.loads(raw))
+        except Exception:
+            items.append({"ts": None, "message": raw})
+    return {"items": items, "next_offset": end + 1}
 
 
 @router.get("/{campaign_id}/logs/", response_model=List[EmailLogResponse])

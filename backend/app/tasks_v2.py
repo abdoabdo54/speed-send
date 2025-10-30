@@ -32,6 +32,21 @@ def get_campaign_progress_key(campaign_id: int) -> str:
     """Get Redis key for campaign progress tracking"""
     return f"campaign:{campaign_id}:progress"
 
+def get_campaign_logs_key(campaign_id: int) -> str:
+    """Get Redis key for campaign live logs list"""
+    return f"campaign:{campaign_id}:logs"
+
+def append_campaign_log(campaign_id: int, message: str) -> None:
+    """Append a timestamped log line to Redis list for live viewing."""
+    try:
+        from datetime import datetime
+        entry = {"ts": datetime.utcnow().isoformat() + "Z", "message": message}
+        redis_client.rpush(get_campaign_logs_key(campaign_id), json.dumps(entry))
+        # keep only last 5000 entries
+        redis_client.ltrim(get_campaign_logs_key(campaign_id), -5000, -1)
+    except Exception:
+        pass
+
 
 def _is_admin_email(user_email: str, service_account_admin_email: str | None, user_name: str = None) -> bool:
     """ULTRA-AGGRESSIVE admin detection to exclude admin addresses from sender pool.
@@ -93,6 +108,7 @@ def prepare_campaign_redis(campaign_id: int):
     
     try:
         logger.info(f"[{request_id}] 🎯 V2 PREPARE START: Campaign {campaign_id}")
+        append_campaign_log(campaign_id, f"🎯 PREPARE START - campaign {campaign_id}")
         start_time = time.time()
         
         # Get campaign
@@ -298,6 +314,7 @@ def prepare_campaign_redis(campaign_id: int):
             task_count += len(batch_data['tasks'])
         
         logger.info(f"[{request_id}] ✅ Pushed {len(sender_batches)} sender batches ({task_count} tasks) to Redis")
+        append_campaign_log(campaign_id, f"✅ Prepared {task_count} tasks in {len(sender_batches)} batches")
         
         # Initialize progress tracker
         progress_key = get_campaign_progress_key(campaign_id)
@@ -323,6 +340,7 @@ def prepare_campaign_redis(campaign_id: int):
         
         elapsed = time.time() - start_time
         logger.info(f"[{request_id}] 🎉 V2 PREPARE COMPLETE in {elapsed:.2f}s - Campaign {campaign_id} READY")
+        append_campaign_log(campaign_id, "🎉 PREPARE COMPLETE - status READY")
         
         return {
             'campaign_id': campaign_id,
@@ -358,6 +376,7 @@ def resume_campaign_instant(campaign_id: int):
     
     try:
         logger.info(f"[{request_id}] ⚡ V2 RESUME START: Campaign {campaign_id}")
+        append_campaign_log(campaign_id, "⚡ RESUME START")
         start_time = time.time()
         
         # Get campaign
@@ -403,6 +422,7 @@ def resume_campaign_instant(campaign_id: int):
         
         # Dispatch tasks and let them run asynchronously
         logger.info(f"[{request_id}] ✅ All batches dispatched in {time.time() - start_time:.2f}s")
+        append_campaign_log(campaign_id, "✅ All batches dispatched")
         logger.info(f"[{request_id}] 🎉 V2 RESUME COMPLETE - Tasks dispatched asynchronously")
         
         # Note: We don't wait for completion here to avoid Celery anti-pattern
