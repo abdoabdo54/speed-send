@@ -692,10 +692,19 @@ def send_prerendered_email(
                     logger.warning(f"SMTP send failed, falling back to Gmail: {smtp_e}")
             logger.info(f"Processing custom header text: {task['custom_header_text'][:100]}...")
             # Process custom header tags for 100% header type
+            # Derive a display name if not provided
+            sender_display = task.get('from_name') or ''
+            if not sender_display:
+                try:
+                    local = sender_email.split('@')[0]
+                    parts = [p for p in local.replace('_',' ').replace('-',' ').split('.') if p]
+                    sender_display = ' '.join(w.capitalize() for w in parts if w) or local
+                except Exception:
+                    sender_display = sender_email
             processed_header = process_custom_header_tags(
                 header_text=task['custom_header_text'],
                 recipient_email=task['recipient_email'],
-                sender_name=task.get('from_name', ''),
+                sender_name=sender_display,
                 subject=task['subject'],
                 smtp_username=sender_email,
                 domain=sender_email.split('@')[1] if '@' in sender_email else None
