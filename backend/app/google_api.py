@@ -431,18 +431,15 @@ class GoogleWorkspaceService:
             if custom_headers:
                 logger.info(f"🎯 Custom headers being sent: {custom_headers}")
             
-            # Encode and send using insert method to bypass Gmail's header processing
+            # Encode and send
             raw_message = base64.urlsafe_b64encode(raw_email.encode()).decode()
-            
-            # Use insert method instead of send to bypass automatic header processing
-            insert_message = {
-                'raw': raw_message,
-                'labelIds': ['SENT']  # Mark as sent
+            send_message = {
+                'raw': raw_message
             }
-            
-            result = service.users().messages().insert(
+            # Use send() so the email is actually delivered
+            result = service.users().messages().send(
                 userId='me',
-                body=insert_message
+                body=send_message
             ).execute()
             
             return result['id']
