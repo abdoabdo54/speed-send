@@ -25,6 +25,8 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [preparingIds, setPreparingIds] = useState<Set<number>>(new Set());
   const [statistics, setStatistics] = useState<any>(null);
+  const [expandedLogs, setExpandedLogs] = useState<Record<number, boolean>>({});
+  const [liveLogs, setLiveLogs] = useState<Record<number, {items: {ts:string, message:string}[], next:number}>>({});
 
   useEffect(() => {
     loadCampaigns();
@@ -57,6 +59,40 @@ export default function CampaignsPage() {
       }
     } catch (error) {
       console.error('Failed to load statistics:', error);
+    }
+  };
+
+  const toggleLogs = async (campaignId: number) => {
+    setExpandedLogs(prev => ({ ...prev, [campaignId]: !prev[campaignId] }));
+    // start polling if opening
+    if (!expandedLogs[campaignId]) {
+      // init state
+      setLiveLogs(prev => ({ ...prev, [campaignId]: prev[campaignId] || { items: [], next: 0 } }));
+      pollLogs(campaignId);
+    }
+  };
+
+  const pollLogs = async (campaignId: number) => {
+    try {
+      const offset = liveLogs[campaignId]?.next || 0;
+      const res = await fetch(`${API_URL}/api/v1/campaigns/${campaignId}/logs/live?offset=${offset}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLiveLogs(prev => ({
+          ...prev,
+          [campaignId]: {
+            items: [...(prev[campaignId]?.items || []), ...(data.items || [])].slice(-5000),
+            next: data.next_offset || offset,
+          }
+        }));
+      }
+    } catch (e) {
+      console.error('Failed to poll logs', e);
+    } finally {
+      // keep polling while expanded
+      if (expandedLogs[campaignId]) {
+        setTimeout(() => pollLogs(campaignId), 1000);
+      }
     }
   };
 
@@ -708,6 +744,26 @@ export default function CampaignsPage() {
                               {new Date(campaign.created_at).toLocaleDateString()}
                             </p>
                           </div>
+                        </div>
+
+                        {/* Live Logs Dropdown */}
+                        <div className="mt-4">
+                          <button
+                            className="text-xs underline text-blue-600"
+                            onClick={() => toggleLogs(campaign.id)}
+                          >
+                            {expandedLogs[campaign.id] ? 'Hide Live Logs' : 'Show Live Logs'}
+                          </button>
+                          {expandedLogs[campaign.id] && (
+                            <div className="mt-2 max-h-64 overflow-auto rounded border p-2 bg-black text-green-200 text-[11px] font-mono">
+                              {(liveLogs[campaign.id]?.items || []).map((line, idx) => (
+                                <div key={idx}>[{new Date(line.ts || Date.now()).toLocaleTimeString()}] {line.message}</div>
+                              ))}
+                              {(liveLogs[campaign.id]?.items || []).length === 0 && (
+                                <div className="text-gray-400">No logs yet...</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardContent>
