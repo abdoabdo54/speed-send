@@ -91,7 +91,12 @@ async def send_test_email(
             logger.error(f"❌ Failed to create Google service: {e}")
             raise HTTPException(status_code=500, detail="Failed to initialize Google Workspace service")
         
-        # Send email directly with custom headers if available
+        # Pre-check Gmail enabled for the user to avoid failedPrecondition
+        if not google_service.is_gmail_enabled(user.email):
+            logger.error("❌ Gmail service not enabled for this user")
+            raise HTTPException(status_code=400, detail="Gmail service is not enabled for this user. Enable Gmail or choose another sender.")
+        
+        # Send email directly
         logger.info("📤 Sending test email...")
         try:
             # Check if we should use custom headers (for testing)

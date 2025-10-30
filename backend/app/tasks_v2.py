@@ -594,6 +594,10 @@ def send_prerendered_email(
         (success: bool, message_id: str, error: str)
     """
     try:
+        # Skip if Gmail not enabled for this user
+        if not google_service.is_gmail_enabled(sender_email):
+            return False, None, "Gmail service not enabled for this user"
+        
         # NO DELAY - Send emails instantly
         # Removed time.sleep() completely for maximum speed
         

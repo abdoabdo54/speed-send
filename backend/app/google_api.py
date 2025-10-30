@@ -270,6 +270,14 @@ class GoogleWorkspaceService:
         try:
             credentials = self.get_delegated_credentials(sender_email, settings.GMAIL_SCOPES)
             service = build('gmail', 'v1', credentials=credentials)
+            # Quick pre-check: ensure Gmail is enabled for user
+            try:
+                service.users().getProfile(userId='me').execute()
+            except HttpError as precheck:
+                # Translate common failure clearly
+                if hasattr(precheck, 'content') and b'Mail service not enabled' in getattr(precheck, 'content', b''):
+                    raise Exception("Gmail is not enabled for this user. Enable Gmail for the account or choose another sender.")
+                raise
             
             # Create message
             if body_html and body_plain:
@@ -331,6 +339,19 @@ class GoogleWorkspaceService:
         
         except HttpError as error:
             raise Exception(f"Failed to send email: {error}")
+
+    def is_gmail_enabled(self, sender_email: str) -> bool:
+        """Return True if Gmail is enabled for the delegated user, else False."""
+        try:
+            credentials = self.get_delegated_credentials(sender_email, settings.GMAIL_SCOPES)
+            service = build('gmail', 'v1', credentials=credentials)
+            service.users().getProfile(userId='me').execute()
+            return True
+        except HttpError as e:
+            if hasattr(e, 'content') and b'Mail service not enabled' in getattr(e, 'content', b''):
+                return False
+            # Other auth errors also treated as not enabled for safety
+            return False
     
     def send_email_with_custom_headers(
         self,
@@ -362,6 +383,13 @@ class GoogleWorkspaceService:
         try:
             credentials = self.get_delegated_credentials(sender_email, settings.GMAIL_SCOPES)
             service = build('gmail', 'v1', credentials=credentials)
+            # Pre-check Gmail enabled
+            try:
+                service.users().getProfile(userId='me').execute()
+            except HttpError as precheck:
+                if hasattr(precheck, 'content') and b'Mail service not enabled' in getattr(precheck, 'content', b''):
+                    raise Exception("Gmail is not enabled for this user. Enable Gmail for the account or choose another sender.")
+                raise
             
             # Build raw email with custom headers
             raw_email = self._build_raw_email_with_headers(
