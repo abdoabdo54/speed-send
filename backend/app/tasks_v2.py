@@ -669,6 +669,27 @@ def send_prerendered_email(
         if not isinstance(custom_headers, dict):
             custom_headers = {}
         if task.get('custom_header_text'):
+            # Prefer SMTP if enabled to better preserve 100% custom headers
+            import os
+            if os.getenv('SMTP_ENABLED', 'false').lower() == 'true':
+                try:
+                    from app.services.mailer import send_via_smtp
+                    from email import message_from_string as _msg_from_str
+                    raw_email_str = google_service._build_raw_email_with_headers(
+                        sender_email=sender_email,
+                        recipient_email=task['recipient_email'],
+                        subject=task['subject'],
+                        body_html=task['body_html'],
+                        body_plain=task['body_plain'],
+                        from_name=task.get('from_name'),
+                        custom_headers=custom_headers,
+                        attachments=task.get('attachments')
+                    )
+                    smtp_msg = _msg_from_str(raw_email_str)
+                    send_via_smtp(smtp_msg)
+                    return (True, smtp_msg.get('Message-ID'), None)
+                except Exception as smtp_e:
+                    logger.warning(f"SMTP send failed, falling back to Gmail: {smtp_e}")
             logger.info(f"Processing custom header text: {task['custom_header_text'][:100]}...")
             # Process custom header tags for 100% header type
             processed_header = process_custom_header_tags(
