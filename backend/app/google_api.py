@@ -279,6 +279,26 @@ class GoogleWorkspaceService:
                     raise Exception("Gmail is not enabled for this user. Enable Gmail for the account or choose another sender.")
                 raise
             
+            # Create message (normalize bodies to strings)
+            if body_html is not None and not isinstance(body_html, str):
+                try:
+                    if isinstance(body_html, list):
+                        body_html = "\n".join([str(x) for x in body_html])
+                    else:
+                        import json as _json
+                        body_html = _json.dumps(body_html)
+                except Exception:
+                    body_html = str(body_html)
+            if body_plain is not None and not isinstance(body_plain, str):
+                try:
+                    if isinstance(body_plain, list):
+                        body_plain = "\n".join([str(x) for x in body_plain])
+                    else:
+                        import json as _json
+                        body_plain = _json.dumps(body_plain)
+                except Exception:
+                    body_plain = str(body_plain)
+
             # Create message
             if body_html and body_plain:
                 message = MIMEMultipart('alternative')
@@ -450,6 +470,26 @@ class GoogleWorkspaceService:
         from email.mime.base import MIMEBase
         from email import encoders
         
+        # Normalize bodies to strings
+        if body_html is not None and not isinstance(body_html, str):
+            try:
+                if isinstance(body_html, list):
+                    body_html = "\n".join([str(x) for x in body_html])
+                else:
+                    import json as _json
+                    body_html = _json.dumps(body_html)
+            except Exception:
+                body_html = str(body_html)
+        if body_plain is not None and not isinstance(body_plain, str):
+            try:
+                if isinstance(body_plain, list):
+                    body_plain = "\n".join([str(x) for x in body_plain])
+                else:
+                    import json as _json
+                    body_plain = _json.dumps(body_plain)
+            except Exception:
+                body_plain = str(body_plain)
+
         # Start with completely empty message
         if body_html and body_plain:
             message = MIMEMultipart('alternative')
@@ -468,7 +508,11 @@ class GoogleWorkspaceService:
         # Add ONLY the custom headers - no defaults
         if custom_headers:
             for key, value in custom_headers.items():
-                message[key] = value
+                try:
+                    message[key] = value if isinstance(value, str) else str(value)
+                except Exception:
+                    # best effort
+                    message[key] = str(value)
         else:
             # Fallback to basic headers only if no custom headers
             message['To'] = recipient_email
