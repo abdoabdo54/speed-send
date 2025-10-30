@@ -255,11 +255,24 @@ def prepare_campaign_redis(campaign_id: int):
                 {'email': email_log.recipient_email, 'variables': {}}
             )
             
-            # Pre-render subject and body
+            # Pre-render subject and body with strong string coercion
+            def _to_str(val):
+                if val is None:
+                    return ""
+                if isinstance(val, str):
+                    return val
+                if isinstance(val, list):
+                    return "\n".join([str(x) for x in val])
+                try:
+                    import json as _json
+                    return _json.dumps(val)
+                except Exception:
+                    return str(val)
+
             variables = recipient_data.get('variables', {})
-            final_subject = substitute_variables(campaign.subject, variables)
-            final_body_html = substitute_variables(campaign.body_html, variables) if campaign.body_html else None
-            final_body_plain = substitute_variables(campaign.body_plain, variables) if campaign.body_plain else None
+            final_subject = _to_str(substitute_variables(campaign.subject, variables))
+            final_body_html = _to_str(substitute_variables(campaign.body_html, variables)) if campaign.body_html is not None else ""
+            final_body_plain = _to_str(substitute_variables(campaign.body_plain, variables)) if campaign.body_plain is not None else ""
             
             # Check if we should use custom headers
             custom_header_text = None
@@ -273,11 +286,11 @@ def prepare_campaign_redis(campaign_id: int):
             task = {
                 'email_log_id': email_log.id,
                 'recipient_email': email_log.recipient_email,
-                'subject': final_subject,
-                'body_html': final_body_html,
-                'body_plain': final_body_plain,
+                'subject': _to_str(final_subject),
+                'body_html': _to_str(final_body_html),
+                'body_plain': _to_str(final_body_plain),
                 'from_name': campaign.from_name,
-                'custom_headers': campaign.custom_headers,
+                'custom_headers': campaign.custom_headers or {},
                 'attachments': campaign.attachments,
                 'custom_header_text': custom_header_text,
             }
@@ -290,11 +303,11 @@ def prepare_campaign_redis(campaign_id: int):
                 test_task = {
                     'email_log_id': None,  # Special test task
                     'recipient_email': campaign.test_after_email,
-                    'subject': f"[TEST AFTER {task_counter}] {final_subject}",
-                    'body_html': f"<p><strong>Test After Email #{task_counter}</strong></p><p>This is a test email sent after {task_counter} campaign emails.</p>{final_body_html}",
-                    'body_plain': f"Test After Email #{task_counter}\n\nThis is a test email sent after {task_counter} campaign emails.\n\n{final_body_plain}",
+                    'subject': _to_str(f"[TEST AFTER {task_counter}] {final_subject}"),
+                    'body_html': _to_str(f"<p><strong>Test After Email #{task_counter}</strong></p><p>This is a test email sent after {task_counter} campaign emails.</p>{final_body_html}"),
+                    'body_plain': _to_str(f"Test After Email #{task_counter}\n\nThis is a test email sent after {task_counter} campaign emails.\n\n{final_body_plain}"),
                     'from_name': campaign.from_name,
-                    'custom_headers': campaign.custom_headers,
+                    'custom_headers': campaign.custom_headers or {},
                     'attachments': campaign.attachments,
                     'is_test_after': True,
                     'test_after_count': task_counter
