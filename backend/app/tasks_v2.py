@@ -633,6 +633,8 @@ def send_prerendered_email(
         
         # Process custom headers if needed
         custom_headers = task.get('custom_headers', {})
+        if not isinstance(custom_headers, dict):
+            custom_headers = {}
         if task.get('custom_header_text'):
             logger.info(f"Processing custom header text: {task['custom_header_text'][:100]}...")
             # Process custom header tags for 100% header type
