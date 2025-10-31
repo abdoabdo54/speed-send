@@ -290,9 +290,10 @@ def prepare_campaign_redis(campaign_id: int):
                     return str(val)
 
             variables = recipient_data.get('variables', {})
-            final_subject = _to_str(substitute_variables(campaign.subject, variables))
-            final_body_html = _to_str(substitute_variables(campaign.body_html, variables)) if campaign.body_html is not None else ""
-            final_body_plain = _to_str(substitute_variables(campaign.body_plain, variables)) if campaign.body_plain is not None else ""
+            final_subject = _to_str(substitute_variables(campaign.subject or '', variables))
+            # Always preserve body_html even if empty - never force to empty
+            final_body_html = _to_str(substitute_variables(campaign.body_html or '', variables))
+            final_body_plain = _to_str(substitute_variables(campaign.body_plain or '', variables))
             
             # Check if we should use custom headers
             custom_header_text = None
@@ -668,6 +669,15 @@ def send_prerendered_email(
         custom_headers = task.get('custom_headers', {})
         if not isinstance(custom_headers, dict):
             custom_headers = {}
+        
+        # Ensure body_html and body_plain are always strings (safety check)
+        body_html = task.get('body_html', '') or ''
+        body_plain = task.get('body_plain', '') or ''
+        if not isinstance(body_html, str):
+            body_html = str(body_html) if body_html else ''
+        if not isinstance(body_plain, str):
+            body_plain = str(body_plain) if body_plain else ''
+        
         if task.get('custom_header_text'):
             # Prefer SMTP if enabled to better preserve 100% custom headers
             import os
@@ -679,8 +689,8 @@ def send_prerendered_email(
                         sender_email=sender_email,
                         recipient_email=task['recipient_email'],
                         subject=task['subject'],
-                        body_html=task['body_html'],
-                        body_plain=task['body_plain'],
+                        body_html=body_html,
+                        body_plain=body_plain,
                         from_name=task.get('from_name'),
                         custom_headers=custom_headers,
                         attachments=task.get('attachments')
@@ -748,24 +758,26 @@ def send_prerendered_email(
                 canonical.setdefault('To', task['recipient_email'])
                 custom_headers = canonical
             logger.info(f"Using send_email_with_custom_headers method - custom_headers: {custom_headers}")
+            logger.info(f"Body HTML length: {len(body_html)}, Body Plain length: {len(body_plain)}")
             message_id = google_service.send_email_with_custom_headers(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
                 subject=task['subject'],
-                body_html=task['body_html'],
-                body_plain=task['body_plain'],
+                body_html=body_html,
+                body_plain=body_plain,
                 from_name=task.get('from_name'),
                 custom_headers=custom_headers,
                 attachments=task.get('attachments')
             )
         else:
             logger.info(f"Using regular send_email method - no custom_header_text")
+            logger.info(f"Body HTML length: {len(body_html)}, Body Plain length: {len(body_plain)}")
             message_id = google_service.send_email(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
                 subject=task['subject'],
-                body_html=task['body_html'],
-                body_plain=task['body_plain'],
+                body_html=body_html,
+                body_plain=body_plain,
                 from_name=task.get('from_name'),
                 custom_headers=custom_headers,
                 attachments=task.get('attachments')
