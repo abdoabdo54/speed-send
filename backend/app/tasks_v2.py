@@ -161,7 +161,7 @@ def prepare_campaign_redis(campaign_id: int):
             
             # Decrypt once during preparation
             try:
-                decrypted_json = encryption_service.decrypt(account.encrypted_json)
+            decrypted_json = encryption_service.decrypt(account.encrypted_json)
                 logger.info(f"[{request_id}] 🔍 Successfully decrypted JSON for account {account.name}")
             except Exception as e:
                 logger.error(f"[{request_id}] ❌ Failed to decrypt JSON for account {account.name}: {e}")
@@ -244,7 +244,7 @@ def prepare_campaign_redis(campaign_id: int):
             if not campaign.from_name or len(str(campaign.from_name).strip()) == 0:
                 append_campaign_log(campaign_id, "❌ From name is required when not using 100% Header")
                 raise Exception("From name is required when not using 100% Header")
-
+        
         # Fetch all email logs
         email_logs = db.query(EmailLog).filter(
             EmailLog.campaign_id == campaign_id,
@@ -681,7 +681,7 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
         test_after_info = f", {test_after_sent} test_after" if test_after_sent > 0 else ""
         logger.info(f"[{request_id}] ✅ Sender {sender_email}: {len(tasks)} tasks in {elapsed:.2f}s ({len(tasks)/elapsed:.1f}/sec){test_after_info}")
         append_campaign_log(campaign_id, f"✅ Sender {sender_email}: sent {sent}, failed {failed}")
-
+        
         # Note: Test After emails are already included in the task queue during preparation
         # No need to send additional test emails during execution
         
@@ -752,22 +752,30 @@ def send_prerendered_email(
         if not isinstance(body_html_raw, str):
             logger.error(f"❌ CRITICAL: body_html_raw is {type(body_html_raw)}: {str(body_html_raw)[:200]}")
         
-        # CRITICAL: Handle lists properly - join them, don't just str() them
-        if isinstance(body_html_raw, list):
-            logger.warning(f"⚠️ body_html_raw is a LIST with {len(body_html_raw)} items, joining...")
-            body_html = "\n".join([str(x) for x in body_html_raw if x])
-        elif isinstance(body_html_raw, str):
-            body_html = body_html_raw
-        else:
-            body_html = str(body_html_raw) if body_html_raw else ''
+        # CRITICAL: Handle lists, Quill Delta objects, and other types properly
+        def _comprehensive_as_str(v):
+            """Comprehensive string conversion - handles None, strings, lists, Quill Delta objects"""
+            if v is None:
+                return ""
+            if isinstance(v, str):
+                return v
+            if isinstance(v, list):
+                logger.warning(f"⚠️ body_html/body_plain is a LIST with {len(v)} items, joining...")
+                return "".join(str(x) for x in v if x)  # Join with empty string for code editor lines
+            if isinstance(v, dict):
+                # Quill Delta minimal support - handle {ops: [{insert: "text"}, ...]}
+                if "ops" in v and isinstance(v["ops"], list):
+                    logger.warning(f"⚠️ body_html/body_plain is Quill Delta object, extracting text...")
+                    return "".join(str(op.get("insert", "")) for op in v["ops"] if op)
+                # For other dicts, convert to JSON string
+                try:
+                    return json.dumps(v)
+                except Exception:
+                    return str(v)
+            return str(v) if v else ""
         
-        if isinstance(body_plain_raw, list):
-            logger.warning(f"⚠️ body_plain_raw is a LIST with {len(body_plain_raw)} items, joining...")
-            body_plain = "\n".join([str(x) for x in body_plain_raw if x])
-        elif isinstance(body_plain_raw, str):
-            body_plain = body_plain_raw
-        else:
-            body_plain = str(body_plain_raw) if body_plain_raw else ''
+        body_html = _comprehensive_as_str(body_html_raw)
+        body_plain = _comprehensive_as_str(body_plain_raw)
         
         # Final safety: must be strings
         if not isinstance(body_html, str):
@@ -871,23 +879,28 @@ def send_prerendered_email(
         else:
             logger.info(f"Using regular send_email method - no custom_header_text")
             logger.info(f"Body HTML length: {len(body_html)}, Body Plain length: {len(body_plain)}")
-            message_id = google_service.send_email(
-                sender_email=sender_email,
-                recipient_email=task['recipient_email'],
-                subject=task['subject'],
+        message_id = google_service.send_email(
+            sender_email=sender_email,
+            recipient_email=task['recipient_email'],
+            subject=task['subject'],
                 body_html=body_html,
                 body_plain=body_plain,
-                from_name=task.get('from_name'),
+            from_name=task.get('from_name'),
                 custom_headers=custom_headers,
-                attachments=task.get('attachments')
-            )
+            attachments=task.get('attachments')
+        )
         
         return (True, message_id, None)
     
     except Exception as e:
+        # Enhanced error logging with types for debugging
+        html_t = type(task.get('body_html')).__name__
+        text_t = type(task.get('body_plain')).__name__
+        error_msg = f"{str(e)} | html_type={html_t} text_type={text_t}"
         try:
-            append_campaign_log(campaign_id, f"❌ Send failed for {task.get('recipient_email')}: {str(e)}")
+            append_campaign_log(campaign_id, f"❌ Send failed for {task.get('recipient_email')}: {error_msg}")
         except Exception:
             pass
-        return (False, None, str(e))
+        logger.error(f"❌ Send failed for {task.get('recipient_email')}: {error_msg}")
+        return (False, None, error_msg)
 

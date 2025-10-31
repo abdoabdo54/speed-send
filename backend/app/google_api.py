@@ -15,6 +15,31 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _as_str(v):
+    """
+    Comprehensive string conversion - handles None, strings, lists, Quill Delta objects, and other types.
+    This is the SINGLE SOURCE OF TRUTH for converting email body content to strings.
+    """
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, list):
+        # Join list items with empty string (for code editor lines or arrays)
+        return "".join(str(x) for x in v if x)
+    if isinstance(v, dict):
+        # Quill Delta minimal support - handle {ops: [{insert: "text"}, ...]}
+        if "ops" in v and isinstance(v["ops"], list):
+            return "".join(str(op.get("insert", "")) for op in v["ops"] if op)
+        # For other dicts, convert to JSON string
+        try:
+            import json as _json
+            return _json.dumps(v)
+        except Exception:
+            return str(v)
+    return str(v) if v else ""
+
+
 class GoogleWorkspaceService:
     """Service for interacting with Google Workspace APIs"""
     
@@ -307,22 +332,10 @@ class GoogleWorkspaceService:
                 except Exception:
                     body_plain = str(body_plain) if body_plain else ''
             
-            # ABSOLUTE FINAL CHECK RIGHT BEFORE MIMEText - handle lists properly
-            def _abs_final_str(val):
-                """Absolute final string conversion - handles lists by joining"""
-                if val is None:
-                    return ''
-                if isinstance(val, str):
-                    return val
-                if isinstance(val, list):
-                    # Join list items, don't convert to string representation
-                    return "\n".join([str(x) for x in val if x])
-                # For any other type, convert to string
-                return str(val) if val else ''
-            
-            # Final safety check - must be strings, JOIN lists don't str() them
-            body_html = _abs_final_str(body_html)
-            body_plain = _abs_final_str(body_plain)
+            # ABSOLUTE FINAL CHECK RIGHT BEFORE MIMEText - use comprehensive _as_str
+            # Final safety check - must be strings, handles lists, Quill Delta, etc.
+            body_html = _as_str(body_html)
+            body_plain = _as_str(body_plain)
             
             # ONE MORE CHECK - if somehow still not string, force it
             if not isinstance(body_html, str):
@@ -555,22 +568,10 @@ class GoogleWorkspaceService:
             except Exception:
                 body_plain = str(body_plain) if body_plain else ''
         
-        # ABSOLUTE FINAL CHECK RIGHT BEFORE MIMEText - handle lists properly
-        def _abs_final_str(val):
-            """Absolute final string conversion - handles lists by joining"""
-            if val is None:
-                return ''
-            if isinstance(val, str):
-                return val
-            if isinstance(val, list):
-                # Join list items, don't convert to string representation
-                return "\n".join([str(x) for x in val if x])
-            # For any other type, convert to string
-            return str(val) if val else ''
-        
-        # Final safety check - must be strings, JOIN lists don't str() them
-        body_html = _abs_final_str(body_html)
-        body_plain = _abs_final_str(body_plain)
+        # ABSOLUTE FINAL CHECK RIGHT BEFORE MIMEText - use comprehensive _as_str
+        # Final safety check - must be strings, handles lists, Quill Delta, etc.
+        body_html = _as_str(body_html)
+        body_plain = _as_str(body_plain)
         
         # ONE MORE CHECK - if somehow still not string, force it
         if not isinstance(body_html, str):

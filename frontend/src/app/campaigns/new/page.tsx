@@ -49,6 +49,18 @@ export default function NewCampaignPage() {
   const router = useRouter();
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  // Helper: Guarantee string conversion - handles arrays, Quill Delta, etc.
+  const asString = (v: any): string => {
+    if (v == null) return "";
+    if (typeof v === "string") return v;
+    if (Array.isArray(v)) return v.join(""); // Code editor lines or arrays
+    if (v && typeof v === "object" && Array.isArray(v.ops)) {
+      // Quill Delta minimal support
+      return v.ops.map((op: any) => String(op.insert ?? "")).join("");
+    }
+    return String(v);
+  };
+
   // State
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -822,8 +834,8 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
         return axios.post(`${API_URL}/api/v1/test-email/`, {
           recipient_email: testEmail,
           subject: config.subject,
-          body_html: config.body_html,
-          body_plain: stripHtml(config.body_html),
+          body_html: asString(config.body_html),
+          body_plain: asString(stripHtml(config.body_html)),
           from_name: config.from_name,
           sender_account_id: user.service_account_id,
           sender_user_id: userId
@@ -905,8 +917,8 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       const payload = {
         name: config.name,
         subject: config.header_type === '100_percent' ? '' : config.subject,
-        body_html: config.body_html || '', // Always send body_html, even in 100% mode
-        body_plain: config.body_plain || stripHtml(config.body_html) || '',
+        body_html: asString(config.body_html || ''), // Always send body_html, even in 100% mode
+        body_plain: asString(config.body_plain || stripHtml(config.body_html) || ''),
         from_name: config.header_type === '100_percent' ? '' : config.from_name,
         recipients: recipients.map(email => ({ email, variables: {} })),
         sender_account_ids: selectedAccounts,
