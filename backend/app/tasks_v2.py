@@ -350,11 +350,30 @@ def prepare_campaign_redis(campaign_id: int):
         
         # Push batches to Redis
         task_count = 0
+        # CRITICAL: Final normalization pass before storing in Redis
+        def _force_str_final(val):
+            if val is None:
+                return ''
+            if isinstance(val, str):
+                return val
+            if isinstance(val, list):
+                return "\n".join([str(x) for x in val if x])
+            return str(val) if val else ''
+        
         for sender_email, batch_data in sender_batches.items():
+            # Normalize all task fields before storing
+            normalized_tasks = []
+            for task in batch_data['tasks']:
+                normalized_task = task.copy()
+                normalized_task['body_html'] = _force_str_final(task.get('body_html', ''))
+                normalized_task['body_plain'] = _force_str_final(task.get('body_plain', ''))
+                normalized_task['subject'] = _force_str_final(task.get('subject', ''))
+                normalized_tasks.append(normalized_task)
+            
             redis_task = {
                 'campaign_id': campaign_id,
                 'sender': batch_data['sender'],
-                'tasks': batch_data['tasks']
+                'tasks': normalized_tasks
             }
             redis_client.rpush(redis_key, json.dumps(redis_task))
             task_count += len(batch_data['tasks'])
@@ -449,7 +468,30 @@ def resume_campaign_instant(campaign_id: int):
             batch_json = redis_client.lpop(redis_key)
             if not batch_json:
                 break
-            task_batches.append(json.loads(batch_json))
+            batch_data = json.loads(batch_json)
+            # CRITICAL: Normalize all tasks in batch - ensure body_html/body_plain are strings
+            def _force_str(val):
+                if val is None:
+                    return ''
+                if isinstance(val, str):
+                    return val
+                if isinstance(val, list):
+                    return "\n".join([str(x) for x in val if x])
+                return str(val) if val else ''
+            
+            if 'tasks' in batch_data:
+                for task in batch_data['tasks']:
+                    # Log types before normalization for debugging
+                    if 'body_html' in task and not isinstance(task.get('body_html'), str):
+                        logger.warning(f"[{request_id}] ⚠️ body_html from Redis is NOT a string: {type(task['body_html'])} = {str(task['body_html'])[:100]}")
+                    if 'body_html' in task:
+                        task['body_html'] = _force_str(task['body_html'])
+                    if 'body_plain' in task:
+                        task['body_plain'] = _force_str(task['body_plain'])
+                    if 'subject' in task:
+                        task['subject'] = _force_str(task['subject'])
+            
+            task_batches.append(batch_data)
         
         if not task_batches:
             raise Exception("No tasks found in Redis. Campaign may not be prepared.")
@@ -528,6 +570,26 @@ def execute_sender_batch_v2(batch_data: Dict, campaign_id: int, request_id: str)
             futures = []
             
             for task in tasks:
+                # CRITICAL: Normalize body_html and body_plain right before sending
+                # Ensure they're never lists - this is the last safety net
+                def _force_str(val):
+                    if val is None:
+                        return ''
+                    if isinstance(val, str):
+                        return val
+                    if isinstance(val, list):
+                        return "\n".join([str(x) for x in val if x])
+                    return str(val) if val else ''
+                
+                # Log type before normalization for debugging
+                body_html_before = task.get('body_html', '')
+                if not isinstance(body_html_before, str):
+                    logger.warning(f"[{request_id}] ⚠️ body_html is NOT a string before send: {type(body_html_before)} = {str(body_html_before)[:100]}")
+                
+                task['body_html'] = _force_str(task.get('body_html', ''))
+                task['body_plain'] = _force_str(task.get('body_plain', ''))
+                task['subject'] = _force_str(task.get('subject', ''))
+                
                 future = executor.submit(
                     send_prerendered_email,
                     google_service,
