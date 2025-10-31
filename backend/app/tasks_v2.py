@@ -161,7 +161,7 @@ def prepare_campaign_redis(campaign_id: int):
             
             # Decrypt once during preparation
             try:
-            decrypted_json = encryption_service.decrypt(account.encrypted_json)
+                decrypted_json = encryption_service.decrypt(account.encrypted_json)
                 logger.info(f"[{request_id}] 🔍 Successfully decrypted JSON for account {account.name}")
             except Exception as e:
                 logger.error(f"[{request_id}] ❌ Failed to decrypt JSON for account {account.name}: {e}")
