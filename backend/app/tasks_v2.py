@@ -745,11 +745,36 @@ def send_prerendered_email(
             custom_headers = {}
         
         # Ensure body_html and body_plain are always strings (safety check)
-        body_html = task.get('body_html', '') or ''
-        body_plain = task.get('body_plain', '') or ''
+        body_html_raw = task.get('body_html', '') or ''
+        body_plain_raw = task.get('body_plain', '') or ''
+        
+        # CRITICAL DEBUG: Log the raw type before normalization
+        if not isinstance(body_html_raw, str):
+            logger.error(f"❌ CRITICAL: body_html_raw is {type(body_html_raw)}: {str(body_html_raw)[:200]}")
+        
+        # CRITICAL: Handle lists properly - join them, don't just str() them
+        if isinstance(body_html_raw, list):
+            logger.warning(f"⚠️ body_html_raw is a LIST with {len(body_html_raw)} items, joining...")
+            body_html = "\n".join([str(x) for x in body_html_raw if x])
+        elif isinstance(body_html_raw, str):
+            body_html = body_html_raw
+        else:
+            body_html = str(body_html_raw) if body_html_raw else ''
+        
+        if isinstance(body_plain_raw, list):
+            logger.warning(f"⚠️ body_plain_raw is a LIST with {len(body_plain_raw)} items, joining...")
+            body_plain = "\n".join([str(x) for x in body_plain_raw if x])
+        elif isinstance(body_plain_raw, str):
+            body_plain = body_plain_raw
+        else:
+            body_plain = str(body_plain_raw) if body_plain_raw else ''
+        
+        # Final safety: must be strings
         if not isinstance(body_html, str):
+            logger.error(f"❌ CRITICAL: body_html still not string after normalization: {type(body_html)}")
             body_html = str(body_html) if body_html else ''
         if not isinstance(body_plain, str):
+            logger.error(f"❌ CRITICAL: body_plain still not string after normalization: {type(body_plain)}")
             body_plain = str(body_plain) if body_plain else ''
         
         if task.get('custom_header_text'):
