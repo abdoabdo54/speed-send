@@ -279,25 +279,34 @@ class GoogleWorkspaceService:
                     raise Exception("Gmail is not enabled for this user. Enable Gmail for the account or choose another sender.")
                 raise
             
-            # Create message (normalize bodies to strings)
-            if body_html is not None and not isinstance(body_html, str):
+            # ALWAYS normalize bodies to strings - never allow None or lists
+            if body_html is None:
+                body_html = ''
+            elif not isinstance(body_html, str):
                 try:
                     if isinstance(body_html, list):
-                        body_html = "\n".join([str(x) for x in body_html])
+                        body_html = "\n".join([str(x) for x in body_html if x])
                     else:
                         import json as _json
                         body_html = _json.dumps(body_html)
                 except Exception:
-                    body_html = str(body_html)
-            if body_plain is not None and not isinstance(body_plain, str):
+                    body_html = str(body_html) if body_html else ''
+            
+            if body_plain is None:
+                body_plain = ''
+            elif not isinstance(body_plain, str):
                 try:
                     if isinstance(body_plain, list):
-                        body_plain = "\n".join([str(x) for x in body_plain])
+                        body_plain = "\n".join([str(x) for x in body_plain if x])
                     else:
                         import json as _json
                         body_plain = _json.dumps(body_plain)
                 except Exception:
-                    body_plain = str(body_plain)
+                    body_plain = str(body_plain) if body_plain else ''
+            
+            # Final safety check - must be strings
+            body_html = str(body_html) if body_html else ''
+            body_plain = str(body_plain) if body_plain else ''
 
             # Create message
             if body_html and body_plain:
@@ -467,25 +476,34 @@ class GoogleWorkspaceService:
         from email.mime.base import MIMEBase
         from email import encoders
         
-        # Normalize bodies to strings
-        if body_html is not None and not isinstance(body_html, str):
+        # ALWAYS normalize bodies to strings - never allow None or lists
+        if body_html is None:
+            body_html = ''
+        elif not isinstance(body_html, str):
             try:
                 if isinstance(body_html, list):
-                    body_html = "\n".join([str(x) for x in body_html])
+                    body_html = "\n".join([str(x) for x in body_html if x])
                 else:
                     import json as _json
                     body_html = _json.dumps(body_html)
             except Exception:
-                body_html = str(body_html)
-        if body_plain is not None and not isinstance(body_plain, str):
+                body_html = str(body_html) if body_html else ''
+        
+        if body_plain is None:
+            body_plain = ''
+        elif not isinstance(body_plain, str):
             try:
                 if isinstance(body_plain, list):
-                    body_plain = "\n".join([str(x) for x in body_plain])
+                    body_plain = "\n".join([str(x) for x in body_plain if x])
                 else:
                     import json as _json
                     body_plain = _json.dumps(body_plain)
             except Exception:
-                body_plain = str(body_plain)
+                body_plain = str(body_plain) if body_plain else ''
+        
+        # Final safety check - must be strings
+        body_html = str(body_html) if body_html else ''
+        body_plain = str(body_plain) if body_plain else ''
 
         # Start with completely empty message
         if body_html and body_plain:

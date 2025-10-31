@@ -116,6 +116,18 @@ def prepare_campaign_redis(campaign_id: int):
         if not campaign:
             raise Exception(f"Campaign {campaign_id} not found")
         
+        # Normalize body_html and body_plain from database - ensure they're always strings
+        if campaign.body_html is not None and not isinstance(campaign.body_html, str):
+            if isinstance(campaign.body_html, list):
+                campaign.body_html = "\n".join([str(x) for x in campaign.body_html if x])
+            else:
+                campaign.body_html = str(campaign.body_html) if campaign.body_html else ''
+        if campaign.body_plain is not None and not isinstance(campaign.body_plain, str):
+            if isinstance(campaign.body_plain, list):
+                campaign.body_plain = "\n".join([str(x) for x in campaign.body_plain if x])
+            else:
+                campaign.body_plain = str(campaign.body_plain) if campaign.body_plain else ''
+        
         campaign.status = CampaignStatus.PREPARING
         campaign.prepared_at = datetime.utcnow()
         db.commit()
