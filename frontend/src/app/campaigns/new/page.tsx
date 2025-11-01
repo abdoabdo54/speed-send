@@ -78,12 +78,12 @@ export default function NewCampaignPage() {
     test_after_email: '',
     test_after_count: 0,
     header_type: 'existing', // 'existing' or '100_percent'
-    custom_header: `MIME-version: 1.0
-Content-type: text/html
+    custom_header: `MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
 To: [to]
 Message-ID: <[rnda_20]@mail.sys.com>
 Feedback-ID: [rndn_10]:[rndn_7]:[rndn_3].[rndn_2].[rndn_2].[rndn_2]:[rnda_8]
-from: [from] <[smtp]>
+From: [from] <[smtp]>
 Subject: [subject]
 Date: [date]
 List-Unsubscribe: <mailto:unsubscribe@[domain]?subject=unsubscribe>
@@ -906,8 +906,8 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       const payload = {
         name: config.name,
         subject: config.header_type === '100_percent' ? '' : config.subject,
-        body_html: config.header_type === '100_percent' ? '' : asString(config.body_html),
-        body_plain: config.header_type === '100_percent' ? '' : asString(stripHtml(config.body_html)),
+        body_html: asString(config.body_html), // Always send HTML body even in 100% Header mode
+        body_plain: asString(stripHtml(config.body_html)), // Always send plain text fallback
         from_name: config.header_type === '100_percent' ? '' : config.from_name,
         recipients: recipients.map(email => ({ email, variables: {} })),
         sender_account_ids: selectedAccounts,

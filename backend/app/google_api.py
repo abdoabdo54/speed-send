@@ -487,35 +487,61 @@ class GoogleWorkspaceService:
             except Exception:
                 body_plain = str(body_plain)
 
-        # Start with completely empty message
+        # Build message with proper HTML/plain text handling
+        # Always prefer HTML if available, ensure Content-Type is set correctly
         if body_html and body_plain:
             message = MIMEMultipart('alternative')
-            part1 = MIMEText(body_plain, 'plain')
-            part2 = MIMEText(body_html, 'html')
+            part1 = MIMEText(body_plain, 'plain', 'utf-8')
+            part2 = MIMEText(body_html, 'html', 'utf-8')
             message.attach(part1)
             message.attach(part2)
         elif body_html:
-            message = MIMEText(body_html, 'html')
+            # HTML-only: Create multipart to ensure proper Content-Type
+            message = MIMEMultipart('alternative')
+            # Add plain text fallback
+            plain_part = MIMEText("This email contains HTML content.", 'plain', 'utf-8')
+            html_part = MIMEText(body_html, 'html', 'utf-8')
+            message.attach(plain_part)
+            message.attach(html_part)
         else:
-            message = MIMEText(body_plain or '', 'plain')
+            message = MIMEText(body_plain or '', 'plain', 'utf-8')
         
-        # Clear all default headers first
+        # Clear all default headers first (we'll add custom ones)
         message._headers = []
         
         # Add ONLY the custom headers - no defaults
         if custom_headers:
             for key, value in custom_headers.items():
                 try:
-                    message[key] = value if isinstance(value, str) else str(value)
+                    # Preserve Content-Type for HTML emails when using custom headers
+                    if key.lower() == 'content-type':
+                        # Ensure Content-Type includes charset for HTML
+                        if 'text/html' in str(value).lower() and 'charset' not in str(value).lower():
+                            message[key] = f"{value}; charset=utf-8"
+                        else:
+                            message[key] = value if isinstance(value, str) else str(value)
+                    else:
+                        message[key] = value if isinstance(value, str) else str(value)
                 except Exception:
                     # best effort
                     message[key] = str(value)
+            
+            # Ensure Content-Type is set for HTML emails if not in custom headers
+            if body_html and 'Content-Type' not in [h[0].lower() for h in message._headers]:
+                if isinstance(message, MIMEMultipart):
+                    # For multipart, Content-Type is automatically set to multipart/alternative
+                    pass
+                else:
+                    message['Content-Type'] = 'text/html; charset=utf-8'
         else:
             # Fallback to basic headers only if no custom headers
             message['To'] = recipient_email
             forced_from = f"{from_name} <{sender_email}>" if from_name else sender_email
             message['From'] = forced_from
             message['Subject'] = subject
+            # Ensure Content-Type for HTML
+            if body_html:
+                message['Content-Type'] = 'text/html; charset=utf-8'
         
         # Handle attachments
         if attachments:
