@@ -1,3 +1,4 @@
+# backend/app/services/mailer.py
 import os
 import uuid
 import time
@@ -15,7 +16,6 @@ def _rfc2822_date() -> str:
 
 
 def _as_str(v):
-    """Normalizes any value to a string, handling various editor formats."""
     if v is None:
         return ""
     if isinstance(v, str):
@@ -23,7 +23,7 @@ def _as_str(v):
     if isinstance(v, list):
         return "".join(str(x) for x in v)
     if isinstance(v, dict):
-        # Handle Quill Delta format (minimal support)
+        # Minimal Quill Delta support
         if "ops" in v and isinstance(v["ops"], list):
             return "".join(str(op.get("insert", "")) for op in v["ops"])
         return str(v)
@@ -31,25 +31,26 @@ def _as_str(v):
 
 
 def build_mime(req) -> tuple[EmailMessage, str]:
+    """
+    req must expose: from_email, from_name, to(list), subject, html, text, custom_headers
+    """
     msg = EmailMessage()
-    from_disp = f"{req.from_name} <{req.from_email}>" if getattr(req, "from_name", None) else req.from_email
+    from_disp = f'{getattr(req, "from_name", None)} <{req.from_email}>' if getattr(req, "from_name", None) else req.from_email
     msg["From"] = from_disp
     msg["To"] = ", ".join(req.to)
     msg["Subject"] = req.subject
     msg["Date"] = _rfc2822_date()
 
-    # Our own RFC-compliant Message-ID
+    # RFC-compliant Message-ID (Gmail may overwrite; SMTP preserves)
     raw_id = f"{uuid.uuid4().hex}.{int(time.time())}"
     msg_id = f"<{raw_id}@{MESSAGE_ID_DOMAIN}>"
     msg["Message-ID"] = msg_id
 
-    # Custom headers (do not allow overriding Message-ID)
     for k, v in (getattr(req, "custom_headers", {}) or {}).items():
         if k.lower() == "message-id":
             continue
         msg[k] = v
 
-    # Normalize HTML and text from various formats
     html = _as_str(getattr(req, "html", None))
     text = _as_str(getattr(req, "text", None))
 
@@ -57,15 +58,17 @@ def build_mime(req) -> tuple[EmailMessage, str]:
         msg.set_content(text)
         msg.add_alternative(html, subtype="html")
     elif html:
-        # HTML-only: provide a fallback plain text
+        # plain fallback avoids "empty body" and helps deliverability
         msg.set_content("This email contains HTML content.")
         msg.add_alternative(html, subtype="html")
     else:
         msg.set_content(text or "")
+
     return msg, msg_id
 
 
 def to_gmail_raw(msg: EmailMessage) -> str:
+    # Gmail API expects base64url of the raw RFC 5322 message
     return base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
 
 
@@ -75,10 +78,6 @@ def send_via_smtp(msg: EmailMessage):
     user = os.getenv("SMTP_USER")
     pwd = os.getenv("SMTP_PASS")
     use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
-
-    if not host:
-        raise RuntimeError("SMTP_HOST is not configured")
-
     if use_tls:
         ctx = ssl.create_default_context()
         with smtplib.SMTP(host, port) as s:
@@ -91,5 +90,3 @@ def send_via_smtp(msg: EmailMessage):
             if user and pwd:
                 s.login(user, pwd)
             s.send_message(msg)
-
-
