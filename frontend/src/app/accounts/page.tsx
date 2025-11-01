@@ -1,28 +1,43 @@
-def send_email_with_custom_headers(
-    self,
-    sender_email: str,
-    recipient_email: str,
-    subject: str,
-    body_html: Optional[str] = None,def _build_raw_email_with_headers(
-    self,
-    sender_email: str,
-    recipient_email: str,
-    subject: str,
-    body_html: Optional[str] = None,
-    body_plain: Optional[str] = None,
-    from_name: Optional[str] = None,cat > frontend/src/app/accounts/page.tsx << 'EOF'
 'use client';
 
 import { useEffect, useState } from 'react';
 import { Sidebar } from '@/components/Sidebar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { serviceAccountsApi, healthCheck, API_URL } from '@/lib/api';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Wifi, WifiOff, Upload } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  Wifi,
+  WifiOff,
+  Upload,
+} from 'lucide-react';
+
+type ServiceAccount = {
+  id: number;
+  name: string;
+  status: 'active' | 'inactive' | string;
+  client_email?: string;
+  domain?: string;
+  total_users?: number;
+  quota_used_today?: number;
+  quota_limit?: number;
+  last_synced?: string | null;
+  admin_email?: string;
+};
 
 export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<ServiceAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [uploadData, setUploadData] = useState({ name: '', json: '' });
@@ -32,6 +47,7 @@ export default function AccountsPage() {
   useEffect(() => {
     checkBackend();
     loadAccounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkBackend = async () => {
@@ -40,7 +56,9 @@ export default function AccountsPage() {
     setBackendStatus(isHealthy);
     if (!isHealthy) {
       console.error('Backend service not accessible:', API_URL);
-      alert(`Unable to connect to backend service: ${API_URL}\n\nPlease ensure the backend service is running and the network connection is normal.`);
+      alert(
+        `Unable to connect to backend service: ${API_URL}\n\nPlease ensure the backend service is running and the network connection is normal.`
+      );
     } else {
       console.log('Backend service connection normal');
     }
@@ -59,12 +77,14 @@ export default function AccountsPage() {
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
-        url: error.config?.url
+        url: error.config?.url,
       });
-      
-      const errorMsg = error.response?.data?.detail || error.message || 'Unknown error occurred';
-      alert(`Failed to load service accounts: ${errorMsg}\n\nPlease check if the backend service is running normally.`);
-      
+
+      const errorMsg =
+        error.response?.data?.detail || error.message || 'Unknown error occurred';
+      alert(
+        `Failed to load service accounts: ${errorMsg}\n\nPlease check if the backend service is running normally.`
+      );
       setAccounts([]);
     } finally {
       setLoading(false);
@@ -79,13 +99,13 @@ export default function AccountsPage() {
 
     const accountName = uploadData.name;
     console.log(`🔄 Attempting upload with account name as admin email: ${accountName}`);
-    
+
     let adminEmail = accountName;
     let useAccountName = true;
 
     try {
       JSON.parse(uploadData.json);
-    } catch (e) {
+    } catch {
       alert('Invalid JSON format. Please check your service account JSON.');
       return;
     }
@@ -98,11 +118,10 @@ export default function AccountsPage() {
         admin_email: adminEmail,
       });
       console.log('Upload successful:', response.data);
-      
+
       const accountId = response.data.id;
-      
       await loadAccounts();
-      
+
       if (adminEmail && adminEmail.includes('@')) {
         try {
           console.log('Syncing users with admin email:', adminEmail);
@@ -110,46 +129,55 @@ export default function AccountsPage() {
           console.log('Sync response:', syncResponse.data);
           alert(
             `✅ Successfully synced ${syncResponse.data.user_count || 0} users!\n\n` +
-            `Admin email used: ${adminEmail}${useAccountName ? ' (auto-detected from account name)' : ' (manually entered)'}\n\n` +
-            'Please refresh the Campaigns page to see the updated user list.'
+              `Admin email used: ${adminEmail}${
+                useAccountName ? ' (auto-detected from account name)' : ' (manually entered)'
+              }\n\n` +
+              'Please refresh the Campaigns page to see the updated user list.'
           );
-          
           await loadAccounts();
         } catch (syncError: any) {
           console.error('Sync error:', syncError);
-          const errorMsg = syncError.response?.data?.detail || syncError.message || 'Unknown error';
-          
+          const errorMsg =
+            syncError.response?.data?.detail || syncError.message || 'Unknown error';
+
           if (useAccountName) {
             console.log(`❌ Sync with account name failed: ${errorMsg}`);
             const manualAdminEmail = prompt(
               `Automatic sync with account name failed.\n` +
-              `Account: ${accountName}\n` +
-              `Error: ${errorMsg}\n\n` +
-              `Please enter admin email manually:\n` +
-              `(Example: admin@yourdomain.com)\n\n` +
-              `This email must have admin privileges.`
+                `Account: ${accountName}\n` +
+                `Error: ${errorMsg}\n\n` +
+                `Please enter admin email manually:\n` +
+                `(Example: admin@yourdomain.com)\n\n` +
+                `This email must have admin privileges.`
             );
-            
+
             if (manualAdminEmail && manualAdminEmail.includes('@')) {
               try {
                 console.log('Trying manual admin email:', manualAdminEmail);
-                const manualSyncResponse = await serviceAccountsApi.sync(accountId, manualAdminEmail);
-                alert(
-                  `✅ Successfully synced ${manualSyncResponse.data.user_count || 0} users!\n\n` +
-                  `Admin email used: ${manualAdminEmail} (manually entered)\n\n` +
-                  'Please refresh the Campaigns page to see the updated user list.'
+                const manualSyncResponse = await serviceAccountsApi.sync(
+                  accountId,
+                  manualAdminEmail
                 );
-                
+                alert(
+                  `✅ Successfully synced ${
+                    manualSyncResponse.data.user_count || 0
+                  } users!\n\n` +
+                    `Admin email used: ${manualAdminEmail} (manually entered)\n\n` +
+                    'Please refresh the Campaigns page to see the updated user list.'
+                );
                 await loadAccounts();
                 return;
               } catch (manualSyncError: any) {
                 console.error('Manual sync also failed:', manualSyncError);
-                const manualErrorMsg = manualSyncError.response?.data?.detail || manualSyncError.message || 'Unknown error';
+                const manualErrorMsg =
+                  manualSyncError.response?.data?.detail ||
+                  manualSyncError.message ||
+                  'Unknown error';
                 alert(
                   `❌ Both sync methods failed:\n\n` +
-                  `1. Account name (${accountName}): ${errorMsg}\n` +
-                  `2. Manual email (${manualAdminEmail}): ${manualErrorMsg}\n\n` +
-                  'Please check your Google Workspace configuration.'
+                    `1. Account name (${accountName}): ${errorMsg}\n` +
+                    `2. Manual email (${manualAdminEmail}): ${manualErrorMsg}\n\n` +
+                    'Please check your Google Workspace configuration.'
                 );
               }
             } else {
@@ -157,22 +185,23 @@ export default function AccountsPage() {
             }
           } else {
             alert(
-              '⚠️ Sync failed: ' + errorMsg +
-              '\n\nPlease check:\n' +
-              '1. The admin email is correct\n' +
-              '2. Domain-wide delegation is set up in Google Admin Console\n' +
-              '3. The admin has super admin privileges\n\n' +
-              'Click "Sync Users" button to try again.'
+              '⚠️ Sync failed: ' +
+                errorMsg +
+                '\n\nPlease check:\n' +
+                '1. The admin email is correct\n' +
+                '2. Domain-wide delegation is set up in Google Admin Console\n' +
+                '3. The admin has super admin privileges\n\n' +
+                'Click "Sync Users" button to try again.'
             );
           }
         }
       } else {
         alert(
           '✅ Service account added!\n\n' +
-          'Click the "Sync Users" button to sync workspace users later.'
+            'Click the "Sync Users" button to sync workspace users later.'
         );
       }
-      
+
       setShowUpload(false);
       setUploadData({ name: '', json: '' });
       loadAccounts();
@@ -182,11 +211,14 @@ export default function AccountsPage() {
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
-        url: error.config?.url
+        url: error.config?.url,
       });
-      
-      const errorMessage = error.response?.data?.detail || error.message || 'Upload failed';
-      alert(`Service account upload failed: ${errorMessage}\n\nPlease check JSON file format and network connection.`);
+
+      const errorMessage =
+        error.response?.data?.detail || error.message || 'Upload failed';
+      alert(
+        `Service account upload failed: ${errorMessage}\n\nPlease check JSON file format and network connection.`
+      );
     }
   };
 
@@ -203,7 +235,7 @@ export default function AccountsPage() {
   };
 
   const handleSync = async (accountId: number) => {
-    const account = accounts.find(acc => acc.id === accountId);
+    const account = accounts.find((acc) => acc.id === accountId);
     if (!account) {
       alert('Service account not found.');
       return;
@@ -211,21 +243,17 @@ export default function AccountsPage() {
 
     try {
       console.log(`Starting to sync user data for account ${accountId}...`);
-      await serviceAccountsApi.sync(accountId, account.admin_email);
+      await serviceAccountsApi.sync(accountId, account.admin_email || '');
       console.log('Sync successful, reloading account list...');
       loadAccounts();
       alert('User data sync successful!');
     } catch (error: any) {
       console.error('Sync failed:', error);
-      console.error('Sync error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      const errorMsg = error.response?.data?.detail || error.message || 'Sync failed';
-      alert(`User data sync failed: ${errorMsg}\n\nPlease check admin email permissions and domain-wide delegation settings.`);
+      const errorMsg =
+        error.response?.data?.detail || error.message || 'Sync failed';
+      alert(
+        `User data sync failed: ${errorMsg}\n\nPlease check admin email permissions and domain-wide delegation settings.`
+      );
     }
   };
 
@@ -243,24 +271,30 @@ export default function AccountsPage() {
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
-      
+
       <div className="flex-1 overflow-auto">
         <div className="p-8">
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold">Service Accounts</h1>
-              <p className="text-muted-foreground">Manage Google Workspace service accounts</p>
+              <p className="text-muted-foreground">
+                Manage Google Workspace service accounts
+              </p>
               {backendStatus !== null && (
                 <div className="mt-2 flex items-center gap-2">
                   {backendStatus ? (
                     <>
                       <Wifi className="h-4 w-4 text-green-500" />
-                      <span className="text-sm text-green-600">Backend Connected ({API_URL})</span>
+                      <span className="text-sm text-green-600">
+                        Backend Connected ({API_URL})
+                      </span>
                     </>
                   ) : (
                     <>
                       <WifiOff className="h-4 w-4 text-red-500" />
-                      <span className="text-sm text-red-600">Backend Offline ({API_URL})</span>
+                      <span className="text-sm text-red-600">
+                        Backend Offline ({API_URL})
+                      </span>
                       <Button size="sm" variant="outline" onClick={checkBackend}>
                         <RefreshCw className="h-3 w-3 mr-1" />
                         Retry
@@ -281,7 +315,8 @@ export default function AccountsPage() {
               <CardHeader>
                 <CardTitle>Upload Service Account JSON</CardTitle>
                 <CardDescription>
-                  Upload your Google Cloud service account JSON file with domain-wide delegation
+                  Upload your Google Cloud service account JSON file with domain-wide
+                  delegation
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -290,7 +325,9 @@ export default function AccountsPage() {
                   <Input
                     placeholder="e.g., My Workspace Account"
                     value={uploadData.name}
-                    onChange={(e) => setUploadData({ ...uploadData, name: e.target.value })}
+                    onChange={(e) =>
+                      setUploadData({ ...uploadData, name: e.target.value })
+                    }
                   />
                 </div>
 
@@ -316,7 +353,9 @@ export default function AccountsPage() {
 
                 {uploadMethod === 'file' && (
                   <div>
-                    <label className="text-sm font-medium">Service Account JSON File</label>
+                    <label className="text-sm font-medium">
+                      Service Account JSON File
+                    </label>
                     <div className="mt-2">
                       <Input
                         type="file"
@@ -335,25 +374,35 @@ export default function AccountsPage() {
 
                 {uploadMethod === 'paste' && (
                   <div>
-                    <label className="text-sm font-medium">Service Account JSON</label>
+                    <label className="text-sm font-medium">
+                      Service Account JSON
+                    </label>
                     <textarea
                       className="w-full h-32 p-3 text-sm border rounded-md font-mono mt-2"
                       placeholder="Paste your service account JSON here..."
                       value={uploadData.json}
-                      onChange={(e) => setUploadData({ ...uploadData, json: e.target.value })}
+                      onChange={(e) =>
+                        setUploadData({ ...uploadData, json: e.target.value })
+                      }
                     />
                   </div>
                 )}
 
                 <div className="flex gap-2">
-                  <Button onClick={handleUpload} disabled={!uploadData.name || !uploadData.json}>
+                  <Button
+                    onClick={handleUpload}
+                    disabled={!uploadData.name || !uploadData.json}
+                  >
                     <Upload className="h-4 w-4 mr-2" />
                     Upload & Sync
                   </Button>
-                  <Button variant="outline" onClick={() => {
-                    setShowUpload(false);
-                    setUploadData({ name: '', json: '' });
-                  }}>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowUpload(false);
+                      setUploadData({ name: '', json: '' });
+                    }}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -367,7 +416,9 @@ export default function AccountsPage() {
             ) : accounts.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">No service accounts configured yet</p>
+                  <p className="text-muted-foreground">
+                    No service accounts configured yet
+                  </p>
                   <Button className="mt-4" onClick={() => setShowUpload(true)}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Your First Account
@@ -375,7 +426,7 @@ export default function AccountsPage() {
                 </CardContent>
               </Card>
             ) : (
-              accounts && Array.isArray(accounts) ? accounts.map((account) => (
+              accounts.map((account) => (
                 <Card key={account.id}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
@@ -391,9 +442,16 @@ export default function AccountsPage() {
                         <CardDescription>{account.client_email}</CardDescription>
                         <div className="mt-2 text-sm">
                           <span className="font-medium">Synced Users: </span>
-                          <span className={account.total_users > 0 ? "text-green-600 font-semibold" : "text-amber-600"}>
+                          <span
+                            className={
+                              (account.total_users ?? 0) > 0
+                                ? 'text-green-600 font-semibold'
+                                : 'text-amber-600'
+                            }
+                          >
                             {account.total_users || 0}
-                            {account.total_users === 0 && " ⚠️ Click Sync button →"}
+                            {(account.total_users ?? 0) === 0 &&
+                              ' ⚠️ Click Sync button →'}
                           </span>
                         </div>
                       </div>
@@ -429,12 +487,14 @@ export default function AccountsPage() {
                       </div>
                       <div>
                         <p className="text-muted-foreground">Quota Used Today</p>
-                        <p className="font-medium">{account.quota_used_today} / {account.quota_limit}</p>
+                        <p className="font-medium">
+                          {account.quota_used_today} / {account.quota_limit}
+                        </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Last Synced</p>
                         <p className="font-medium">
-                          {account.last_synced 
+                          {account.last_synced
                             ? new Date(account.last_synced).toLocaleString()
                             : 'Never'}
                         </p>
@@ -442,11 +502,7 @@ export default function AccountsPage() {
                     </div>
                   </CardContent>
                 </Card>
-              )) : (
-                <div className="text-center py-4 text-gray-500">
-                  No accounts available
-                </div>
-              )
+              ))
             )}
           </div>
         </div>
@@ -454,1587 +510,3 @@ export default function AccountsPage() {
     </div>
   );
 }
-EOF
-
-    custom_headers: Optional[Dict[str, str]] = None,
-    attachments: Optional[List[Dict]] = None
-) -> str:
-    """
-    Build raw email with full custom header control - completely manual construction
-    """
-    import base64
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from email.mime.base import MIMEBase
-    from email import encoders
-    
-    # Normalize bodies to strings
-    if body_html is not None and not isinstance(body_html, str):
-        try:
-            if isinstance(body_html, list):
-                body_html = "\n".join([str(x) for x in body_html])
-            else:
-                import json as _json
-                body_html = _json.dumps(body_html)
-        except Exception:
-            body_html = str(body_html)
-    if body_plain is not None and not isinstance(body_plain, str):
-        try:
-            if isinstance(body_plain, list):
-                body_plain = "\n".join([str(x) for x in body_plain])
-            else:
-                import json as _json
-                body_plain = _json.dumps(body_plain)
-        except Exception:
-            body_plain = str(body_plain)
-
-    # Create message with proper MIME structure
-    if body_html and body_plain:
-        message = MIMEMultipart('alternative')
-        part1 = MIMEText(body_plain, 'plain')
-        part2 = MIMEText(body_html, 'html')
-        message.attach(part1)
-        message.attach(part2)
-    elif body_html:
-        message = MIMEMultipart('alternative')
-        message.attach(MIMEText(body_html, 'html'))
-    else:
-        message = MIMEMultipart('alternative')
-        message.attach(MIMEText(body_plain or '', 'plain'))
-
-    # Clear all default headers first
-    message._headers = []
-    
-    # Add ONLY the custom headers
-    if custom_headers:
-        for key, value in custom_headers.items():
-            try:
-                message[key] = value if isinstance(value, str) else str(value)
-            except Exception:
-                message[key] = str(value)
-    else:
-        # Fallback to basic headers only if no custom headers
-        message['To'] = recipient_email
-        forced_from = f"{from_name} <{sender_email}>" if from_name else sender_email
-        message['From'] = forced_from
-        message['Subject'] = subject
-
-    # Handle attachments
-    if attachments:
-        if not isinstance(message, MIMEMultipart):
-            old_message = message
-            message = MIMEMultipart()
-            for key, value in old_message.items():
-                message[key] = value
-            message.attach(old_message)
-        
-        for attachment in attachments:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(base64.b64decode(attachment['content']))
-            encoders.encode_base64(part)
-            part.add_header(
-                'Content-Disposition',
-                f'attachment; filename={attachment["filename"]}'
-            )
-            message.attach(part)
-
-    # Debug logging
-    raw_email = message.as_string()
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"🔍 FINAL RAW EMAIL:")
-    logger.info(f"📧 Raw email headers: {raw_email[:1000]}...")
-    
-    return raw_email
-
-    body_plain: Optional[str] = None,
-    from_name: Optional[str] = None,
-    custom_headers: Optional[Dict[str, str]] = None,
-    attachments: Optional[List[Dict]] = None
-) -> str:
-    try:
-        credentials = self.get_delegated_credentials(sender_email, settings.GMAIL_SCOPES)
-        service = build('gmail', 'v1', credentials=credentials)
-        
-        # Pre-check Gmail enabled'use client';
-
-import { useEffect, useState } from 'react';
-import { Sidebar } from '@/components/Sidebar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { serviceAccountsApi, healthCheck, API_URL } from '@/lib/api';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Wifi, WifiOff, Upload } from 'lucide-react';
-
-export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showUpload, setShowUpload] = useState(false);
-  const [uploadData, setUploadData] = useState({ name: '', json: '' });
-  const [backendStatus, setBackendStatus] = useState<boolean | null>(null);
-  const [uploadMethod, setUploadMethod] = useState<'file' | 'paste'>('file');
-
-  useEffect(() => {
-    checkBackend();
-    loadAccounts();
-  }, []);
-
-  const checkBackend = async () => {
-    console.log('Checking backend service status...', API_URL);
-    const isHealthy = await healthCheck();
-    setBackendStatus(isHealthy);
-    if (!isHealthy) {
-      console.error('Backend service not accessible:', API_URL);
-      alert(`Unable to connect to backend service: ${API_URL}\n\nPlease ensure the backend service is running and the network connection is normal.`);
-    } else {
-      console.log('Backend service connection normal');
-    }
-  };
-
-  const loadAccounts = async () => {
-    try {
-      console.log('🔄 Loading accounts from API...');
-      const response = await serviceAccountsApi.list();
-      console.log('✅ API Response:', response);
-      setAccounts(Array.isArray(response.data) ? response.data : []);
-      console.log(`✅ Loaded ${response.data?.length || 0} accounts`);
-    } catch (error: any) {
-      console.error('❌ Failed to load accounts:', error);
-      console.error('Error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      const errorMsg = error.response?.data?.detail || error.message || 'Unknown error occurred';
-      alert(`Failed to load service accounts: ${errorMsg}\n\nPlease check if the backend service is running normally.`);
-      
-      setAccounts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!uploadData.name || !uploadData.json) {
-      alert('Please provide both account name and JSON content');
-      return;
-    }
-
-    const accountName = uploadData.name;
-    console.log(`🔄 Attempting upload with account name as admin email: ${accountName}`);
-    
-    let adminEmail = accountName;
-    let useAccountName = true;
-
-    try {
-      JSON.parse(uploadData.json);
-    } catch (e) {
-      alert('Invalid JSON format. Please check your service account JSON.');
-      return;
-    }
-
-    try {
-      console.log('Uploading service account...', { name: uploadData.name });
-      const response = await serviceAccountsApi.create({
-        name: uploadData.name,
-        json_content: JSON.parse(uploadData.json),
-        admin_email: adminEmail,
-      });
-      console.log('Upload successful:', response.data);
-      
-      const accountId = response.data.id;
-      
-      await loadAccounts();
-      
-      if (adminEmail && adminEmail.includes('@')) {
-        try {
-          console.log('Syncing users with admin email:', adminEmail);
-          const syncResponse = await serviceAccountsApi.sync(accountId, adminEmail);
-          console.log('Sync response:', syncResponse.data);
-          alert(
-            `✅ Successfully synced ${syncResponse.data.user_count || 0} users!\n\n` +
-            `Admin email used: ${adminEmail}${useAccountName ? ' (auto-detected from account name)' : ' (manually entered)'}\n\n` +
-            'Please refresh the Campaigns page to see the updated user list.'
-          );
-          
-          await loadAccounts();
-        } catch (syncError: any) {
-          console.error('Sync error:', syncError);
-          const errorMsg = syncError.response?.data?.detail || syncError.message || 'Unknown error';
-          
-          if (useAccountName) {
-            console.log(`❌ Sync with account name failed: ${errorMsg}`);
-            const manualAdminEmail = prompt(
-              `Automatic sync with account name failed.\n` +
-              `Account: ${accountName}\n` +
-              `Error: ${errorMsg}\n\n` +
-              `Please enter admin email manually:\n` +
-              `(Example: admin@yourdomain.com)\n\n` +
-              `This email must have admin privileges.`
-            );
-            
-            if (manualAdminEmail && manualAdminEmail.includes('@')) {
-              try {
-                console.log('Trying manual admin email:', manualAdminEmail);
-                const manualSyncResponse = await serviceAccountsApi.sync(accountId, manualAdminEmail);
-                alert(
-                  `✅ Successfully synced ${manualSyncResponse.data.user_count || 0} users!\n\n` +
-                  `Admin email used: ${manualAdminEmail} (manually entered)\n\n` +
-                  'Please refresh the Campaigns page to see the updated user list.'
-                );
-                
-                await loadAccounts();
-                return;
-              } catch (manualSyncError: any) {
-                console.error('Manual sync also failed:', manualSyncError);
-                const manualErrorMsg = manualSyncError.response?.data?.detail || manualSyncError.message || 'Unknown error';
-                alert(
-                  `❌ Both sync methods failed:\n\n` +
-                  `1. Account name (${accountName}): ${errorMsg}\n` +
-                  `2. Manual email (${manualAdminEmail}): ${manualErrorMsg}\n\n` +
-                  'Please check your Google Workspace configuration.'
-                );
-              }
-            } else {
-              alert('Please provide a valid admin email address.');
-            }
-          } else {
-            alert(
-              '⚠️ Sync failed: ' + errorMsg +
-              '\n\nPlease check:\n' +
-              '1. The admin email is correct\n' +
-              '2. Domain-wide delegation is set up in Google Admin Console\n' +
-              '3. The admin has super admin privileges\n\n' +
-              'Click "Sync Users" button to try again.'
-            );
-          }
-        }
-      } else {
-        alert(
-          '✅ Service account added!\n\n' +
-          'Click the "Sync Users" button to sync workspace users later.'
-        );
-      }
-      
-      setShowUpload(false);
-      setUploadData({ name: '', json: '' });
-      loadAccounts();
-    } catch (error: any) {
-      console.error('❌ Upload error:', error);
-      console.error('Upload error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      const errorMessage = error.response?.data?.detail || error.message || 'Upload failed';
-      alert(`Service account upload failed: ${errorMessage}\n\nPlease check JSON file format and network connection.`);
-    }
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setUploadData({ ...uploadData, json: content });
-    };
-    reader.readAsText(file);
-  };
-
-  const handleSync = async (accountId: number) => {
-    const account = accounts.find(acc => acc.id === accountId);
-    if (!account) {
-      alert('Service account not found.');
-      return;
-    }
-
-    try {
-      console.log(`Starting to sync user data for account ${accountId}...`);
-      await serviceAccountsApi.sync(accountId, account.admin_email);
-      console.log('Sync successful, reloading account list...');
-      loadAccounts();
-      alert('User data sync successful!');
-    } catch (error: any) {
-      console.error('Sync failed:', error);
-      console.error('Sync error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      const errorMsg = error.response?.data?.detail || error.message || 'Sync failed';
-      alert(`User data sync failed: ${errorMsg}\n\nPlease check admin email permissions and domain-wide delegation settings.`);
-    }
-  };
-
-  const handleDelete = async (accountId: number) => {
-    if (!confirm('Are you sure you want to delete this account?')) return;
-
-    try {
-      await serviceAccountsApi.delete(accountId);
-      loadAccounts();
-    } catch (error: any) {
-      alert('Failed to delete: ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
-  return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-8">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Service Accounts</h1>
-              <p className="text-muted-foreground">Manage Google Workspace service accounts</p>
-              {backendStatus !== null && (
-                <div className="mt-2 flex items-center gap-2">
-                  {backendStatus ? (
-                    <>
-                      <Wifi className="h-4 w-4 text-green-500" />
-                      <span className="text-sm text-green-600">Backend Connected ({API_URL})</span>
-                    </>
-                  ) : (
-                    <>
-                      <WifiOff className="h-4 w-4 text-red-500" />
-                      <span className="text-sm text-red-600">Backend Offline ({API_URL})</span>
-                      <Button size="sm" variant="outline" onClick={checkBackend}>
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Retry
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            <Button onClick={() => setShowUpload(!showUpload)} disabled={!backendStatus}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Account
-            </Button>
-          </div>
-
-          {showUpload && (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Upload Service Account JSON</CardTitle>
-                <CardDescription>
-                  Upload your Google Cloud service account JSON file with domain-wide delegation
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Account Name</label>
-                  <Input
-                    placeholder="e.g., My Workspace Account"
-                    value={uploadData.name}
-                    onChange={(e) => setUploadData({ ...uploadData, name: e.target.value })}
-                  />
-                </div>
-
-                <div className="flex gap-2 border-b pb-3">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={uploadMethod === 'file' ? 'default' : 'outline'}
-                    onClick={() => setUploadMethod('file')}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload File
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={uploadMethod === 'paste' ? 'default' : 'outline'}
-                    onClick={() => setUploadMethod('paste')}
-                  >
-                    Paste JSON
-                  </Button>
-                </div>
-
-                {uploadMethod === 'file' && (
-                  <div>
-                    <label className="text-sm font-medium">Service Account JSON File</label>
-                    <div className="mt-2">
-                      <Input
-                        type="file"
-                        accept=".json"
-                        onChange={handleFileUpload}
-                        className="cursor-pointer"
-                      />
-                    </div>
-                    {uploadData.json && (
-                      <p className="text-sm text-green-600 mt-2">
-                        ✓ JSON file loaded ({uploadData.json.length} characters)
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {uploadMethod === 'paste' && (
-                  <div>
-                    <label className="text-sm font-medium">Service Account JSON</label>
-                    <textarea
-                      className="w-full h-32 p-3 text-sm border rounded-md font-mono mt-2"
-                      placeholder="Paste your service account JSON here..."
-                      value={uploadData.json}
-                      onChange={(e) => setUploadData({ ...uploadData, json: e.target.value })}
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button onClick={handleUpload} disabled={!uploadData.name || !uploadData.json}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload & Sync
-                  </Button>
-                  <Button variant="outline" onClick={() => {
-                    setShowUpload(false);
-                    setUploadData({ name: '', json: '' });
-                  }}>
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid gap-6">
-            {loading ? (
-              <div className="animate-pulse">Loading accounts...</div>
-            ) : accounts.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">No service accounts configured yet</p>
-                  <Button className="mt-4" onClick={() => setShowUpload(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Account
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              accounts && Array.isArray(accounts) ? accounts.map((account) => (
-                <Card key={account.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          {account.name}
-                          {account.status === 'active' ? (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          )}
-                        </CardTitle>
-                        <CardDescription>{account.client_email}</CardDescription>
-                        <div className="mt-2 text-sm">
-                          <span className="font-medium">Synced Users: </span>
-                          <span className={account.total_users > 0 ? "text-green-600 font-semibold" : "text-amber-600"}>
-                            {account.total_users || 0}
-                            {account.total_users === 0 && " ⚠️ Click Sync button →"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSync(account.id)}
-                          title="Sync workspace users from Google"
-                        >
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                          Sync Users
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(account.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Domain</p>
-                        <p className="font-medium">{account.domain}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Total Users</p>
-                        <p className="font-medium">{account.total_users}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Quota Used Today</p>
-                        <p className="font-medium">{account.quota_used_today} / {account.quota_limit}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Last Synced</p>
-                        <p className="font-medium">
-                          {account.last_synced 
-                            ? new Date(account.last_synced).toLocaleString()
-                            : 'Never'}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )) : (
-                <div className="text-center py-4 text-gray-500">
-                  No accounts available
-                </div>
-              )
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-        try:
-            service.users().getProfile(userId='me').execute()
-        except HttpError as precheck:
-            if hasattr(precheck, 'content') and b'Mail service not enabled' in getattr(precheck, 'content', b''):
-                raise Exception("Gmail is not enabled for this user. Enable Gmail for the account or choose another sender.")
-            raise'use client';
-
-import { useEffect, useState } from 'react';
-import { Sidebar } from '@/components/Sidebar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { serviceAccountsApi, healthCheck, API_URL } from '@/lib/api';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Wifi, WifiOff, Upload } from 'lucide-react';
-
-export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showUpload, setShowUpload] = useState(false);
-  const [uploadData, setUploadData] = useState({ name: '', json: '' });
-  const [backendStatus, setBackendStatus] = useState<boolean | null>(null);
-  const [uploadMethod, setUploadMethod] = useState<'file' | 'paste'>('file');
-
-  useEffect(() => {
-    checkBackend();
-    loadAccounts();
-  }, []);
-
-  const checkBackend = async () => {
-    console.log('Checking backend service status...', API_URL);
-    const isHealthy = await healthCheck();
-    setBackendStatus(isHealthy);
-    if (!isHealthy) {
-      console.error('Backend service not accessible:', API_URL);
-      alert(`Unable to connect to backend service: ${API_URL}\n\nPlease ensure the backend service is running and the network connection is normal.`);
-    } else {
-      console.log('Backend service connection normal');
-    }
-  };
-
-  const loadAccounts = async () => {
-    try {
-      console.log('🔄 Loading accounts from API...');
-      const response = await serviceAccountsApi.list();
-      console.log('✅ API Response:', response);
-      setAccounts(Array.isArray(response.data) ? response.data : []);
-      console.log(`✅ Loaded ${response.data?.length || 0} accounts`);
-    } catch (error: any) {
-      console.error('❌ Failed to load accounts:', error);
-      console.error('Error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      const errorMsg = error.response?.data?.detail || error.message || 'Unknown error occurred';
-      alert(`Failed to load service accounts: ${errorMsg}\n\nPlease check if the backend service is running normally.`);
-      
-      setAccounts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!uploadData.name || !uploadData.json) {
-      alert('Please provide both account name and JSON content');
-      return;
-    }
-
-    const accountName = uploadData.name;
-    console.log(`🔄 Attempting upload with account name as admin email: ${accountName}`);
-    
-    let adminEmail = accountName;
-    let useAccountName = true;
-
-    try {
-      JSON.parse(uploadData.json);
-    } catch (e) {
-      alert('Invalid JSON format. Please check your service account JSON.');
-      return;
-    }
-
-    try {
-      console.log('Uploading service account...', { name: uploadData.name });
-      const response = await serviceAccountsApi.create({
-        name: uploadData.name,
-        json_content: JSON.parse(uploadData.json),
-        admin_email: adminEmail,
-      });
-      console.log('Upload successful:', response.data);
-      
-      const accountId = response.data.id;
-      
-      await loadAccounts();
-      
-      if (adminEmail && adminEmail.includes('@')) {
-        try {
-          console.log('Syncing users with admin email:', adminEmail);
-          const syncResponse = await serviceAccountsApi.sync(accountId, adminEmail);
-          console.log('Sync response:', syncResponse.data);
-          alert(
-            `✅ Successfully synced ${syncResponse.data.user_count || 0} users!\n\n` +
-            `Admin email used: ${adminEmail}${useAccountName ? ' (auto-detected from account name)' : ' (manually entered)'}\n\n` +
-            'Please refresh the Campaigns page to see the updated user list.'
-          );
-          
-          await loadAccounts();
-        } catch (syncError: any) {
-          console.error('Sync error:', syncError);
-          const errorMsg = syncError.response?.data?.detail || syncError.message || 'Unknown error';
-          
-          if (useAccountName) {
-            console.log(`❌ Sync with account name failed: ${errorMsg}`);
-            const manualAdminEmail = prompt(
-              `Automatic sync with account name failed.\n` +
-              `Account: ${accountName}\n` +
-              `Error: ${errorMsg}\n\n` +
-              `Please enter admin email manually:\n` +
-              `(Example: admin@yourdomain.com)\n\n` +
-              `This email must have admin privileges.`
-            );
-            
-            if (manualAdminEmail && manualAdminEmail.includes('@')) {
-              try {
-                console.log('Trying manual admin email:', manualAdminEmail);
-                const manualSyncResponse = await serviceAccountsApi.sync(accountId, manualAdminEmail);
-                alert(
-                  `✅ Successfully synced ${manualSyncResponse.data.user_count || 0} users!\n\n` +
-                  `Admin email used: ${manualAdminEmail} (manually entered)\n\n` +
-                  'Please refresh the Campaigns page to see the updated user list.'
-                );
-                
-                await loadAccounts();
-                return;
-              } catch (manualSyncError: any) {
-                console.error('Manual sync also failed:', manualSyncError);
-                const manualErrorMsg = manualSyncError.response?.data?.detail || manualSyncError.message || 'Unknown error';
-                alert(
-                  `❌ Both sync methods failed:\n\n` +
-                  `1. Account name (${accountName}): ${errorMsg}\n` +
-                  `2. Manual email (${manualAdminEmail}): ${manualErrorMsg}\n\n` +
-                  'Please check your Google Workspace configuration.'
-                );
-              }
-            } else {
-              alert('Please provide a valid admin email address.');
-            }
-          } else {
-            alert(
-              '⚠️ Sync failed: ' + errorMsg +
-              '\n\nPlease check:\n' +
-              '1. The admin email is correct\n' +
-              '2. Domain-wide delegation is set up in Google Admin Console\n' +
-              '3. The admin has super admin privileges\n\n' +
-              'Click "Sync Users" button to try again.'
-            );
-          }
-        }
-      } else {
-        alert(
-          '✅ Service account added!\n\n' +
-          'Click the "Sync Users" button to sync workspace users later.'
-        );
-      }
-      
-      setShowUpload(false);
-      setUploadData({ name: '', json: '' });
-      loadAccounts();
-    } catch (error: any) {
-      console.error('❌ Upload error:', error);
-      console.error('Upload error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      const errorMessage = error.response?.data?.detail || error.message || 'Upload failed';
-      alert(`Service account upload failed: ${errorMessage}\n\nPlease check JSON file format and network connection.`);
-    }
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setUploadData({ ...uploadData, json: content });
-    };
-    reader.readAsText(file);
-  };
-
-  const handleSync = async (accountId: number) => {
-    const account = accounts.find(acc => acc.id === accountId);
-    if (!account) {
-      alert('Service account not found.');
-      return;
-    }
-
-    try {
-      console.log(`Starting to sync user data for account ${accountId}...`);
-      await serviceAccountsApi.sync(accountId, account.admin_email);
-      console.log('Sync successful, reloading account list...');
-      loadAccounts();
-      alert('User data sync successful!');
-    } catch (error: any) {
-      console.error('Sync failed:', error);
-      console.error('Sync error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      const errorMsg = error.response?.data?.detail || error.message || 'Sync failed';
-      alert(`User data sync failed: ${errorMsg}\n\nPlease check admin email permissions and domain-wide delegation settings.`);
-    }
-  };
-
-  const handleDelete = async (accountId: number) => {
-    if (!confirm('Are you sure you want to delete this account?')) return;
-
-    try {
-      await serviceAccountsApi.delete(accountId);
-      loadAccounts();
-    } catch (error: any) {
-      alert('Failed to delete: ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
-  return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-8">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Service Accounts</h1>
-              <p className="text-muted-foreground">Manage Google Workspace service accounts</p>
-              {backendStatus !== null && (
-                <div className="mt-2 flex items-center gap-2">
-                  {backendStatus ? (
-                    <>
-                      <Wifi className="h-4 w-4 text-green-500" />
-                      <span className="text-sm text-green-600">Backend Connected ({API_URL})</span>
-                    </>
-                  ) : (
-                    <>
-                      <WifiOff className="h-4 w-4 text-red-500" />
-                      <span className="text-sm text-red-600">Backend Offline ({API_URL})</span>
-                      <Button size="sm" variant="outline" onClick={checkBackend}>
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Retry
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            <Button onClick={() => setShowUpload(!showUpload)} disabled={!backendStatus}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Account
-            </Button>
-          </div>
-
-          {showUpload && (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Upload Service Account JSON</CardTitle>
-                <CardDescription>
-                  Upload your Google Cloud service account JSON file with domain-wide delegation
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Account Name</label>
-                  <Input
-                    placeholder="e.g., My Workspace Account"
-                    value={uploadData.name}
-                    onChange={(e) => setUploadData({ ...uploadData, name: e.target.value })}
-                  />
-                </div>
-
-                <div className="flex gap-2 border-b pb-3">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={uploadMethod === 'file' ? 'default' : 'outline'}
-                    onClick={() => setUploadMethod('file')}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload File
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={uploadMethod === 'paste' ? 'default' : 'outline'}
-                    onClick={() => setUploadMethod('paste')}
-                  >
-                    Paste JSON
-                  </Button>
-                </div>
-
-                {uploadMethod === 'file' && (
-                  <div>
-                    <label className="text-sm font-medium">Service Account JSON File</label>
-                    <div className="mt-2">
-                      <Input
-                        type="file"
-                        accept=".json"
-                        onChange={handleFileUpload}
-                        className="cursor-pointer"
-                      />
-                    </div>
-                    {uploadData.json && (
-                      <p className="text-sm text-green-600 mt-2">
-                        ✓ JSON file loaded ({uploadData.json.length} characters)
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {uploadMethod === 'paste' && (
-                  <div>
-                    <label className="text-sm font-medium">Service Account JSON</label>
-                    <textarea
-                      className="w-full h-32 p-3 text-sm border rounded-md font-mono mt-2"
-                      placeholder="Paste your service account JSON here..."
-                      value={uploadData.json}
-                      onChange={(e) => setUploadData({ ...uploadData, json: e.target.value })}
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button onClick={handleUpload} disabled={!uploadData.name || !uploadData.json}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload & Sync
-                  </Button>
-                  <Button variant="outline" onClick={() => {
-                    setShowUpload(false);
-                    setUploadData({ name: '', json: '' });
-                  }}>
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid gap-6">
-            {loading ? (
-              <div className="animate-pulse">Loading accounts...</div>
-            ) : accounts.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">No service accounts configured yet</p>
-                  <Button className="mt-4" onClick={() => setShowUpload(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Account
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              accounts && Array.isArray(accounts) ? accounts.map((account) => (
-                <Card key={account.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          {account.name}
-                          {account.status === 'active' ? (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          )}
-                        </CardTitle>
-                        <CardDescription>{account.client_email}</CardDescription>
-                        <div className="mt-2 text-sm">
-                          <span className="font-medium">Synced Users: </span>
-                          <span className={account.total_users > 0 ? "text-green-600 font-semibold" : "text-amber-600"}>
-                            {account.total_users || 0}
-                            {account.total_users === 0 && " ⚠️ Click Sync button →"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSync(account.id)}
-                          title="Sync workspace users from Google"
-                        >
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                          Sync Users
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(account.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Domain</p>
-                        <p className="font-medium">{account.domain}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Total Users</p>
-                        <p className="font-medium">{account.total_users}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Quota Used Today</p>
-                        <p className="font-medium">{account.quota_used_today} / {account.quota_limit}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Last Synced</p>
-                        <p className="font-medium">
-                          {account.last_synced 
-                            ? new Date(account.last_synced).toLocaleString()
-                            : 'Never'}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )) : (
-                <div className="text-center py-4 text-gray-500">
-                  No accounts available
-                </div>
-              )
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-        
-        # Build raw email with custom headers
-        raw_email = self._build_raw_email_with_headers(
-            sender_email=sender_email,
-            recipient_email=recipient_email,
-            subject=subject,
-            body_html=body_html,
-            body_plain=body_plain,
-            from_name=from_name,
-            custom_headers=custom_headers,
-            attachments=attachments
-        )
-        
-        # Debug logging
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"🔍 RAW EMAIL HEADERS:")
-        logger.info(f"📧 Raw email preview: {raw_email[:500]}...")
-        if custom_headers:
-            logger.info(f"🎯 Custom headers being sent: {custom_headers}")
-        
-        # Encode and send
-        raw_message = base64.urlsafe_b64encode(raw_email.encode()).decode()
-        send_message = {
-            'raw': raw_message
-        }
-        
-        result = service.users().messages().send(
-            userId='me',
-            body=send_message
-        ).execute()
-        
-        return result['id']
-    
-    except HttpError as error:
-        raise Exception(f"Failed to send email: {error}")
-def _build_raw_email_with_headers(
-    self,
-    sender_email: str,
-    recipient_email: str,
-    subject: str,
-    body_html: Optional[str] = None,
-    body_plain: Optional[str] = None,
-    from_name: Optional[str] = None,
-    custom_headers: Optional[Dict[str, str]] = None,
-    attachments: Optional[List[Dict]] = None
-) -> str:
-    """
-    Build raw email with full custom header control - completely manual construction
-    """
-    import base64
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from email.mime.base import MIMEBase
-    from email import encoders
-    
-    # Normalize bodies to strings
-    if body_html is not None and not isinstance(body_html, str):
-        try:
-            if isinstance(body_html, list):
-                body_html = "\n".join([str(x) for x in body_html])
-            else:
-                import json as _json
-                body_html = _json.dumps(body_html)
-        except Exception:
-            body_html = str(body_html)
-    if body_plain is not None and not isinstance(body_plain, str):
-        try:
-            if isinstance(body_plain, list):
-                body_plain = "\n".join([str(x) for x in body_plain])
-            else:
-                import json as _json
-                body_plain = _json.dumps(body_plain)
-        except Exception:
-            body_plain = str(body_plain)
-
-    # Create message with proper MIME structure
-    if body_html and body_plain:
-        message = MIMEMultipart('alternative')
-        part1 = MIMEText(body_plain, 'plain')
-        part2 = MIMEText(body_html, 'html')
-        message.attach(part1)
-        message.attach(part2)
-    elif body_html:
-        message = MIMEMultipart('alternative')
-        message.attach(MIMEText(body_html, 'html'))
-    else:
-        message = MIMEMultipart('alternative')
-        message.attach(MIMEText(body_plain or '', 'plain'))
-
-    # Clear all default headers first
-    message._headers = []
-    
-    # Add ONLY the custom headers
-    if custom_headers:
-        for key, value in custom_headers.items():
-            try:
-                message[key] = value if isinstance(value, str) else str(value)
-            except Exception:
-                message[key] = str(value)
-    else:
-        # Fallback to basic headers only if no custom headers
-        message['To'] = recipient_email
-        forced_from = f"{from_name} <{sender_email}>" if from_name else sender_email
-        message['From'] = forced_from
-        message['Subject'] = subject
-
-    # Handle attachments
-    if attachments:
-        if not isinstance(message, MIMEMultipart):
-            old_message = message
-            message = MIMEMultipart()
-            for key, value in old_message.items():
-                message[key] = value
-            message.attach(old_message)
-        
-        for attachment in attachments:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(base64.b64decode(attachment['content']))
-            encoders.encode_base64(part)
-            part.add_header(
-                'Content-Disposition',
-                f'attachment; filename={attachment["filename"]}'
-            )
-            message.attach(part)
-
-    # Debug logging
-    raw_email = message.as_string()
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"🔍 FINAL RAW EMAIL:")
-    logger.info(f"📧 Raw email headers: {raw_email[:1000]}...")
-    
-    return raw_email
-'use client';
-
-import { useEffect, useState } from 'react';
-import { Sidebar } from '@/components/Sidebar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { serviceAccountsApi, healthCheck, API_URL } from '@/lib/api';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Wifi, WifiOff, Upload } from 'lucide-react';
-
-export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showUpload, setShowUpload] = useState(false);
-  const [uploadData, setUploadData] = useState({ name: '', json: '' });
-  const [backendStatus, setBackendStatus] = useState<boolean | null>(null);
-  const [uploadMethod, setUploadMethod] = useState<'file' | 'paste'>('file');
-
-  useEffect(() => {
-    checkBackend();
-    loadAccounts();
-  }, []);
-
-  const checkBackend = async () => {
-    console.log('Checking backend service status...', API_URL);
-    const isHealthy = await healthCheck();
-    setBackendStatus(isHealthy);
-    if (!isHealthy) {
-      console.error('Backend service not accessible:', API_URL);
-      alert(`Unable to connect to backend service: ${API_URL}\n\nPlease ensure the backend service is running and the network connection is normal.`);
-    } else {
-      console.log('Backend service connection normal');
-    }
-  };
-
-  const loadAccounts = async () => {
-    try {
-      console.log('🔄 Loading accounts from API...');
-      const response = await serviceAccountsApi.list();
-      console.log('✅ API Response:', response);
-      setAccounts(Array.isArray(response.data) ? response.data : []);
-      console.log(`✅ Loaded ${response.data?.length || 0} accounts`);
-    } catch (error: any) {
-      console.error('❌ Failed to load accounts:', error);
-      console.error('Error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      // Show more friendly error message
-      const errorMsg = error.response?.data?.detail || error.message || 'Unknown error occurred';
-      alert(`Failed to load service accounts: ${errorMsg}\n\nPlease check if the backend service is running normally.`);
-      
-      setAccounts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!uploadData.name || !uploadData.json) {
-      alert('Please provide both account name and JSON content');
-      return;
-    }
-
-    // Try using account name as admin email first
-    const accountName = uploadData.name;
-    console.log(`🔄 Attempting upload with account name as admin email: ${accountName}`);
-    
-    let adminEmail = accountName;
-    let useAccountName = true;
-
-    // Validate JSON
-    try {
-      JSON.parse(uploadData.json);
-    } catch (e) {
-      alert('Invalid JSON format. Please check your service account JSON.');
-      return;
-    }
-
-    try {
-      console.log('Uploading service account...', { name: uploadData.name });
-      const response = await serviceAccountsApi.create({
-        name: uploadData.name,
-        json_content: JSON.parse(uploadData.json),
-        admin_email: adminEmail,
-      });
-      console.log('Upload successful:', response.data);
-      
-      const accountId = response.data.id;
-      
-      // Refresh the accounts list to show the newly created account
-      await loadAccounts();
-      
-      // Use the same admin email for sync
-      if (adminEmail && adminEmail.includes('@')) {
-        try {
-          console.log('Syncing users with admin email:', adminEmail);
-          const syncResponse = await serviceAccountsApi.sync(accountId, adminEmail);
-          console.log('Sync response:', syncResponse.data);
-          alert(
-            `✅ Successfully synced ${syncResponse.data.user_count || 0} users!\n\n` +
-            `Admin email used: ${adminEmail}${useAccountName ? ' (auto-detected from account name)' : ' (manually entered)'}\n\n` +
-            'Please refresh the Campaigns page to see the updated user list.'
-          );
-          
-          // Refresh the accounts list to show the newly created account
-          await loadAccounts();
-        } catch (syncError: any) {
-          console.error('Sync error:', syncError);
-          const errorMsg = syncError.response?.data?.detail || syncError.message || 'Unknown error';
-          
-          // If we used account name and it failed, try manual input
-          if (useAccountName) {
-            console.log(`❌ Sync with account name failed: ${errorMsg}`);
-            const manualAdminEmail = prompt(
-              `Automatic sync with account name failed.\n` +
-              `Account: ${accountName}\n` +
-              `Error: ${errorMsg}\n\n` +
-              `Please enter admin email manually:\n` +
-              `(Example: admin@yourdomain.com)\n\n` +
-              `This email must have admin privileges.`
-            );
-            
-            if (manualAdminEmail && manualAdminEmail.includes('@')) {
-              try {
-                console.log('Trying manual admin email:', manualAdminEmail);
-                const manualSyncResponse = await serviceAccountsApi.sync(accountId, manualAdminEmail);
-                alert(
-                  `✅ Successfully synced ${manualSyncResponse.data.user_count || 0} users!\n\n` +
-                  `Admin email used: ${manualAdminEmail} (manually entered)\n\n` +
-                  'Please refresh the Campaigns page to see the updated user list.'
-                );
-                
-                // Refresh the accounts list to show the newly created account
-                await loadAccounts();
-                return;
-              } catch (manualSyncError: any) {
-                console.error('Manual sync also failed:', manualSyncError);
-                const manualErrorMsg = manualSyncError.response?.data?.detail || manualSyncError.message || 'Unknown error';
-                alert(
-                  `❌ Both sync methods failed:\n\n` +
-                  `1. Account name (${accountName}): ${errorMsg}\n` +
-                  `2. Manual email (${manualAdminEmail}): ${manualErrorMsg}\n\n` +
-                  'Please check your Google Workspace configuration.'
-                );
-              }
-            } else {
-              alert('Please provide a valid admin email address.');
-            }
-          } else {
-            alert(
-              '⚠️ Sync failed: ' + errorMsg +
-              '\n\nPlease check:\n' +
-              '1. The admin email is correct\n' +
-              '2. Domain-wide delegation is set up in Google Admin Console\n' +
-              '3. The admin has super admin privileges\n\n' +
-              'Click "Sync Users" button to try again.'
-            );
-          }
-        }
-      } else {
-        alert(
-          '✅ Service account added!\n\n' +
-          'Click the "Sync Users" button to sync workspace users later.'
-        );
-      }
-      
-      setShowUpload(false);
-      setUploadData({ name: '', json: '' });
-      loadAccounts();
-    } catch (error: any) {
-      console.error('❌ Upload error:', error);
-      console.error('Upload error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      const errorMessage = error.response?.data?.detail || error.message || 'Upload failed';
-      alert(`Service account upload failed: ${errorMessage}\n\nPlease check JSON file format and network connection.`);
-    }
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setUploadData({ ...uploadData, json: content });
-    };
-    reader.readAsText(file);
-  };
-
-  const handleSync = async (accountId: number) => {
-    const account = accounts.find(acc => acc.id === accountId);
-    if (!account) {
-      alert('Service account not found.');
-      return;
-    }
-
-    try {
-      console.log(`Starting to sync user data for account ${accountId}...`);
-      await serviceAccountsApi.sync(accountId, account.admin_email);
-      console.log('Sync successful, reloading account list...');
-      loadAccounts();
-      alert('User data sync successful!');
-    } catch (error: any) {
-      console.error('Sync failed:', error);
-      console.error('Sync error details:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-      
-      const errorMsg = error.response?.data?.detail || error.message || 'Sync failed';
-      alert(`User data sync failed: ${errorMsg}\n\nPlease check admin email permissions and domain-wide delegation settings.`);
-    }
-  };
-
-  const handleDelete = async (accountId: number) => {
-    if (!confirm('Are you sure you want to delete this account?')) return;
-
-    try {
-      await serviceAccountsApi.delete(accountId);
-      loadAccounts();
-    } catch (error: any) {
-      alert('Failed to delete: ' + (error.response?.data?.detail || error.message));
-    }
-  };
-
-  return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      
-      <div className="flex-1 overflow-auto">
-        <div className="p-8">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Service Accounts</h1>
-              <p className="text-muted-foreground">Manage Google Workspace service accounts</p>
-              {backendStatus !== null && (
-                <div className="mt-2 flex items-center gap-2">
-                  {backendStatus ? (
-                    <>
-                      <Wifi className="h-4 w-4 text-green-500" />
-                      <span className="text-sm text-green-600">Backend Connected ({API_URL})</span>
-                    </>
-                  ) : (
-                    <>
-                      <WifiOff className="h-4 w-4 text-red-500" />
-                      <span className="text-sm text-red-600">Backend Offline ({API_URL})</span>
-                      <Button size="sm" variant="outline" onClick={checkBackend}>
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Retry
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            <Button onClick={() => setShowUpload(!showUpload)} disabled={!backendStatus}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Account
-            </Button>
-          </div>
-
-          {showUpload && (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle>Upload Service Account JSON</CardTitle>
-                <CardDescription>
-                  Upload your Google Cloud service account JSON file with domain-wide delegation
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Account Name</label>
-                  <Input
-                    placeholder="e.g., My Workspace Account"
-                    value={uploadData.name}
-                    onChange={(e) => setUploadData({ ...uploadData, name: e.target.value })}
-                  />
-                </div>
-
-                {/* Upload Method Toggle */}
-                <div className="flex gap-2 border-b pb-3">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={uploadMethod === 'file' ? 'default' : 'outline'}
-                    onClick={() => setUploadMethod('file')}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload File
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={uploadMethod === 'paste' ? 'default' : 'outline'}
-                    onClick={() => setUploadMethod('paste')}
-                  >
-                    Paste JSON
-                  </Button>
-                </div>
-
-                {/* File Upload */}
-                {uploadMethod === 'file' && (
-                  <div>
-                    <label className="text-sm font-medium">Service Account JSON File</label>
-                    <div className="mt-2">
-                      <Input
-                        type="file"
-                        accept=".json"
-                        onChange={handleFileUpload}
-                        className="cursor-pointer"
-                      />
-                    </div>
-                    {uploadData.json && (
-                      <p className="text-sm text-green-600 mt-2">
-                        ✓ JSON file loaded ({uploadData.json.length} characters)
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Paste JSON */}
-                {uploadMethod === 'paste' && (
-                  <div>
-                    <label className="text-sm font-medium">Service Account JSON</label>
-                    <textarea
-                      className="w-full h-32 p-3 text-sm border rounded-md font-mono mt-2"
-                      placeholder="Paste your service account JSON here..."
-                      value={uploadData.json}
-                      onChange={(e) => setUploadData({ ...uploadData, json: e.target.value })}
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button onClick={handleUpload} disabled={!uploadData.name || !uploadData.json}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload & Sync
-                  </Button>
-                  <Button variant="outline" onClick={() => {
-                    setShowUpload(false);
-                    setUploadData({ name: '', json: '' });
-                  }}>
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid gap-6">
-            {loading ? (
-              <div className="animate-pulse">Loading accounts...</div>
-            ) : accounts.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">No service accounts configured yet</p>
-                  <Button className="mt-4" onClick={() => setShowUpload(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Account
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              accounts && Array.isArray(accounts) ? accounts.map((account) => (
-                <Card key={account.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          {account.name}
-                          {account.status === 'active' ? (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          )}
-                        </CardTitle>
-                        <CardDescription>{account.client_email}</CardDescription>
-                        <div className="mt-2 text-sm">
-                          <span className="font-medium">Synced Users: </span>
-                          <span className={account.total_users > 0 ? "text-green-600 font-semibold" : "text-amber-600"}>
-                            {account.total_users || 0}
-                            {account.total_users === 0 && " ⚠️ Click Sync button →"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSync(account.id)}
-                          title="Sync workspace users from Google"
-                        >
-                          <RefreshCw className="h-4 w-4 mr-1" />
-                          Sync Users
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(account.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Domain</p>
-                        <p className="font-medium">{account.domain}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Total Users</p>
-                        <p className="font-medium">{account.total_users}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Quota Used Today</p>
-                        <p className="font-medium">{account.quota_used_today} / {account.quota_limit}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Last Synced</p>
-                        <p className="font-medium">
-                          {account.last_synced 
-                            ? new Date(account.last_synced).toLocaleString()
-                            : 'Never'}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )) : (
-                <div className="text-center py-4 text-gray-500">
-                  No accounts available
-                </div>
-              )
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
