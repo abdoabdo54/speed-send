@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from datetime import datetime, date
 from enum import Enum
 
@@ -354,13 +354,14 @@ class CampaignStatistics(BaseModel):
         extra = "allow"  # Allow additional fields
 
 # Flexible Send schema (Gmail or SMTP)
+# Accepts broader input types for html/text and normalizes them
 class SendEmailRequest(BaseModel):
     from_email: EmailStr
     from_name: Optional[str] = None
     to: List[EmailStr]
     subject: str
-    html: Optional[str] = None
-    text: Optional[str] = None
+    html: Optional[Union[str, List[Any], Dict[str, Any]]] = None
+    text: Optional[Union[str, List[Any], Dict[str, Any]]] = None
     use_gmail: bool = True
     custom_headers: Dict[str, str] = {}
 

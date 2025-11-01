@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sidebar } from '@/components/Sidebar';
 import { serviceAccountsApi, usersApi, dataListsApi, contactsApi, API_URL as DETECTED_API_URL } from '@/lib/api';
+import { asString } from '@/lib/asString';
 import {
   Send,
   Users,
@@ -822,8 +823,8 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
         return axios.post(`${API_URL}/api/v1/test-email/`, {
           recipient_email: testEmail,
           subject: config.subject,
-          body_html: config.body_html,
-          body_plain: stripHtml(config.body_html),
+          body_html: asString(config.body_html),
+          body_plain: asString(stripHtml(config.body_html)),
           from_name: config.from_name,
           sender_account_id: user.service_account_id,
           sender_user_id: userId
@@ -905,8 +906,8 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
       const payload = {
         name: config.name,
         subject: config.header_type === '100_percent' ? '' : config.subject,
-        body_html: config.header_type === '100_percent' ? '' : config.body_html,
-        body_plain: config.header_type === '100_percent' ? '' : stripHtml(config.body_html),
+        body_html: config.header_type === '100_percent' ? '' : asString(config.body_html),
+        body_plain: config.header_type === '100_percent' ? '' : asString(stripHtml(config.body_html)),
         from_name: config.header_type === '100_percent' ? '' : config.from_name,
         recipients: recipients.map(email => ({ email, variables: {} })),
         sender_account_ids: selectedAccounts,

@@ -14,6 +14,22 @@ def _rfc2822_date() -> str:
     return email.utils.formatdate(localtime=False, usegmt=True)
 
 
+def _as_str(v):
+    """Normalizes any value to a string, handling various editor formats."""
+    if v is None:
+        return ""
+    if isinstance(v, str):
+        return v
+    if isinstance(v, list):
+        return "".join(str(x) for x in v)
+    if isinstance(v, dict):
+        # Handle Quill Delta format (minimal support)
+        if "ops" in v and isinstance(v["ops"], list):
+            return "".join(str(op.get("insert", "")) for op in v["ops"])
+        return str(v)
+    return str(v)
+
+
 def build_mime(req) -> tuple[EmailMessage, str]:
     msg = EmailMessage()
     from_disp = f"{req.from_name} <{req.from_email}>" if getattr(req, "from_name", None) else req.from_email
@@ -33,14 +49,19 @@ def build_mime(req) -> tuple[EmailMessage, str]:
             continue
         msg[k] = v
 
-    if getattr(req, "html", None) and getattr(req, "text", None):
-        msg.set_content(req.text)
-        msg.add_alternative(req.html, subtype="html")
-    elif getattr(req, "html", None):
-        # Prefer HTML-only as alternative for better clients
-        msg.add_alternative(req.html, subtype="html")
+    # Normalize HTML and text from various formats
+    html = _as_str(getattr(req, "html", None))
+    text = _as_str(getattr(req, "text", None))
+
+    if html and text:
+        msg.set_content(text)
+        msg.add_alternative(html, subtype="html")
+    elif html:
+        # HTML-only: provide a fallback plain text
+        msg.set_content("This email contains HTML content.")
+        msg.add_alternative(html, subtype="html")
     else:
-        msg.set_content(getattr(req, "text", "") or "")
+        msg.set_content(text or "")
     return msg, msg_id
 
 

@@ -774,9 +774,16 @@ def send_prerendered_email(
         return (True, message_id, None)
     
     except Exception as e:
+        # Enhanced error logging with type information for debugging
+        html_type = type(task.get('body_html')).__name__
+        text_type = type(task.get('body_plain')).__name__
+        subject_type = type(task.get('subject')).__name__
+        error_msg = f"{str(e)} | html_type={html_type} text_type={text_type} subject_type={subject_type}"
+        
         try:
-            append_campaign_log(campaign_id, f"❌ Send failed for {task.get('recipient_email')}: {str(e)}")
+            append_campaign_log(campaign_id, f"❌ Send failed for {task.get('recipient_email')}: {error_msg}")
+            logger.error(f"Send failed for {task.get('recipient_email')} | sender={sender_email} | {error_msg}")
         except Exception:
             pass
-        return (False, None, str(e))
+        return (False, None, error_msg)
 
