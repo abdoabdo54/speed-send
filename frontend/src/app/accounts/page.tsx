@@ -1,3 +1,8 @@
+try:
+    decrypted_json = encryption_service.decrypt(account.encrypted_json)
+    # ... rest of the code under try block
+except Exception as e:
+    # ... exception handling
 'use client';
 
 import { useEffect, useState } from 'react';
