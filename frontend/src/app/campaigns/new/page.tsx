@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Sidebar } from '@/components/Sidebar';
 import { serviceAccountsApi, usersApi, dataListsApi, contactsApi, API_URL as DETECTED_API_URL } from '@/lib/api';
-import { asString } from '../../lib/asString';
+import { asString } from '@/lib/asString';
 import {
   Send,
   Users,
