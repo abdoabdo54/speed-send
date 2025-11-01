@@ -489,12 +489,20 @@ class GoogleWorkspaceService:
 
         # Build message with proper HTML/plain text handling
         # Always prefer HTML if available, ensure Content-Type is set correctly
+        # IMPORTANT: Normalize and validate body content
+        body_html = body_html or ""  # Ensure not None
+        body_plain = body_plain or ""  # Ensure not None
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"📧 Building email - body_html length: {len(body_html) if body_html else 0}, body_plain length: {len(body_plain) if body_plain else 0}")
+        
         if body_html and body_plain:
             message = MIMEMultipart('alternative')
             part1 = MIMEText(body_plain, 'plain', 'utf-8')
             part2 = MIMEText(body_html, 'html', 'utf-8')
             message.attach(part1)
             message.attach(part2)
+            logger.info(f"📧 Attached both plain ({len(body_plain)} chars) and HTML ({len(body_html)} chars) parts")
         elif body_html:
             # HTML-only: Create multipart to ensure proper Content-Type
             message = MIMEMultipart('alternative')
@@ -503,8 +511,10 @@ class GoogleWorkspaceService:
             html_part = MIMEText(body_html, 'html', 'utf-8')
             message.attach(plain_part)
             message.attach(html_part)
+            logger.info(f"📧 Attached HTML-only part ({len(body_html)} chars)")
         else:
             message = MIMEText(body_plain or '', 'plain', 'utf-8')
+            logger.info(f"📧 Created plain text only part ({len(body_plain)} chars)")
         
         # Clear all default headers first (we'll add custom ones)
         message._headers = []
@@ -513,13 +523,20 @@ class GoogleWorkspaceService:
         if custom_headers:
             for key, value in custom_headers.items():
                 try:
-                    # Preserve Content-Type for HTML emails when using custom headers
+                    # CRITICAL: Never override Content-Type for MIMEMultipart messages!
+                    # MIMEMultipart needs multipart/alternative Content-Type for the structure to work
+                    # If custom headers have Content-Type: text/html, skip it for multipart messages
                     if key.lower() == 'content-type':
-                        # Ensure Content-Type includes charset for HTML
-                        if 'text/html' in str(value).lower() and 'charset' not in str(value).lower():
-                            message[key] = f"{value}; charset=utf-8"
+                        # Skip Content-Type for multipart messages - they need multipart/alternative
+                        if isinstance(message, MIMEMultipart):
+                            # Don't set Content-Type - MIMEMultipart sets it automatically
+                            continue
                         else:
-                            message[key] = value if isinstance(value, str) else str(value)
+                            # For single-part messages, ensure Content-Type includes charset
+                            if 'text/html' in str(value).lower() and 'charset' not in str(value).lower():
+                                message[key] = f"{value}; charset=utf-8"
+                            else:
+                                message[key] = value if isinstance(value, str) else str(value)
                     else:
                         message[key] = value if isinstance(value, str) else str(value)
                 except Exception:
@@ -530,6 +547,7 @@ class GoogleWorkspaceService:
             if body_html and 'Content-Type' not in [h[0].lower() for h in message._headers]:
                 if isinstance(message, MIMEMultipart):
                     # For multipart, Content-Type is automatically set to multipart/alternative
+                    # Don't override it!
                     pass
                 else:
                     message['Content-Type'] = 'text/html; charset=utf-8'
@@ -565,10 +583,19 @@ class GoogleWorkspaceService:
         
         # Debug: Log the final raw email
         raw_email = message.as_string()
-        import logging
-        logger = logging.getLogger(__name__)
         logger.info(f"🔍 FINAL RAW EMAIL:")
-        logger.info(f"📧 Raw email headers: {raw_email[:1000]}...")
+        logger.info(f"📧 Raw email length: {len(raw_email)} characters")
+        logger.info(f"📧 Raw email preview (first 500 chars): {raw_email[:500]}...")
+        # Check if body content is present
+        if isinstance(message, MIMEMultipart):
+            logger.info(f"📧 MIMEMultipart - payload count: {len(message._payload) if hasattr(message, '_payload') else 'N/A'}")
+            if hasattr(message, '_payload') and message._payload:
+                for i, part in enumerate(message._payload):
+                    payload = part.get_payload(decode=False) if hasattr(part, 'get_payload') else 'N/A'
+                    logger.info(f"📧 Part {i} type: {part.get_content_type() if hasattr(part, 'get_content_type') else 'N/A'}, payload length: {len(payload) if payload else 0}")
+        else:
+            payload = message.get_payload(decode=False) if hasattr(message, 'get_payload') else 'N/A'
+            logger.info(f"📧 Single part - payload length: {len(payload) if payload else 0}")
         
         return raw_email
     

@@ -79,7 +79,6 @@ export default function NewCampaignPage() {
     test_after_count: 0,
     header_type: 'existing', // 'existing' or '100_percent'
     custom_header: `MIME-Version: 1.0
-Content-Type: text/html; charset=utf-8
 To: [to]
 Message-ID: <[rnda_20]@mail.sys.com>
 Feedback-ID: [rndn_10]:[rndn_7]:[rndn_3].[rndn_2].[rndn_2].[rndn_2]:[rnda_8]
