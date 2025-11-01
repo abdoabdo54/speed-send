@@ -883,6 +883,23 @@ def send_prerendered_email(
                 custom_headers = canonical
             logger.info(f"Using send_email_with_custom_headers method - custom_headers: {custom_headers}")
             logger.info(f"Body HTML length: {len(body_html)}, Body Plain length: {len(body_plain)}")
+            
+            # CRITICAL: Ensure body_html and body_plain are strings before sending with custom headers
+            if not isinstance(body_html, str):
+                logger.error(f"❌ CRITICAL: body_html is not a string before custom headers send: {type(body_html)}")
+                body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
+            if not isinstance(body_plain, str):
+                logger.error(f"❌ CRITICAL: body_plain is not a string before custom headers send: {type(body_plain)}")
+                body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
+            
+            # FINAL CHECK - ensure they are strings
+            if not isinstance(body_html, str):
+                logger.error(f"❌ CRITICAL: body_html is STILL not a string after conversion: {type(body_html)}")
+                body_html = str(body_html) if body_html else ''
+            if not isinstance(body_plain, str):
+                logger.error(f"❌ CRITICAL: body_plain is STILL not a string after conversion: {type(body_plain)}")
+                body_plain = str(body_plain) if body_plain else ''
+                
             message_id = google_service.send_email_with_custom_headers(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
@@ -896,6 +913,23 @@ def send_prerendered_email(
         else:
             logger.info(f"Using regular send_email method - no custom_header_text")
             logger.info(f"Body HTML length: {len(body_html)}, Body Plain length: {len(body_plain)}")
+            
+            # CRITICAL: Ensure body_html and body_plain are strings before sending
+            if not isinstance(body_html, str):
+                logger.error(f"❌ CRITICAL: body_html is not a string before regular send: {type(body_html)}")
+                body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
+            if not isinstance(body_plain, str):
+                logger.error(f"❌ CRITICAL: body_plain is not a string before regular send: {type(body_plain)}")
+                body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
+            
+            # FINAL CHECK - ensure they are strings
+            if not isinstance(body_html, str):
+                logger.error(f"❌ CRITICAL: body_html is STILL not a string after conversion: {type(body_html)}")
+                body_html = str(body_html) if body_html else ''
+            if not isinstance(body_plain, str):
+                logger.error(f"❌ CRITICAL: body_plain is STILL not a string after conversion: {type(body_plain)}")
+                body_plain = str(body_plain) if body_plain else ''
+                
         message_id = google_service.send_email(
             sender_email=sender_email,
             recipient_email=task['recipient_email'],
