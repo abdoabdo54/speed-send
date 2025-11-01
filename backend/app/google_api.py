@@ -496,6 +496,7 @@ class GoogleWorkspaceService:
         logger = logging.getLogger(__name__)
         logger.info(f"📧 Building email - body_html length: {len(body_html) if body_html else 0}, body_plain length: {len(body_plain) if body_plain else 0}")
         
+        # Build message with body content FIRST (this is critical!)
         if body_html and body_plain:
             message = MIMEMultipart('alternative')
             part1 = MIMEText(body_plain, 'plain', 'utf-8')
@@ -516,20 +517,20 @@ class GoogleWorkspaceService:
             message = MIMEText(body_plain or '', 'plain', 'utf-8')
             logger.info(f"📧 Created plain text only part ({len(body_plain)} chars)")
         
-        # Clear all default headers first (we'll add custom ones)
-        message._headers = []
+        # CRITICAL: Do NOT clear headers after attaching parts!
+        # Instead, selectively override headers while preserving MIME structure
         
-        # Add ONLY the custom headers - no defaults
+        # Apply custom headers selectively (don't clear all headers)
         if custom_headers:
             for key, value in custom_headers.items():
                 try:
                     # CRITICAL: Never override Content-Type for MIMEMultipart messages!
                     # MIMEMultipart needs multipart/alternative Content-Type for the structure to work
-                    # If custom headers have Content-Type: text/html, skip it for multipart messages
                     if key.lower() == 'content-type':
                         # Skip Content-Type for multipart messages - they need multipart/alternative
                         if isinstance(message, MIMEMultipart):
                             # Don't set Content-Type - MIMEMultipart sets it automatically
+                            logger.info(f"📧 Skipping Content-Type from custom headers for MIMEMultipart")
                             continue
                         else:
                             # For single-part messages, ensure Content-Type includes charset
@@ -537,29 +538,29 @@ class GoogleWorkspaceService:
                                 message[key] = f"{value}; charset=utf-8"
                             else:
                                 message[key] = value if isinstance(value, str) else str(value)
-                    else:
+                    elif key.lower() in ['mime-version']:
+                        # Preserve MIME-Version if set
                         message[key] = value if isinstance(value, str) else str(value)
-                except Exception:
+                    else:
+                        # Override other headers (To, From, Subject, Date, etc.)
+                        message[key] = value if isinstance(value, str) else str(value)
+                except Exception as e:
                     # best effort
-                    message[key] = str(value)
+                    logger.warning(f"⚠️ Failed to set header {key}: {e}")
+                    try:
+                        message[key] = str(value)
+                    except:
+                        pass
             
-            # Ensure Content-Type is set for HTML emails if not in custom headers
-            if body_html and 'Content-Type' not in [h[0].lower() for h in message._headers]:
-                if isinstance(message, MIMEMultipart):
-                    # For multipart, Content-Type is automatically set to multipart/alternative
-                    # Don't override it!
-                    pass
-                else:
-                    message['Content-Type'] = 'text/html; charset=utf-8'
+            # Ensure required headers are present if not in custom headers
+            if 'To' not in [h[0] for h in message._headers if isinstance(h, tuple)]:
+                message['To'] = recipient_email
         else:
-            # Fallback to basic headers only if no custom headers
+            # No custom headers - set basic required headers
             message['To'] = recipient_email
             forced_from = f"{from_name} <{sender_email}>" if from_name else sender_email
             message['From'] = forced_from
             message['Subject'] = subject
-            # Ensure Content-Type for HTML
-            if body_html:
-                message['Content-Type'] = 'text/html; charset=utf-8'
         
         # Handle attachments
         if attachments:

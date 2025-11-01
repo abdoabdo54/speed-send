@@ -294,6 +294,11 @@ def prepare_campaign_redis(campaign_id: int):
             final_body_html = _to_str(substitute_variables(campaign.body_html, variables)) if campaign.body_html is not None else ""
             final_body_plain = _to_str(substitute_variables(campaign.body_plain, variables)) if campaign.body_plain is not None else ""
             
+            # CRITICAL: Log body content to ensure it's not lost
+            logger.info(f"[{request_id}] 📝 Task body_html length: {len(final_body_html)}, body_plain length: {len(final_body_plain)}")
+            if campaign.header_type == '100_percent':
+                logger.info(f"[{request_id}] 🔍 100% Header mode - body_html: {final_body_html[:100] if final_body_html else 'EMPTY'}...")
+            
             # Check if we should use custom headers
             custom_header_text = None
             logger.info(f"Campaign {campaign_id} - header_type: {campaign.header_type}, custom_header: {campaign.custom_header[:100] if campaign.custom_header else 'None'}...")
@@ -307,13 +312,19 @@ def prepare_campaign_redis(campaign_id: int):
                 'email_log_id': email_log.id,
                 'recipient_email': email_log.recipient_email,
                 'subject': _to_str(final_subject),
-                'body_html': _to_str(final_body_html),
-                'body_plain': _to_str(final_body_plain),
+                'body_html': _to_str(final_body_html),  # CRITICAL: Always include HTML body
+                'body_plain': _to_str(final_body_plain),  # CRITICAL: Always include plain body
                 'from_name': campaign.from_name,
                 'custom_headers': campaign.custom_headers or {},
                 'attachments': campaign.attachments,
                 'custom_header_text': custom_header_text,
             }
+            
+            # Validate task has body content
+            if not task['body_html'] and not task['body_plain']:
+                logger.warning(f"[{request_id}] ⚠️ WARNING: Task has NO body content! body_html='{task['body_html']}', body_plain='{task['body_plain']}'")
+            elif not task['body_html']:
+                logger.warning(f"[{request_id}] ⚠️ WARNING: Task has NO HTML body! Only plain text available.")
             
             sender_batches[sender_email]['tasks'].append(task)
             task_counter += 1
@@ -748,12 +759,17 @@ def send_prerendered_email(
                 canonical.setdefault('To', task['recipient_email'])
                 custom_headers = canonical
             logger.info(f"Using send_email_with_custom_headers method - custom_headers: {custom_headers}")
+            # CRITICAL: Log body content before sending
+            logger.info(f"📧 Sending email - body_html length: {len(task.get('body_html', '') or '')}, body_plain length: {len(task.get('body_plain', '') or '')}")
+            if not task.get('body_html'):
+                logger.warning(f"⚠️ WARNING: body_html is EMPTY before sending!")
+            
             message_id = google_service.send_email_with_custom_headers(
                 sender_email=sender_email,
                 recipient_email=task['recipient_email'],
                 subject=task['subject'],
-                body_html=task['body_html'],
-                body_plain=task['body_plain'],
+                body_html=task.get('body_html') or '',  # Ensure not None
+                body_plain=task.get('body_plain') or '',  # Ensure not None
                 from_name=task.get('from_name'),
                 custom_headers=custom_headers,
                 attachments=task.get('attachments')
