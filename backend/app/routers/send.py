@@ -26,29 +26,7 @@ def send_email(req: SendEmailRequest, db: Session = Depends(get_db)):
         try:
             # Decrypt and send using our existing Google API utility
             from app.encryption import encryption_service
-            
-            # Check if encrypted_json exists and is not empty
-            if not sa.encrypted_json:
-                logger.error(f"❌ Empty encrypted JSON for service account {sa.name}")
-                raise HTTPException(status_code=500, detail="Service account credentials are missing")
-                
-            try:
-                decrypted_json = encryption_service.decrypt(sa.encrypted_json)
-                logger.info(f"🔍 Successfully decrypted JSON for service account {sa.name}")
-            except Exception as e:
-                logger.error(f"❌ Failed to decrypt JSON for service account {sa.name} (ID: {sa.id}): {str(e)}")
-                
-                # Try to use the model's get_json_content method as a fallback
-                try:
-                    decrypted_json = sa.get_json_content()
-                    if decrypted_json:
-                        logger.info(f"🔍 Successfully decrypted JSON using fallback method for service account {sa.name}")
-                    else:
-                        logger.error(f"❌ Fallback decryption also failed for service account {sa.name}")
-                        raise HTTPException(status_code=500, detail="Failed to decrypt service account credentials")
-                except Exception as fallback_error:
-                    logger.error(f"❌ Fallback decryption failed with error: {str(fallback_error)}")
-                    raise HTTPException(status_code=500, detail="Failed to decrypt service account credentials")
+            decrypted_json = encryption_service.decrypt(sa.encrypted_json)
             gw = GoogleWorkspaceService(decrypted_json)
             # Use custom headers when present
             # Build minimal inputs for google_service that match our current helper

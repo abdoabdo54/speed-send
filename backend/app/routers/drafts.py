@@ -354,29 +354,7 @@ def create_gmail_draft(user_id: int, subject: str, from_name: str, body_html: st
         # Decrypt service account credentials
         from app.encryption import EncryptionService
         encryption_service = EncryptionService()
-        
-        try:
-            # Check if encrypted_json exists and is not empty
-            if not service_account.encrypted_json:
-                logger.error(f"❌ Empty encrypted JSON for service account {service_account.name}")
-                raise Exception("Empty encrypted JSON for service account")
-                
-            service_account_json = encryption_service.decrypt(service_account.encrypted_json)
-            logger.info(f"🔍 Successfully decrypted JSON for service account {service_account.name}")
-        except Exception as e:
-            logger.error(f"❌ Failed to decrypt JSON for service account {service_account.name} (ID: {service_account.id}): {str(e)}")
-            
-            # Try to use the model's get_json_content method as a fallback
-            try:
-                service_account_json = service_account.get_json_content()
-                if service_account_json:
-                    logger.info(f"🔍 Successfully decrypted JSON using fallback method for service account {service_account.name}")
-                else:
-                    logger.error(f"❌ Fallback decryption also failed for service account {service_account.name}")
-                    raise Exception("Failed to decrypt service account credentials")
-            except Exception as fallback_error:
-                logger.error(f"❌ Fallback decryption failed with error: {str(fallback_error)}")
-                raise Exception("Failed to decrypt service account credentials")
+        service_account_json = encryption_service.decrypt(service_account.encrypted_json)
         
         logger.info("Service account credentials decrypted successfully")
         

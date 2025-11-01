@@ -10,34 +10,6 @@ import json
 from typing import List, Dict, Optional
 from app.config import settings
 from app.encryption import encryption_service
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-def _as_str(v):
-    """
-    Comprehensive string conversion - handles None, strings, lists, Quill Delta objects, and other types.
-    This is the SINGLE SOURCE OF TRUTH for converting email body content to strings.
-    """
-    if v is None:
-        return ""
-    if isinstance(v, str):
-        return v
-    if isinstance(v, list):
-        # Join list items with empty string (for code editor lines or arrays)
-        return "".join(str(x) for x in v if x)
-    if isinstance(v, dict):
-        # Quill Delta minimal support - handle {ops: [{insert: "text"}, ...]}
-        if "ops" in v and isinstance(v["ops"], list):
-            return "".join(str(op.get("insert", "")) for op in v["ops"] if op)
-        # For other dicts, convert to JSON string
-        try:
-            import json as _json
-            return _json.dumps(v)
-        except Exception:
-            return str(v)
-    return str(v) if v else ""
 
 
 class GoogleWorkspaceService:
@@ -307,85 +279,37 @@ class GoogleWorkspaceService:
                     raise Exception("Gmail is not enabled for this user. Enable Gmail for the account or choose another sender.")
                 raise
             
-            # ALWAYS normalize bodies to strings - never allow None or lists
-            if body_html is None:
-                body_html = ''
-            elif not isinstance(body_html, str):
+            # Create message (normalize bodies to strings)
+            if body_html is not None and not isinstance(body_html, str):
                 try:
                     if isinstance(body_html, list):
-                        body_html = "\n".join([str(x) for x in body_html if x])
+                        body_html = "\n".join([str(x) for x in body_html])
                     else:
                         import json as _json
                         body_html = _json.dumps(body_html)
                 except Exception:
-                    body_html = str(body_html) if body_html else ''
-            
-            if body_plain is None:
-                body_plain = ''
-            elif not isinstance(body_plain, str):
+                    body_html = str(body_html)
+            if body_plain is not None and not isinstance(body_plain, str):
                 try:
                     if isinstance(body_plain, list):
-                        body_plain = "\n".join([str(x) for x in body_plain if x])
+                        body_plain = "\n".join([str(x) for x in body_plain])
                     else:
                         import json as _json
                         body_plain = _json.dumps(body_plain)
                 except Exception:
-                    body_plain = str(body_plain) if body_plain else ''
-            
-            # ABSOLUTE FINAL CHECK RIGHT BEFORE MIMEText - use comprehensive _as_str
-            # Final safety check - must be strings, handles lists, Quill Delta, etc.
-            body_html = _as_str(body_html)
-            body_plain = _as_str(body_plain)
-            
-            # ONE MORE CHECK - if somehow still not string, force it
-            if not isinstance(body_html, str):
-                body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
-            if not isinstance(body_plain, str):
-                body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
+                    body_plain = str(body_plain)
 
             # Create message
-            # CRITICAL: Wrap MIMEText creation in try/except to catch any list errors
-            try:
-                if body_html and body_plain:
-                    message = MIMEMultipart('alternative')
-                    # Double-check types before MIMEText
-                    if not isinstance(body_plain, str):
-                        body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
-                    if not isinstance(body_html, str):
-                        body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
-                    part1 = MIMEText(body_plain, 'plain')
-                    part2 = MIMEText(body_html, 'html')
-                    message.attach(part1)
-                    message.attach(part2)
-                elif body_html:
-                    # Double-check type before MIMEText
-                    if not isinstance(body_html, str):
-                        body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
-                    message = MIMEText(body_html, 'html')
-                else:
-                    # Double-check type before MIMEText
-                    if not isinstance(body_plain, str):
-                        body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
-                    message = MIMEText(body_plain or '', 'plain')
-            except TypeError as e:
-                if 'list' in str(e):
-                    logger.error(f"❌ CRITICAL: MIMEText received list - body_html type: {type(body_html)}, body_plain type: {type(body_plain)}")
-                    logger.error(f"❌ body_html value: {str(body_html)[:200]}")
-                    logger.error(f"❌ body_plain value: {str(body_plain)[:200]}")
-                    # Force convert one last time
-                    body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
-                    body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
-                    # Retry
-                    if body_html and body_plain:
-                        message = MIMEMultipart('alternative')
-                        message.attach(MIMEText(body_plain, 'plain'))
-                        message.attach(MIMEText(body_html, 'html'))
-                    elif body_html:
-                        message = MIMEText(body_html, 'html')
-                    else:
-                        message = MIMEText(body_plain or '', 'plain')
-                else:
-                    raise
+            if body_html and body_plain:
+                message = MIMEMultipart('alternative')
+                part1 = MIMEText(body_plain, 'plain')
+                part2 = MIMEText(body_html, 'html')
+                message.attach(part1)
+                message.attach(part2)
+            elif body_html:
+                message = MIMEText(body_html, 'html')
+            else:
+                message = MIMEText(body_plain or '', 'plain')
             
             message['To'] = recipient_email
             # Force display name if provided, otherwise default to raw email
@@ -543,152 +467,37 @@ class GoogleWorkspaceService:
         from email.mime.base import MIMEBase
         from email import encoders
         
-        # ALWAYS normalize bodies to strings - never allow None or lists
-        if body_html is None:
-            body_html = ''
-        elif not isinstance(body_html, str):
+        # Normalize bodies to strings
+        if body_html is not None and not isinstance(body_html, str):
             try:
                 if isinstance(body_html, list):
-                    body_html = "\n".join([str(x) for x in body_html if x])
+                    body_html = "\n".join([str(x) for x in body_html])
                 else:
                     import json as _json
                     body_html = _json.dumps(body_html)
             except Exception:
-                body_html = str(body_html) if body_html else ''
-        
-        if body_plain is None:
-            body_plain = ''
-        elif not isinstance(body_plain, str):
+                body_html = str(body_html)
+        if body_plain is not None and not isinstance(body_plain, str):
             try:
                 if isinstance(body_plain, list):
-                    body_plain = "\n".join([str(x) for x in body_plain if x])
+                    body_plain = "\n".join([str(x) for x in body_plain])
                 else:
                     import json as _json
                     body_plain = _json.dumps(body_plain)
             except Exception:
-                body_plain = str(body_plain) if body_plain else ''
-        
-        # ABSOLUTE FINAL CHECK RIGHT BEFORE MIMEText - use comprehensive _as_str
-        # Final safety check - must be strings, handles lists, Quill Delta, etc.
-        body_html = _as_str(body_html)
-        body_plain = _as_str(body_plain)
-        
-        # ONE MORE CHECK - if somehow still not string, force it
-        if not isinstance(body_html, str):
-            body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
-        if not isinstance(body_plain, str):
-            body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
+                body_plain = str(body_plain)
 
         # Start with completely empty message
-        # CRITICAL: Wrap MIMEText creation in try/except to catch any list errors
-        try:
-            if body_html and body_plain:
-                message = MIMEMultipart('alternative')
-                # Double-check types before MIMEText
-                if not isinstance(body_plain, str):
-                    logger.error(f"❌ CRITICAL: body_plain is not a string before MIMEText: {type(body_plain)}")
-                    body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
-                if not isinstance(body_html, str):
-                    logger.error(f"❌ CRITICAL: body_html is not a string before MIMEText: {type(body_html)}")
-                    body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
-                
-                # FINAL CHECK - ensure they are strings
-                if not isinstance(body_plain, str):
-                    logger.error(f"❌ CRITICAL: body_plain is STILL not a string after conversion: {type(body_plain)}")
-                    body_plain = str(body_plain) if body_plain else ''
-                if not isinstance(body_html, str):
-                    logger.error(f"❌ CRITICAL: body_html is STILL not a string after conversion: {type(body_html)}")
-                    body_html = str(body_html) if body_html else ''
-                    
-                try:
-                    part1 = MIMEText(body_plain, 'plain')
-                    part2 = MIMEText(body_html, 'html')
-                except TypeError as e:
-                    logger.error(f"❌ CRITICAL: MIMEText creation failed: {str(e)}")
-                    logger.error(f"❌ body_plain type: {type(body_plain)}, value: {str(body_plain)[:200]}")
-                    logger.error(f"❌ body_html type: {type(body_html)}, value: {str(body_html)[:200]}")
-                    # Force conversion one last time
-                    body_plain = str(body_plain) if body_plain else ''
-                    body_html = str(body_html) if body_html else ''
-                    part1 = MIMEText(body_plain, 'plain')
-                    part2 = MIMEText(body_html, 'html')
-                message.attach(part1)
-                message.attach(part2)
-            elif body_html:
-                # Double-check type before MIMEText
-                if not isinstance(body_html, str):
-                    logger.error(f"❌ CRITICAL: body_html is not a string before MIMEText (html only): {type(body_html)}")
-                    body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
-                
-                # FINAL CHECK - ensure it's a string
-                if not isinstance(body_html, str):
-                    logger.error(f"❌ CRITICAL: body_html is STILL not a string after conversion (html only): {type(body_html)}")
-                    body_html = str(body_html) if body_html else ''
-                    
-                try:
-                    message = MIMEText(body_html, 'html')
-                except TypeError as e:
-                    logger.error(f"❌ CRITICAL: MIMEText creation failed (html only): {str(e)}")
-                    logger.error(f"❌ body_html type: {type(body_html)}, value: {str(body_html)[:200]}")
-                    # Force conversion one last time
-                    body_html = str(body_html) if body_html else ''
-                    message = MIMEText(body_html, 'html')
-            else:
-                # Double-check type before MIMEText
-                if not isinstance(body_plain, str):
-                    logger.error(f"❌ CRITICAL: body_plain is not a string before MIMEText (plain only): {type(body_plain)}")
-                    body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
-                
-                # FINAL CHECK - ensure it's a string
-                if not isinstance(body_plain, str):
-                    logger.error(f"❌ CRITICAL: body_plain is STILL not a string after conversion (plain only): {type(body_plain)}")
-                    body_plain = str(body_plain) if body_plain else ''
-                    
-                try:
-                    message = MIMEText(body_plain or '', 'plain')
-                except TypeError as e:
-                    logger.error(f"❌ CRITICAL: MIMEText creation failed (plain only): {str(e)}")
-                    logger.error(f"❌ body_plain type: {type(body_plain)}, value: {str(body_plain)[:200]}")
-                    # Force conversion one last time
-                    body_plain = str(body_plain) if body_plain else ''
-                    message = MIMEText(body_plain or '', 'plain')
-        except TypeError as e:
-            if 'list' in str(e):
-                logger.error(f"❌ CRITICAL: MIMEText received list - body_html type: {type(body_html)}, body_plain type: {type(body_plain)}")
-                logger.error(f"❌ body_html value: {str(body_html)[:200]}")
-                logger.error(f"❌ body_plain value: {str(body_plain)[:200]}")
-                # Force convert one last time
-                body_html = "\n".join([str(x) for x in body_html]) if isinstance(body_html, list) else str(body_html) or ''
-                body_plain = "\n".join([str(x) for x in body_plain]) if isinstance(body_plain, list) else str(body_plain) or ''
-                # Retry
-                if body_html and body_plain:
-                    message = MIMEMultipart('alternative')
-                    try:
-                        message.attach(MIMEText(body_plain, 'plain'))
-                        message.attach(MIMEText(body_html, 'html'))
-                    except TypeError as e:
-                        logger.error(f"❌ CRITICAL: MIMEText failed in retry: {str(e)}")
-                        # Force conversion one more time
-                        body_plain = str(body_plain) if body_plain else ''
-                        body_html = str(body_html) if body_html else ''
-                        message.attach(MIMEText(body_plain, 'plain'))
-                        message.attach(MIMEText(body_html, 'html'))
-                elif body_html:
-                    try:
-                        message = MIMEText(body_html, 'html')
-                    except TypeError as e:
-                        logger.error(f"❌ CRITICAL: MIMEText failed for html in retry: {str(e)}")
-                        body_html = str(body_html) if body_html else ''
-                        message = MIMEText(body_html, 'html')
-                else:
-                    try:
-                        message = MIMEText(body_plain or '', 'plain')
-                    except TypeError as e:
-                        logger.error(f"❌ CRITICAL: MIMEText failed for plain in retry: {str(e)}")
-                        body_plain = str(body_plain) if body_plain else ''
-                        message = MIMEText(body_plain or '', 'plain')
-            else:
-                raise
+        if body_html and body_plain:
+            message = MIMEMultipart('alternative')
+            part1 = MIMEText(body_plain, 'plain')
+            part2 = MIMEText(body_html, 'html')
+            message.attach(part1)
+            message.attach(part2)
+        elif body_html:
+            message = MIMEText(body_html, 'html')
+        else:
+            message = MIMEText(body_plain or '', 'plain')
         
         # Clear all default headers first
         message._headers = []
@@ -697,10 +506,6 @@ class GoogleWorkspaceService:
         if custom_headers:
             for key, value in custom_headers.items():
                 try:
-                    # CRITICAL: Ensure value is a string, not a list
-                    if isinstance(value, list):
-                        logger.error(f"❌ CRITICAL: Custom header value is a list for key {key}: {str(value)[:100]}")
-                        value = "\n".join([str(x) for x in value]) if value else ''
                     message[key] = value if isinstance(value, str) else str(value)
                 except Exception:
                     # best effort
