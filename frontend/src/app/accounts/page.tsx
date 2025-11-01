@@ -3,7 +3,105 @@ def send_email_with_custom_headers(
     sender_email: str,
     recipient_email: str,
     subject: str,
+    body_html: Optional[str] = None,def _build_raw_email_with_headers(
+    self,
+    sender_email: str,
+    recipient_email: str,
+    subject: str,
     body_html: Optional[str] = None,
+    body_plain: Optional[str] = None,
+    from_name: Optional[str] = None,
+    custom_headers: Optional[Dict[str, str]] = None,
+    attachments: Optional[List[Dict]] = None
+) -> str:
+    """
+    Build raw email with full custom header control - completely manual construction
+    """
+    import base64
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.base import MIMEBase
+    from email import encoders
+    
+    # Normalize bodies to strings
+    if body_html is not None and not isinstance(body_html, str):
+        try:
+            if isinstance(body_html, list):
+                body_html = "\n".join([str(x) for x in body_html])
+            else:
+                import json as _json
+                body_html = _json.dumps(body_html)
+        except Exception:
+            body_html = str(body_html)
+    if body_plain is not None and not isinstance(body_plain, str):
+        try:
+            if isinstance(body_plain, list):
+                body_plain = "\n".join([str(x) for x in body_plain])
+            else:
+                import json as _json
+                body_plain = _json.dumps(body_plain)
+        except Exception:
+            body_plain = str(body_plain)
+
+    # Create message with proper MIME structure
+    if body_html and body_plain:
+        message = MIMEMultipart('alternative')
+        part1 = MIMEText(body_plain, 'plain')
+        part2 = MIMEText(body_html, 'html')
+        message.attach(part1)
+        message.attach(part2)
+    elif body_html:
+        message = MIMEMultipart('alternative')
+        message.attach(MIMEText(body_html, 'html'))
+    else:
+        message = MIMEMultipart('alternative')
+        message.attach(MIMEText(body_plain or '', 'plain'))
+
+    # Clear all default headers first
+    message._headers = []
+    
+    # Add ONLY the custom headers
+    if custom_headers:
+        for key, value in custom_headers.items():
+            try:
+                message[key] = value if isinstance(value, str) else str(value)
+            except Exception:
+                message[key] = str(value)
+    else:
+        # Fallback to basic headers only if no custom headers
+        message['To'] = recipient_email
+        forced_from = f"{from_name} <{sender_email}>" if from_name else sender_email
+        message['From'] = forced_from
+        message['Subject'] = subject
+
+    # Handle attachments
+    if attachments:
+        if not isinstance(message, MIMEMultipart):
+            old_message = message
+            message = MIMEMultipart()
+            for key, value in old_message.items():
+                message[key] = value
+            message.attach(old_message)
+        
+        for attachment in attachments:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(base64.b64decode(attachment['content']))
+            encoders.encode_base64(part)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename={attachment["filename"]}'
+            )
+            message.attach(part)
+
+    # Debug logging
+    raw_email = message.as_string()
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔍 FINAL RAW EMAIL:")
+    logger.info(f"📧 Raw email headers: {raw_email[:1000]}...")
+    
+    return raw_email
+
     body_plain: Optional[str] = None,
     from_name: Optional[str] = None,
     custom_headers: Optional[Dict[str, str]] = None,
