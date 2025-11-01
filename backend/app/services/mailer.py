@@ -33,14 +33,26 @@ def build_mime(req) -> tuple[EmailMessage, str]:
             continue
         msg[k] = v
 
-    if getattr(req, "html", None) and getattr(req, "text", None):
-        msg.set_content(req.text)
-        msg.add_alternative(req.html, subtype="html")
-    elif getattr(req, "html", None):
+    # CRITICAL: Ensure HTML and text content are strings, not lists
+    html_content = getattr(req, "html", None)
+    text_content = getattr(req, "text", None)
+    
+    # Convert list content to strings if needed
+    if isinstance(html_content, list):
+        logger.error(f"❌ CRITICAL: HTML content is a list: {str(html_content)[:100]}")
+        html_content = "\n".join([str(x) for x in html_content]) if html_content else ''
+    if isinstance(text_content, list):
+        logger.error(f"❌ CRITICAL: Text content is a list: {str(text_content)[:100]}")
+        text_content = "\n".join([str(x) for x in text_content]) if text_content else ''
+    
+    if html_content and text_content:
+        msg.set_content(text_content)
+        msg.add_alternative(html_content, subtype="html")
+    elif html_content:
         # Prefer HTML-only as alternative for better clients
-        msg.add_alternative(req.html, subtype="html")
+        msg.add_alternative(html_content, subtype="html")
     else:
-        msg.set_content(getattr(req, "text", "") or "")
+        msg.set_content(text_content or "")
     return msg, msg_id
 
 

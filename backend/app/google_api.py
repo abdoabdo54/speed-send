@@ -697,6 +697,10 @@ class GoogleWorkspaceService:
         if custom_headers:
             for key, value in custom_headers.items():
                 try:
+                    # CRITICAL: Ensure value is a string, not a list
+                    if isinstance(value, list):
+                        logger.error(f"❌ CRITICAL: Custom header value is a list for key {key}: {str(value)[:100]}")
+                        value = "\n".join([str(x) for x in value]) if value else ''
                     message[key] = value if isinstance(value, str) else str(value)
                 except Exception:
                     # best effort

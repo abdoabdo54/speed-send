@@ -819,6 +819,12 @@ def send_prerendered_email(
                         custom_headers=custom_headers,
                         attachments=task.get('attachments')
                     )
+                    
+                    # CRITICAL: Ensure raw email string is properly formed
+                    if isinstance(raw_email_str, list):
+                        logger.error(f"❌ CRITICAL: Raw email string is a list: {str(raw_email_str)[:100]}")
+                        raw_email_str = "\n".join([str(x) for x in raw_email_str]) if raw_email_str else ''
+                    
                     smtp_msg = _msg_from_str(raw_email_str)
                     send_via_smtp(smtp_msg)
                     return (True, smtp_msg.get('Message-ID'), None)
