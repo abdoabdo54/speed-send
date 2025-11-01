@@ -75,7 +75,28 @@ def send_campaign_emails(self, campaign_id: int):
             ).all()
             
             # Decrypt service account JSON once
-            decrypted_json = encryption_service.decrypt(account.encrypted_json)
+            try:
+                # Check if encrypted_json exists and is not empty
+                if not account.encrypted_json:
+                    logger.error(f"❌ Empty encrypted JSON for account {account.name}")
+                    continue
+                    
+                decrypted_json = encryption_service.decrypt(account.encrypted_json)
+                logger.info(f"🔍 Successfully decrypted JSON for account {account.name}")
+            except Exception as e:
+                logger.error(f"❌ Failed to decrypt JSON for account {account.name} (ID: {account.id}): {str(e)}")
+                
+                # Try to use the model's get_json_content method as a fallback
+                try:
+                    decrypted_json = account.get_json_content()
+                    if decrypted_json:
+                        logger.info(f"🔍 Successfully decrypted JSON using fallback method for account {account.name}")
+                    else:
+                        logger.error(f"❌ Fallback decryption also failed for account {account.name}")
+                        continue
+                except Exception as fallback_error:
+                    logger.error(f"❌ Fallback decryption failed with error: {str(fallback_error)}")
+                    continue
             
             from app.tasks_v2 import _is_admin_email
             for user in users:
@@ -297,7 +318,28 @@ def send_single_email(
             raise Exception(f"Service account {sender_account_id} not found")
         
         # Decrypt service account JSON
-        decrypted_json = encryption_service.decrypt(service_account.encrypted_json)
+        try:
+            # Check if encrypted_json exists and is not empty
+            if not service_account.encrypted_json:
+                logger.error(f"❌ Empty encrypted JSON for service account {service_account.name}")
+                raise Exception("Empty encrypted JSON for service account")
+                
+            decrypted_json = encryption_service.decrypt(service_account.encrypted_json)
+            logger.info(f"🔍 Successfully decrypted JSON for service account {service_account.name}")
+        except Exception as e:
+            logger.error(f"❌ Failed to decrypt JSON for service account {service_account.name} (ID: {service_account.id}): {str(e)}")
+            
+            # Try to use the model's get_json_content method as a fallback
+            try:
+                decrypted_json = service_account.get_json_content()
+                if decrypted_json:
+                    logger.info(f"🔍 Successfully decrypted JSON using fallback method for service account {service_account.name}")
+                else:
+                    logger.error(f"❌ Fallback decryption also failed for service account {service_account.name}")
+                    raise Exception("Failed to decrypt service account credentials")
+            except Exception as fallback_error:
+                logger.error(f"❌ Fallback decryption failed with error: {str(fallback_error)}")
+                raise Exception("Failed to decrypt service account credentials")
         
         # Initialize Google API service
         google_service = GoogleWorkspaceService(decrypted_json)
@@ -434,11 +476,27 @@ def sync_workspace_users(service_account_id: int, admin_email: str):
         
         # Decrypt service account JSON
         try:
+            # Check if encrypted_json exists and is not empty
+            if not service_account.encrypted_json:
+                logger.error(f"❌ Empty encrypted JSON for service account {service_account.name}")
+                raise Exception("Empty encrypted JSON for service account")
+                
             decrypted_json = encryption_service.decrypt(service_account.encrypted_json)
             logger.info("✅ Decrypted service account JSON")
         except Exception as e:
-            logger.error(f"❌ Failed to decrypt JSON: {str(e)}")
-            raise
+            logger.error(f"❌ Failed to decrypt JSON for service account {service_account.name} (ID: {service_account.id}): {str(e)}")
+            
+            # Try to use the model's get_json_content method as a fallback
+            try:
+                decrypted_json = service_account.get_json_content()
+                if decrypted_json:
+                    logger.info("✅ Decrypted service account JSON using fallback method")
+                else:
+                    logger.error("❌ Fallback decryption also failed")
+                    raise Exception("Failed to decrypt service account credentials")
+            except Exception as fallback_error:
+                logger.error(f"❌ Fallback decryption failed with error: {str(fallback_error)}")
+                raise Exception("Failed to decrypt service account credentials")
         
         # Initialize Google API service
         try:

@@ -161,11 +161,28 @@ def prepare_campaign_redis(campaign_id: int):
             
             # Decrypt once during preparation
             try:
+                # Check if encrypted_json exists and is not empty
+                if not account.encrypted_json:
+                    logger.error(f"[{request_id}] ❌ Empty encrypted JSON for account {account.name}")
+                    continue
+                    
                 decrypted_json = encryption_service.decrypt(account.encrypted_json)
                 logger.info(f"[{request_id}] 🔍 Successfully decrypted JSON for account {account.name}")
             except Exception as e:
-                logger.error(f"[{request_id}] ❌ Failed to decrypt JSON for account {account.name}: {e}")
-                continue
+                logger.error(f"[{request_id}] ❌ Failed to decrypt JSON for account {account.name} (ID: {account.id}): {str(e)}")
+                logger.error(f"[{request_id}] ❌ Encrypted data length: {len(account.encrypted_json) if account.encrypted_json else 0}")
+                
+                # Try to use the model's get_json_content method as a fallback
+                try:
+                    decrypted_json = account.get_json_content()
+                    if decrypted_json:
+                        logger.info(f"[{request_id}] 🔍 Successfully decrypted JSON using fallback method for account {account.name}")
+                    else:
+                        logger.error(f"[{request_id}] ❌ Fallback decryption also failed for account {account.name}")
+                        continue
+                except Exception as fallback_error:
+                    logger.error(f"[{request_id}] ❌ Fallback decryption failed with error: {str(fallback_error)}")
+                    continue
             
             for user in users:
                 # Skip admin addresses (must not be used as senders)

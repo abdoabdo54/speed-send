@@ -76,11 +76,27 @@ async def send_test_email(
         # Decrypt service account JSON
         logger.info("🔐 Decrypting service account JSON...")
         try:
+            # Check if encrypted_json exists and is not empty
+            if not service_account.encrypted_json:
+                logger.error(f"❌ Empty encrypted JSON for service account {service_account.name}")
+                raise HTTPException(status_code=500, detail="Service account credentials are missing")
+                
             decrypted_json = encryption_service.decrypt(service_account.encrypted_json)
             logger.info("✅ Service account JSON decrypted successfully")
         except Exception as e:
             logger.error(f"❌ Failed to decrypt service account JSON: {e}")
-            raise HTTPException(status_code=500, detail="Failed to decrypt service account credentials")
+            
+            # Try to use the model's get_json_content method as a fallback
+            try:
+                decrypted_json = service_account.get_json_content()
+                if decrypted_json:
+                    logger.info("✅ Service account JSON decrypted successfully using fallback method")
+                else:
+                    logger.error("❌ Fallback decryption also failed")
+                    raise HTTPException(status_code=500, detail="Failed to decrypt service account credentials")
+            except Exception as fallback_error:
+                logger.error(f"❌ Fallback decryption failed with error: {str(fallback_error)}")
+                raise HTTPException(status_code=500, detail="Failed to decrypt service account credentials")
         
         # Create Google service
         logger.info("🌐 Creating Google Workspace service...")
