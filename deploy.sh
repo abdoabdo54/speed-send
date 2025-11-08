@@ -105,7 +105,92 @@ fi
 
 # Build and Start
 print_section "🚀 Build & Launch"
-print_info "Building images and starting services..."
+
+# Verify critical files exist before building
+print_info "Verifying frontend files..."
+if [ ! -f "frontend/package.json" ]; then
+    print_warning "frontend/package.json is missing! Creating it..."
+    cat > frontend/package.json << 'EOF'
+{
+  "name": "speed-send-frontend",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.0.2",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-label": "^2.0.2",
+    "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-scroll-area": "^1.0.5",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-toast": "^1.1.5",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "lucide-react": "^0.294.0",
+    "next": "14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwind-merge": "^2.0.0",
+    "cmdk": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.9.0",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.54.0",
+    "eslint-config-next": "14.0.4",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.6",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+EOF
+    print_success "Created frontend/package.json"
+fi
+if [ ! -d "frontend/src/lib" ]; then
+    print_info "Creating frontend/src/lib directory..."
+    mkdir -p frontend/src/lib
+fi
+if [ ! -f "frontend/src/lib/utils.ts" ]; then
+    print_warning "frontend/src/lib/utils.ts is missing! Creating it..."
+    cat > frontend/src/lib/utils.ts << 'EOF'
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+EOF
+    print_success "Created frontend/src/lib/utils.ts"
+fi
+
+# Display frontend directory contents for debugging
+print_info "Frontend directory contents:"
+ls -la frontend/
+print_info "Frontend package.json size: $(stat -f%z frontend/package.json 2>/dev/null || stat -c%s frontend/package.json)"
+print_success "All frontend files verified."
+
+# Build frontend first to catch errors early
+print_info "Building frontend image..."
+docker compose build frontend --no-cache
+if [ $? -ne 0 ]; then
+    print_error "Frontend build failed! Check the logs above."
+fi
+print_success "Frontend build completed."
+
+print_info "Building remaining services and starting..."
 docker compose build --no-cache
 docker compose up -d
 
