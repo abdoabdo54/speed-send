@@ -362,6 +362,15 @@ EOF
     print_success "Created frontend/src/lib/asString.ts"
 fi
 
+# Fix any remaining direct axios imports in components
+print_info "Fixing direct axios imports in frontend files..."
+if grep -r "import axios from 'axios'" frontend/src/ 2>/dev/null; then
+    find frontend/src/ -name "*.tsx" -exec sed -i "s/import axios from 'axios';/\/\/ Using apiClient from @\/lib\/api instead of direct axios/g" {} \;
+    print_success "Fixed direct axios imports."
+else
+    print_success "No direct axios imports found."
+fi
+
 # Display frontend directory contents for debugging
 print_info "Frontend directory contents:"
 ls -la frontend/
@@ -370,9 +379,17 @@ print_success "All frontend files verified."
 
 # Build frontend first to catch errors early
 print_info "Building frontend image..."
-docker compose build frontend --no-cache
+# Force complete rebuild to clear npm cache
+docker compose build frontend --no-cache --pull
 if [ $? -ne 0 ]; then
     print_error "Frontend build failed! Check the logs above."
+    print_info "Attempting to clean Docker cache and retry..."
+    docker system prune -f
+    docker compose build frontend --no-cache --pull
+    if [ $? -ne 0 ]; then
+        print_error "Frontend build failed after cache cleanup! Please check dependencies."
+        exit 1
+    fi
 fi
 print_success "Frontend build completed."
 

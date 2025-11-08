@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { serviceAccountsApi, usersApi, dataListsApi, API_URL } from '@/lib/api';
-import axios from 'axios';
+// Using apiClient from @/lib/api instead of direct axios
 
 export default function TestApiPage() {
   const [results, setResults] = useState<any>({});
