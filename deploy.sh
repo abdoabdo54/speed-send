@@ -246,8 +246,8 @@ EOF
 fi
 
 # Verify/Create API client
-if [ ! -f "frontend/src/lib/api.ts" ]; then
-    print_warning "frontend/src/lib/api.ts is missing! Creating it..."
+if [ ! -f "frontend/src/lib/api.ts" ] || ! grep -q "class ApiClient" "frontend/src/lib/api.ts"; then
+    print_warning "frontend/src/lib/api.ts is missing or corrupted! Creating it..."
     cat > frontend/src/lib/api.ts << 'EOF'
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
