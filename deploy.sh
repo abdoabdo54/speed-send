@@ -160,8 +160,10 @@ if [ ! -f "frontend/package.json" ]; then
     "@radix-ui/react-scroll-area": "^1.0.5",
     "@radix-ui/react-select": "^2.0.0",
     "@radix-ui/react-toast": "^1.1.5",
+    "axios": "^1.6.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "date-fns": "^2.30.0",
     "lucide-react": "^0.294.0",
     "next": "14.0.4",
     "react": "^18.2.0",
@@ -321,6 +323,43 @@ export const apiClient = new ApiClient();
 export default apiClient;
 EOF
     print_success "Created frontend/src/lib/api.ts"
+fi
+
+# Verify/Create asString utility
+if [ ! -f "frontend/src/lib/asString.ts" ]; then
+    print_warning "frontend/src/lib/asString.ts is missing! Creating it..."
+    cat > frontend/src/lib/asString.ts << 'EOF'
+/**
+ * Utility to safely convert various types to string
+ * Useful for Next.js params and search params handling
+ */
+export function asString(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value[0] || '';
+  }
+  return value || '';
+}
+
+/**
+ * Convert value to number, with fallback
+ */
+export function asNumber(value: string | string[] | undefined, fallback: number = 0): number {
+  const str = asString(value);
+  const num = parseInt(str, 10);
+  return isNaN(num) ? fallback : num;
+}
+
+/**
+ * Convert value to boolean
+ */
+export function asBoolean(value: string | string[] | undefined): boolean {
+  const str = asString(value).toLowerCase();
+  return str === 'true' || str === '1' || str === 'yes';
+}
+
+export default asString;
+EOF
+    print_success "Created frontend/src/lib/asString.ts"
 fi
 
 # Display frontend directory contents for debugging
