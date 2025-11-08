@@ -2,12 +2,12 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
+# Copy package files (include lockfile if present for reproducible builds)
+COPY package*.json ./
 COPY tsconfig.json ./
 
 # Install dependencies
-RUN npm install --verbose
+RUN if [ -f package-lock.json ]; then npm ci --verbose; else npm install --verbose; fi
 
 # Copy application code
 COPY . .
