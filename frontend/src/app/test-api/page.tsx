@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import { serviceAccountsApi, usersApi, dataListsApi, API_URL } from '@/lib/api';
 // Using apiClient from @/lib/api instead of direct axios
 
