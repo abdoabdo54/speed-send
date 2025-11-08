@@ -245,84 +245,10 @@ EOF
     print_success "Created frontend/src/lib/utils.ts"
 fi
 
-# Verify/Create API client
+# Verify API client exists and is valid (do not auto-generate to avoid corruption)
 if [ ! -f "frontend/src/lib/api.ts" ] || ! grep -q "class ApiClient" "frontend/src/lib/api.ts"; then
-    print_warning "frontend/src/lib/api.ts is missing or corrupted! Creating it..."
-    cat > frontend/src/lib/api.ts << 'EOF'
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-interface ApiResponse<T = any> {
-  data?: T;
-  message?: string;
-  error?: string;
-}
-
-class ApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = API_BASE_URL) {
-    this.baseUrl = baseUrl;
-  }
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`;
-    
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-        ...options,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return { data };
-    } catch (error) {
-      console.error('API request failed:', error);
-      return { error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-  }
-
-  async getAccounts() {
-    return this.request('/api/accounts/');
-  }
-
-  async createAccount(accountData: any) {
-    return this.request('/api/accounts/', {
-      method: 'POST',
-      body: JSON.stringify(accountData),
-    });
-  }
-
-  async getCampaigns() {
-    return this.request('/api/campaigns/');
-  }
-
-  async getDrafts() {
-    return this.request('/api/drafts/');
-  }
-
-  async getContacts() {
-    return this.request('/api/contacts/');
-  }
-
-  async getDashboardStats() {
-    return this.request('/api/dashboard/stats');
-  }
-}
-
-export const apiClient = new ApiClient();
-export default apiClient;
-EOF
-    print_success "Created frontend/src/lib/api.ts"
+    print_error "frontend/src/lib/api.ts is missing or invalid. Please ensure the file exists in your repository."
+    exit 1
 fi
 
 # Verify/Create asString utility
@@ -374,10 +300,24 @@ fi
 # Display frontend directory contents for debugging
 print_info "Frontend directory contents:"
 ls -la frontend/
+print_info "Sanity check: first lines of frontend/src/lib/api.ts (should start with 'const API_BASE_URL')"
+if [ -f "frontend/src/lib/api.ts" ]; then
+  head -n 5 frontend/src/lib/api.ts || true
+  if head -n 1 frontend/src/lib/api.ts | grep -q "^mkdir -p"; then
+    print_error "frontend/src/lib/api.ts appears to be corrupted (contains shell commands). Aborting."
+    exit 1
+  fi
+else
+  print_error "frontend/src/lib/api.ts is missing. Aborting."
+  exit 1
+fi
 print_info "Frontend package.json size: $(stat -f%z frontend/package.json 2>/dev/null || stat -c%s frontend/package.json)"
 print_success "All frontend files verified."
 
 # Build frontend first to catch errors early
+print_info "Cleaning Docker caches to avoid stale files..."
+docker builder prune -af || true
+docker system prune -af || true
 print_info "Building frontend image..."
 # Force complete rebuild to clear npm cache
 docker compose build frontend --no-cache --pull
