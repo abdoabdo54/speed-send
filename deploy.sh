@@ -56,7 +56,8 @@ echo "╚═══════════════════════�
 # Install system dependencies
 print_section "📦 System Dependencies"
 $SUDO_CMD apt-get update -y
-$SUDO_CMD apt-get install -y curl wget gnupg2 software-properties-common apt-transport-https ca-certificates lsb-release
+$SUDO_CMD apt-get upgrade -y
+$SUDO_CMD apt-get install -y curl wget gnupg2 software-properties-common apt-transport-https ca-certificates lsb-release git ufw
 
 # Install Nginx
 print_section "🌐 Nginx Setup"
@@ -88,11 +89,30 @@ else
     print_success "Docker is already installed."
 fi
 
+# Ensure Docker service is enabled and running
+print_info "Enabling and starting Docker service..."
+$SUDO_CMD systemctl enable docker
+$SUDO_CMD systemctl start docker
+
+# Add current user to docker group (if running with sudo)
+CURRENT_USER=${SUDO_USER:-$(whoami)}
+if id -nG "$CURRENT_USER" | grep -qw docker; then
+  print_success "User $CURRENT_USER is already in 'docker' group."
+else
+  print_info "Adding $CURRENT_USER to 'docker' group (you may need to re-login for this to take effect)."
+  $SUDO_CMD usermod -aG docker "$CURRENT_USER" || true
+fi
+
 # Check for Docker Compose v2 (plugin)
 if ! docker compose version >/dev/null 2>&1; then
     print_error "Docker Compose (v2 plugin) not found. Please ensure it is installed correctly."
 fi
 print_success "Docker Compose is available."
+
+# Verify Docker can run without sudo (might require re-login if group just changed)
+if ! docker ps >/dev/null 2>&1; then
+  print_warning "Docker may require re-login for group changes to take effect. You can continue using sudo or re-login later."
+fi
 
 # Install Certbot for SSL
 print_section "🔒 SSL Certificate Setup"
