@@ -70,7 +70,7 @@ export default function AccountsPage() {
       const response = await serviceAccountsApi.list();
       console.log('✅ API Response:', response);
       setAccounts(Array.isArray(response.data) ? response.data : []);
-      console.log(`✅ Loaded ${response.data?.length || 0} accounts`);
+      console.log(`✅ Loaded ${(Array.isArray(response.data) ? response.data.length : 0) || 0} accounts`);
     } catch (error: any) {
       console.error('❌ Failed to load accounts:', error);
       console.error('Error details:', {

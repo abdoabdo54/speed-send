@@ -17,7 +17,7 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
-  async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
     try {
       const response = await fetch(url, {
@@ -99,6 +99,10 @@ export const draftsApi = {
 // Data Lists API
 export const dataListsApi = {
   list: () => apiClient.request(`/api/v1/data-lists/`),
+  get: (id: number | string) => apiClient.request(`/api/v1/data-lists/${id}`),
+  create: (payload: any) => apiClient.request(`/api/v1/data-lists/`, { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id: number | string, payload: any) => apiClient.request(`/api/v1/data-lists/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  delete: (id: number | string) => apiClient.request(`/api/v1/data-lists/${id}`, { method: 'DELETE' }),
 };
 
 // Contacts API

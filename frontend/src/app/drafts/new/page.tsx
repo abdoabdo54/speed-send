@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 // Using apiClient from @/lib/api instead of direct axios
+import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -102,8 +103,8 @@ export default function NewDraftPage() {
 
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
-        console.log('Accounts loaded successfully:', response.data.length, 'accounts');
-        showNotification(`Loaded ${response.data.length} Google Workspace accounts`, 'success');
+        console.log('Accounts loaded successfully:', Array.isArray(response.data) ? response.data.length : 0, 'accounts');
+        showNotification(`Loaded ${(Array.isArray(response.data) ? response.data.length : 0)} Google Workspace accounts`, 'success');
       } else {
         console.warn(' Invalid response format:', response.data);
         setAccounts([]);
@@ -140,7 +141,7 @@ export default function NewDraftPage() {
 
       if (response.data && Array.isArray(response.data)) {
         setUsers(response.data);
-        console.log(' Users loaded successfully:', response.data.length, 'users');
+        console.log(' Users loaded successfully:', Array.isArray(response.data) ? response.data.length : 0, 'users');
       } else {
         console.warn(' Invalid response format:', response.data);
         setUsers([]);
@@ -165,7 +166,7 @@ export default function NewDraftPage() {
 
       if (response.data && Array.isArray(response.data)) {
         setContactLists(response.data);
-        console.log(' Contact lists loaded successfully:', response.data.length, 'lists');
+        console.log(' Contact lists loaded successfully:', Array.isArray(response.data) ? response.data.length : 0, 'lists');
       } else {
         console.warn(' Invalid response format:', response.data);
         setContactLists([]);

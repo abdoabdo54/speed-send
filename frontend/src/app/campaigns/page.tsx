@@ -1,4 +1,5 @@
 'use client';
+import axios from 'axios';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -362,8 +363,8 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
 
       if (response.data && Array.isArray(response.data)) {
         setAccounts(response.data);
-        console.log(' Accounts loaded successfully:', response.data.length, 'accounts');
-        showNotification(`Loaded ${response.data.length} Google Workspace accounts`, 'success');
+        console.log(' Accounts loaded successfully:', Array.isArray(response.data) ? response.data.length : 0, 'accounts');
+        showNotification(`Loaded ${(Array.isArray(response.data) ? response.data.length : 0)} Google Workspace accounts`, 'success');
       } else {
         console.warn(' Invalid response format:', response.data);
         setAccounts([]);
@@ -441,7 +442,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
         });
 
         setUsers(filteredUsers);
-        appendLog(` Users loaded successfully: ${filteredUsers.length} users (${response.data.length - filteredUsers.length} admin users excluded)`);
+        appendLog(` Users loaded successfully: ${filteredUsers.length} users (${(Array.isArray(response.data) ? response.data.length : 0) - filteredUsers.length} admin users excluded)`);
         console.log(' Users loaded successfully:', filteredUsers.length, 'users (admin users excluded)');
         showNotification(`Loaded ${filteredUsers.length} Google Workspace users (admin users excluded)`, 'success');
       } else {
@@ -510,7 +511,7 @@ Received: by [rnda_15].[rnda_10].com with SMTP id [rnda_20] for [to]; [date]`
 
       if (response.data && Array.isArray(response.data)) {
         setRecipientLists(response.data);
-        console.log('Contact lists loaded successfully:', response.data.length, 'lists');
+        console.log('Contact lists loaded successfully:', Array.isArray(response.data) ? response.data.length : 0, 'lists');
       } else {
         console.warn('Invalid response format:', response.data);
         setRecipientLists([]);

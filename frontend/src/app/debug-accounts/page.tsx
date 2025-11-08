@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { serviceAccountsApi, usersApi, dataListsApi, API_URL, healthCheck } from '@/lib/api';
 // Using apiClient from @/lib/api instead of direct axios
+import axios from 'axios';
 
 export default function DebugAccountsPage() {
   const [results, setResults] = useState<any>({});

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { API_URL } from '@/lib/api';
+import axios from 'axios';
 
 interface ContactList {
   id: string;
@@ -31,7 +32,7 @@ export const ContactListModal: React.FC<ContactListModalProps> = ({ isOpen, onCl
       const fetchContactLists = async () => {
         setError(null);
         try {
-          const response = await axios.get(`${API_URL}/api/v1/contacts/`);
+          const response = await axios.get(`${API_URL}/api/v1/contacts/lists`);
           const lists = response.data.map((list: any) => ({
             ...list,
             contacts_count: list.contacts.length,
