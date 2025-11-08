@@ -145,7 +145,7 @@ export default function EditCampaignPage() {
 
   const loadRecipientLists = async () => {
       try {
-          const response = await axios.get(`${API_URL}/api/v1/contacts/`);
+          const response = await axios.get(`${API_URL}/api/v1/contacts/lists`);
           setRecipientLists(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
           showNotification('Failed to load recipient lists.', 'error');
