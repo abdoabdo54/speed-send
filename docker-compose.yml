@@ -1,0 +1,142 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: gmail_saas_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gmailsaas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gmailsaas123}
+      POSTGRES_DB: ${POSTGRES_DB:-gmail_saas}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gmailsaas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: gmail_saas_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gmail_saas_backend
+    image: speed-send-backend
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-gmailsaas}:${POSTGRES_PASSWORD:-gmailsaas123}@gmail_saas_db:5432/${POSTGRES_DB:-gmail_saas}"
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-bytes-long}
+      ENVIRONMENT: production
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      MESSAGE_ID_DOMAIN: ${MESSAGE_ID_DOMAIN:-example.local}
+    volumes:
+      - service_accounts:/app/service_accounts
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 8
+    restart: unless-stopped
+
+  # Celery Worker (PowerMTA Mode - High Concurrency)
+  celery_worker:
+    image: speed-send-backend
+    container_name: gmail_saas_celery_worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gmailsaas}:${POSTGRES_PASSWORD:-gmailsaas123}@postgres:5432/${POSTGRES_DB:-gmail_saas}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-bytes-long}
+      ENVIRONMENT: production
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      MESSAGE_ID_DOMAIN: ${MESSAGE_ID_DOMAIN:-example.local}
+    volumes:
+      - service_accounts:/app/service_accounts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Optimized Mode: Reasonable concurrency for stable parallel sending
+    # Each worker handles multiple senders with proper resource management
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=50 --pool=threads --prefetch-multiplier=100 --max-tasks-per-child=1000
+    restart: unless-stopped
+
+  # Celery Beat (for scheduled tasks)
+  celery_beat:
+    image: speed-send-backend
+    container_name: gmail_saas_celery_beat
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gmailsaas}:${POSTGRES_PASSWORD:-gmailsaas123}@postgres:5432/${POSTGRES_DB:-gmail_saas}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-encryption-key-32-bytes-long}
+      ENVIRONMENT: production
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      MESSAGE_ID_DOMAIN: ${MESSAGE_ID_DOMAIN:-example.local}
+    volumes:
+      - service_accounts:/app/service_accounts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.celery_app beat --loglevel=info
+    restart: unless-stopped
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gmail_saas_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  service_accounts:
+

@@ -1,0 +1,47 @@
+// ❌ NEGATIVE PROMPT — Speed Send V2
+// These are forbidden or undesired coding actions, patterns, and architectures for this project.
+
+1. ❌ Do NOT use SMTP for sending emails.
+   → Only Gmail API (OAuth2 / service account) must be used for all send operations.
+
+2. ❌ Do NOT generate or fetch message data after pressing "Resume".
+   → All campaign data must be fully prepared and queued *before* sending starts.
+
+3. ❌ Do NOT add artificial delays, sleep calls, or sequential loops in the send process.
+   → All emails must be dispatched asynchronously (parallel threads, asyncio, or worker pools).
+
+4. ❌ Do NOT rebuild or rename existing models, routes, or UI components unless necessary.
+   → Maintain backward compatibility with current campaigns, accounts, and frontend state.
+
+5. ❌ Do NOT use blocking I/O (like synchronous Gmail API calls or file writes) inside the sending worker.
+   → Only non-blocking async requests and in-memory data structures are allowed during send bursts.
+
+6. ❌ Do NOT hardcode credentials, tokens, or secrets.
+   → Use environment variables and `.env` files for all API keys and service credentials.
+
+7. ❌ Do NOT store email bodies or recipients in plain text beyond runtime memory.
+   → Use temporary encrypted storage (Redis or secure cache) and clear after completion.
+
+8. ❌ Do NOT use global variables or single-thread loops for sending.
+   → Each account or user must run independently (thread pool / worker queue).
+
+9. ❌ Do NOT create new UI pages for existing workflows unless explicitly requested.
+   → Extend current Send page and dashboard with modular, minimal changes.
+
+10. ❌ Do NOT exceed Gmail API quota by trying to bypass rate limits or send unauthenticated requests.
+    → All sends must respect 25 emails per user per day limit; distribute load properly.
+
+11. ❌ Do NOT include unnecessary libraries or dependencies that bloat the app.
+    → Keep performance critical: Redis, FastAPI (or Express), Gmail API SDK, Celery/BullMQ, PostgreSQL.
+
+12. ❌ Do NOT use `time.sleep()` or `setTimeout()` in loops for throttling.
+    → Implement controlled concurrency via async pools or rate-limited queue consumers.
+
+13. ❌ Do NOT modify database schema manually in code suggestions.
+    → Schema changes must be done through migrations with Alembic (Python) or Prisma (Node).
+
+14. ❌ Do NOT use fake delays to “simulate” sending speed.
+    → The system must rely on real API calls with optimized async logic.
+
+15. ❌ Do NOT generate test or placeholder emails to real recipients.
+    → Use sandbox or mock mode for tests.

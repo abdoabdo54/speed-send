@@ -1,0 +1,55 @@
+# Git
+.git
+.gitignore
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Service accounts
+backend/service_accounts/
+*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+DEPLOYMENT.md
+LICENSE
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Backups
+backups/
+*.sql
+
