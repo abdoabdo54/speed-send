@@ -66,3 +66,5 @@ docker-compose.override.yml
 logs/
 *.log
 
+!frontend/src/lib/
+!frontend/src/lib/**
