@@ -57,7 +57,7 @@ echo "╚═══════════════════════�
 print_section "📦 System Dependencies"
 $SUDO_CMD apt-get update -y
 $SUDO_CMD apt-get upgrade -y
-$SUDO_CMD apt-get install -y curl wget gnupg2 software-properties-common apt-transport-https ca-certificates lsb-release git ufw
+$SUDO_CMD apt-get install -y curl wget gnupg2 software-properties-common apt-transport-https ca-certificates lsb-release git ufw jq
 
 # Install Nginx
 print_section "🌐 Nginx Setup"
@@ -333,6 +333,16 @@ else
 fi
 print_info "Frontend package.json size: $(stat -f%z frontend/package.json 2>/dev/null || stat -c%s frontend/package.json)"
 print_success "All frontend files verified."
+
+# Ensure required frontend dependency and generate lockfile via Dockerized Node
+print_info "Ensuring frontend dependencies are present and lockfile is generated..."
+docker run --rm -v "$PWD/frontend:/app" -w /app node:18-bullseye bash -lc '
+  set -e
+  node -e "const p=require(\"./package.json\"); process.exit(p.dependencies && p.dependencies[\"@radix-ui/react-progress\"] ? 0 : 1)" || npm pkg set dependencies.@radix-ui/react-progress=^1.0.3
+  npm install --no-audit --no-fund
+  npm ls @radix-ui/react-progress || true
+'
+print_success "Frontend dependencies ensured and package-lock.json generated."
 
 # Build frontend first to catch errors early
 print_info "Cleaning Docker caches to avoid stale files..."
