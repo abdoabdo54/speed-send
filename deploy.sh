@@ -53,6 +53,21 @@ echo "║     Gmail Bulk Sender SaaS - Automated Deployment           ║"
 echo "║                                                              ║"
 echo "╚══════════════════════════════════════════════════════════════╝${NC}\n"
 
+# Install system dependencies
+print_section "📦 System Dependencies"
+$SUDO_CMD apt-get update -y
+$SUDO_CMD apt-get install -y curl wget gnupg2 software-properties-common apt-transport-https ca-certificates lsb-release
+
+# Install Nginx
+print_section "🌐 Nginx Setup"
+if ! command_exists nginx; then
+    print_info "Installing Nginx..."
+    $SUDO_CMD apt-get install -y nginx
+    print_success "Nginx installed successfully."
+else
+    print_success "Nginx is already installed."
+fi
+
 # Install Docker if not present
 print_section "🐳 Docker & Docker Compose Check"
 if ! command_exists docker; then
@@ -78,6 +93,20 @@ if ! docker compose version >/dev/null 2>&1; then
     print_error "Docker Compose (v2 plugin) not found. Please ensure it is installed correctly."
 fi
 print_success "Docker Compose is available."
+
+# Install Certbot for SSL
+print_section "🔒 SSL Certificate Setup"
+if ! command_exists certbot; then
+    print_info "Installing Certbot for SSL certificates..."
+    $SUDO_CMD apt-get install -y snapd
+    $SUDO_CMD snap install core
+    $SUDO_CMD snap refresh core
+    $SUDO_CMD snap install --classic certbot
+    $SUDO_CMD ln -sf /snap/bin/certbot /usr/bin/certbot
+    print_success "Certbot installed successfully."
+else
+    print_success "Certbot is already installed."
+fi
 
 # Environment Configuration
 print_section "🔐 Environment Configuration"
@@ -159,6 +188,44 @@ if [ ! -f "frontend/package.json" ]; then
 EOF
     print_success "Created frontend/package.json"
 fi
+
+# Verify/Create tsconfig.json
+if [ ! -f "frontend/tsconfig.json" ]; then
+    print_warning "frontend/tsconfig.json is missing! Creating it..."
+    cat > frontend/tsconfig.json << 'EOF'
+{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "es6"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/app/*": ["./src/app/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+EOF
+    print_success "Created frontend/tsconfig.json"
+fi
 if [ ! -d "frontend/src/lib" ]; then
     print_info "Creating frontend/src/lib directory..."
     mkdir -p frontend/src/lib
@@ -174,6 +241,86 @@ export function cn(...inputs: ClassValue[]) {
 }
 EOF
     print_success "Created frontend/src/lib/utils.ts"
+fi
+
+# Verify/Create API client
+if [ ! -f "frontend/src/lib/api.ts" ]; then
+    print_warning "frontend/src/lib/api.ts is missing! Creating it..."
+    cat > frontend/src/lib/api.ts << 'EOF'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+interface ApiResponse<T = any> {
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+class ApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string = API_BASE_URL) {
+    this.baseUrl = baseUrl;
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    const url = `${this.baseUrl}${endpoint}`;
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        ...options,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return { data };
+    } catch (error) {
+      console.error('API request failed:', error);
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  async getAccounts() {
+    return this.request('/api/accounts/');
+  }
+
+  async createAccount(accountData: any) {
+    return this.request('/api/accounts/', {
+      method: 'POST',
+      body: JSON.stringify(accountData),
+    });
+  }
+
+  async getCampaigns() {
+    return this.request('/api/campaigns/');
+  }
+
+  async getDrafts() {
+    return this.request('/api/drafts/');
+  }
+
+  async getContacts() {
+    return this.request('/api/contacts/');
+  }
+
+  async getDashboardStats() {
+    return this.request('/api/dashboard/stats');
+  }
+}
+
+export const apiClient = new ApiClient();
+export default apiClient;
+EOF
+    print_success "Created frontend/src/lib/api.ts"
 fi
 
 # Display frontend directory contents for debugging
@@ -194,6 +341,90 @@ print_info "Building remaining services and starting..."
 docker compose build --no-cache
 docker compose up -d
 
+# Configure Nginx
+print_section "🌐 Nginx Configuration"
+SERVER_IP=$(hostname -I | awk '{print $1}')
+DOMAIN_NAME=${DOMAIN_NAME:-$SERVER_IP}
+
+print_info "Configuring Nginx for domain: $DOMAIN_NAME"
+$SUDO_CMD tee /etc/nginx/sites-available/speed-send << EOF
+server {
+    listen 80;
+    server_name $DOMAIN_NAME;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+
+    # Frontend (Next.js)
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
+    }
+
+    # Backend API
+    location /api {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
+    }
+
+    # API Documentation
+    location /docs {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Health check endpoint
+    location /health {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # File upload size limit
+    client_max_body_size 50M;
+}
+EOF
+
+# Enable the site
+$SUDO_CMD ln -sf /etc/nginx/sites-available/speed-send /etc/nginx/sites-enabled/
+$SUDO_CMD rm -f /etc/nginx/sites-enabled/default
+
+# Test Nginx configuration
+$SUDO_CMD nginx -t
+if [ $? -eq 0 ]; then
+    print_success "Nginx configuration is valid."
+    $SUDO_CMD systemctl reload nginx
+    $SUDO_CMD systemctl enable nginx
+    print_success "Nginx reloaded and enabled."
+else
+    print_error "Nginx configuration is invalid!"
+fi
+
 # Health Check
 print_section "⏳ Waiting for Services"
 print_info "Waiting for backend to be healthy..."
@@ -210,12 +441,60 @@ done
 echo ""
 print_success "Backend is healthy!"
 
+# SSL Certificate Setup (Optional)
+if [ -n "$DOMAIN_NAME" ] && [ "$DOMAIN_NAME" != "$SERVER_IP" ]; then
+    print_section "🔒 SSL Certificate Generation"
+    print_info "Setting up SSL certificate for domain: $DOMAIN_NAME"
+    echo -e "${YELLOW}To enable HTTPS, run the following command manually after deployment:${NC}"
+    echo -e "${CYAN}sudo certbot --nginx -d $DOMAIN_NAME${NC}"
+    echo -e "${YELLOW}This will automatically configure SSL and redirect HTTP to HTTPS.${NC}\n"
+fi
+
+# Firewall Setup
+print_section "🛡️ Firewall Configuration"
+if command_exists ufw; then
+    print_info "Configuring UFW firewall..."
+    $SUDO_CMD ufw --force enable
+    $SUDO_CMD ufw allow 22/tcp
+    $SUDO_CMD ufw allow 80/tcp
+    $SUDO_CMD ufw allow 443/tcp
+    print_success "Firewall configured (SSH, HTTP, HTTPS allowed)."
+else
+    print_warning "UFW not installed. Consider installing it for security."
+fi
+
 # Final Info
-SERVER_IP=$(hostname -I | awk '{print $1}')
-print_section "✅ Deployment Complete"
-echo -e "${GREEN}Your Gmail Bulk Sender is now running!${NC}\n"
-echo -e "   Frontend:  ${WHITE}http://${SERVER_IP}:3000${NC}"
-echo -e "   Backend:   ${WHITE}http://${SERVER_IP}:8000${NC}"
-echo -e "   API Docs:  ${WHITE}http://${SERVER_IP}:8000/docs${NC}\n"
-echo -e "To view logs, run: ${CYAN}docker compose logs -f${NC}"
-echo -e "To stop, run: ${CYAN}docker compose stop${NC}"
+print_section "✅ Speed-Send Deployment Complete"
+echo -e "${GREEN}🎉 Your Speed-Send Email Marketing Platform is now running!${NC}\n"
+
+if [ -n "$DOMAIN_NAME" ] && [ "$DOMAIN_NAME" != "$SERVER_IP" ]; then
+    echo -e "   🌐 Website:     ${WHITE}http://$DOMAIN_NAME${NC}"
+    echo -e "   📊 Dashboard:   ${WHITE}http://$DOMAIN_NAME/dashboard${NC}"
+    echo -e "   📧 Campaigns:   ${WHITE}http://$DOMAIN_NAME/campaigns${NC}"
+    echo -e "   📋 API Docs:    ${WHITE}http://$DOMAIN_NAME/docs${NC}"
+else
+    echo -e "   🌐 Website:     ${WHITE}http://$SERVER_IP${NC}"
+    echo -e "   📊 Dashboard:   ${WHITE}http://$SERVER_IP/dashboard${NC}"
+    echo -e "   📧 Campaigns:   ${WHITE}http://$SERVER_IP/campaigns${NC}"
+    echo -e "   📋 API Docs:    ${WHITE}http://$SERVER_IP/docs${NC}"
+fi
+
+echo -e "\n${CYAN}🔧 Management Commands:${NC}"
+echo -e "   View logs:      ${WHITE}docker compose logs -f${NC}"
+echo -e "   Stop services:  ${WHITE}docker compose stop${NC}"
+echo -e "   Start services: ${WHITE}docker compose start${NC}"
+echo -e "   Restart:        ${WHITE}docker compose restart${NC}"
+echo -e "   Update:         ${WHITE}./deploy.sh${NC}"
+
+echo -e "\n${CYAN}🔒 Security Notes:${NC}"
+echo -e "   • Change default passwords in .env file"
+echo -e "   • Set up SSL certificate for production use"
+echo -e "   • Configure email sending providers in the admin panel"
+echo -e "   • Review firewall settings for your security requirements"
+
+if [ -n "$DOMAIN_NAME" ] && [ "$DOMAIN_NAME" != "$SERVER_IP" ]; then
+    echo -e "\n${YELLOW}📝 Next Steps:${NC}"
+    echo -e "   1. Run: ${WHITE}sudo certbot --nginx -d $DOMAIN_NAME${NC}"
+    echo -e "   2. Configure your email providers in the admin panel"
+    echo -e "   3. Start creating campaigns and sending emails!"
+fi
