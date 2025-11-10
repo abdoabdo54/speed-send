@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Bootstrap a fresh Ubuntu 22.04 server with Docker and Docker Compose plugin
-# Then build and start the Speed-Send stack via docker compose
+# Enhanced Bootstrap script for Speed-Send on Ubuntu 22.04
+# This script installs Docker and sets up the basic environment
+# For complete installation, use setup.sh instead
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/<your-org-or-user>/speed-send/main/scripts/bootstrap_ubuntu22.sh -o bootstrap.sh
+#   curl -fsSL https://raw.githubusercontent.com/yourusername/speed-send/main/scripts/bootstrap_ubuntu22.sh -o bootstrap.sh
 #   bash bootstrap.sh
 
 if [ "${EUID}" -ne 0 ]; then
