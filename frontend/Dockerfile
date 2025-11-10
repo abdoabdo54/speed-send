@@ -50,8 +50,8 @@ RUN mkdir -p .next public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy public folder (create empty if doesn't exist)
-COPY --from=builder /app/public ./public 2>/dev/null || mkdir -p ./public
+# Copy public folder from builder stage
+COPY --from=builder /app/public ./public
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app
