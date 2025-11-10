@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+# Speed-Send Email SaaS Application

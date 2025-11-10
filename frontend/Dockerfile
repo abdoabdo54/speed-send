@@ -1,10 +1,16 @@
-# Clean Dockerfile for Speed-Send Frontend
+# Robust Dockerfile for Speed-Send Frontend
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Install dependencies
+# Copy package files
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production --verbose
+
+# Install dependencies
+RUN if [ -f package-lock.json ]; then \
+      npm ci --verbose; \
+    else \
+      npm install --verbose; \
+    fi
 
 # Build stage
 FROM node:20-alpine AS builder
@@ -19,8 +25,8 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Install dev dependencies for build
-RUN npm ci --verbose
+# Create public directory if it doesn't exist
+RUN mkdir -p public
 
 # Build the application
 RUN npm run build
@@ -33,10 +39,24 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 
+# Add non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Create directories
+RUN mkdir -p .next public
+
 # Copy built application
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+
+# Copy public folder (create empty if doesn't exist)
+COPY --from=builder /app/public ./public 2>/dev/null || mkdir -p ./public
+
+# Set ownership
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
 
 EXPOSE 3000
 
