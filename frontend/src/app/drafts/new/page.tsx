@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { serviceAccountsApi, usersApi, dataListsApi, contactsApi, API_URL as DETECTED_API_URL } from '@/lib/api';
+import { serviceAccountsApi, usersApi, dataListsApi, contactsApi, API_URL } from '@/lib/api';
 import { 
   Upload,
   Users, 
@@ -22,8 +22,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-// API Configuration - Use dynamic API URL detection
-const API_URL = DETECTED_API_URL;
+// API Configuration - Use imported API URL from centralized config
 
 
 interface Account {

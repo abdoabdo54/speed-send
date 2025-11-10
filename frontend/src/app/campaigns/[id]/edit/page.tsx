@@ -13,10 +13,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sidebar } from '@/components/Sidebar';
-import { API_URL as DETECTED_API_URL } from '@/lib/api';
+import { API_URL } from '@/lib/api';
 import { Loader2, RefreshCw, X, Save } from 'lucide-react';
 
-const API_URL = DETECTED_API_URL;
 
 // Interfaces from the new campaign page, adapted for the edit page
 interface Account {
