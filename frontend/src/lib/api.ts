@@ -1,7 +1,8 @@
 // Centralized frontend API layer with stable named exports
 // Provides compatibility with existing pages that import named APIs
 
-export const API_URL: string = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_URL: string = process.env.NEXT_PUBLIC_API_URL || 
+  (typeof window === 'undefined' ? 'http://backend:8000' : 'http://localhost:8000');
 
 export interface ApiResponse<T = any> {
   data?: T;
