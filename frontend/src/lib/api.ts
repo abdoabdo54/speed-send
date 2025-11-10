@@ -1,9 +1,11 @@
 // Centralized frontend API layer with stable named exports
 // Provides compatibility with existing pages that import named APIs
 
-// For Docker: Use backend service name for all requests
-// The frontend container should connect to backend via Docker network
-export const API_URL: string = process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000';
+// Use different URLs for server-side and client-side requests
+// Server-side: Use Docker service name, Client-side: Use server IP
+export const API_URL: string = typeof window === 'undefined' 
+  ? (process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000')  // Server-side (Docker network)
+  : 'http://167.99.131.112:8000';  // Client-side (browser to server IP)
 
 export interface ApiResponse<T = any> {
   data?: T;
