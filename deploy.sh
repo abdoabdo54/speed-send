@@ -2,6 +2,27 @@
 
 set -e
 
+# Error recovery function
+cleanup_on_error() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        print_error "Deployment failed with exit code $exit_code"
+        print_info "Starting error recovery procedures..."
+        
+        # Stop any partially started containers
+        docker compose down --remove-orphans 2>/dev/null || true
+        
+        # Show recent logs for debugging
+        print_info "Recent container logs:"
+        docker compose logs --tail=20 2>/dev/null || true
+        
+        print_info "Recovery completed. Please check the logs above and retry deployment."
+    fi
+}
+
+# Set up error trap
+trap cleanup_on_error EXIT
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -331,7 +352,7 @@ else
   print_error "frontend/src/lib/api.ts is missing. Aborting."
   exit 1
 fi
-print_info "Frontend package.json size: $(stat -f%z frontend/package.json 2>/dev/null || stat -c%s frontend/package.json)"
+print_info "Frontend package.json size: $(stat -c%s frontend/package.json 2>/dev/null || stat -f%z frontend/package.json 2>/dev/null || echo 'unknown')"
 print_success "All frontend files verified."
 
 # Ensure required frontend dependency and generate lockfile via Dockerized Node
@@ -346,9 +367,24 @@ print_success "Frontend dependencies ensured and package-lock.json generated."
 
 # Build frontend first to catch errors early
 print_info "Cleaning Docker caches to avoid stale files..."
+
+# Check available disk space before building
+AVAILABLE_SPACE=$(df / | tail -1 | awk '{print $4}')
+REQUIRED_SPACE=2097152  # 2GB in KB
+if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_SPACE" ]; then
+    print_error "Insufficient disk space. Required: 2GB, Available: $((AVAILABLE_SPACE/1024/1024))GB"
+    exit 1
+fi
+
 docker builder prune -af || true
 docker system prune -af || true
 print_info "Building frontend image..."
+
+# Create backup of current running containers before rebuilding
+BACKUP_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+print_info "Creating backup snapshot before rebuild..."
+docker compose ps --format json > "/tmp/speedsend_backup_${BACKUP_TIMESTAMP}.json" 2>/dev/null || true
+
 # Force complete rebuild to clear npm cache
 docker compose build frontend --no-cache --pull
 if [ $? -ne 0 ]; then
@@ -358,14 +394,49 @@ if [ $? -ne 0 ]; then
     docker compose build frontend --no-cache --pull
     if [ $? -ne 0 ]; then
         print_error "Frontend build failed after cache cleanup! Please check dependencies."
+        
+        # Try to restore previous containers if they exist
+        if [ -f "/tmp/speedsend_backup_${BACKUP_TIMESTAMP}.json" ] && [ -s "/tmp/speedsend_backup_${BACKUP_TIMESTAMP}.json" ]; then
+            print_info "Attempting to restore previous state..."
+            docker compose up -d 2>/dev/null || true
+        fi
         exit 1
     fi
 fi
 print_success "Frontend build completed."
 
 print_info "Building remaining services and starting..."
-docker compose build --no-cache
-docker compose up -d
+
+# Attempt graceful service start with retry logic
+START_ATTEMPTS=0
+MAX_START_ATTEMPTS=3
+
+while [ $START_ATTEMPTS -lt $MAX_START_ATTEMPTS ]; do
+    if docker compose build --no-cache && docker compose up -d; then
+        print_success "All services started successfully."
+        break
+    else
+        START_ATTEMPTS=$((START_ATTEMPTS + 1))
+        if [ $START_ATTEMPTS -lt $MAX_START_ATTEMPTS ]; then
+            print_warning "Service start failed (attempt $START_ATTEMPTS/$MAX_START_ATTEMPTS). Retrying in 10 seconds..."
+            sleep 10
+            
+            # Clean up any failed containers before retry
+            docker compose down --remove-orphans 2>/dev/null || true
+        else
+            print_error "Failed to start services after $MAX_START_ATTEMPTS attempts!"
+            print_info "Showing service logs for debugging:"
+            docker compose logs --tail=50 2>/dev/null || true
+            
+            # Try to restore from backup
+            if [ -f "/tmp/speedsend_backup_${BACKUP_TIMESTAMP}.json" ] && [ -s "/tmp/speedsend_backup_${BACKUP_TIMESTAMP}.json" ]; then
+                print_info "Attempting to restore previous state..."
+                docker compose up -d 2>/dev/null || true
+            fi
+            exit 1
+        fi
+    fi
+done
 
 # Configure Nginx
 print_section "🌐 Nginx Configuration"

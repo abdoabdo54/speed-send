@@ -20,7 +20,7 @@ async def list_service_accounts(db: Session = Depends(get_db)):
         logger.info("Fetching service accounts...")
         accounts = db.query(ServiceAccount).all()
         logger.info(f"Found {len(accounts)} service accounts")
-    return accounts
+        return accounts
     except Exception as e:
         logger.error(f"Failed to fetch service accounts: {e}")
         raise HTTPException(status_code=500, detail=str(e))

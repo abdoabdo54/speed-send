@@ -2,6 +2,25 @@
 set -euo pipefail
 
 # Comprehensive Speed-Send Validation and Deployment Script
+
+# Error recovery function
+cleanup_on_error() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        log_error "Validation/Deployment failed with exit code $exit_code"
+        echo "🔧 Troubleshooting steps:"
+        echo "1. Check Docker daemon is running: sudo systemctl status docker"
+        echo "2. Check available disk space: df -h"
+        echo "3. Check container logs: docker compose logs"
+        echo "4. Clean Docker cache: docker system prune -f"
+        
+        # Stop any partially started containers
+        docker compose down --remove-orphans 2>/dev/null || true
+    fi
+}
+
+# Set up error trap
+trap cleanup_on_error EXIT
 echo "🔍 Speed-Send Pre-Deployment Validation & Build Test"
 echo "=================================================="
 

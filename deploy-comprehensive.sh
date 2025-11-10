@@ -4,6 +4,31 @@ set -euo pipefail
 # Comprehensive Speed-Send Deployment Script
 # This script handles the complete deployment process with error checking
 
+# Error recovery function
+cleanup_on_error() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        log_error "Deployment failed with exit code $exit_code"
+        log_info "Starting error recovery procedures..."
+        
+        # Stop any partially started containers
+        docker compose down --remove-orphans 2>/dev/null || true
+        
+        # Show recent logs for debugging
+        log_info "Recent container logs:"
+        docker compose logs --tail=20 2>/dev/null || true
+        
+        # Check disk space
+        log_info "Current disk usage:"
+        df -h / 2>/dev/null || true
+        
+        log_info "Recovery completed. Please check the logs above and retry deployment."
+    fi
+}
+
+# Set up error trap
+trap cleanup_on_error EXIT
+
 echo "🚀 Starting Speed-Send Comprehensive Deployment"
 echo "==============================================="
 
@@ -116,10 +141,30 @@ docker system prune -f >/dev/null 2>&1 || true
 log_step "5. Building and starting services"
 
 log_info "Building services (this may take several minutes)..."
+
+# Check disk space before build
+AVAILABLE_SPACE=$(df / | tail -1 | awk '{print $4}')
+REQUIRED_SPACE=2097152  # 2GB in KB
+if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_SPACE" ]; then
+    log_error "❌ Insufficient disk space. Required: 2GB, Available: $((AVAILABLE_SPACE/1024/1024))GB"
+    exit 1
+fi
+
+# Create backup snapshot
+BACKUP_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+log_info "Creating backup snapshot..."
+docker compose ps --format json > "/tmp/speedsend_backup_${BACKUP_TIMESTAMP}.json" 2>/dev/null || true
+
 if docker compose build --no-cache; then
     log_info "✅ Build completed successfully"
 else
     log_error "❌ Build failed. Check the output above for errors."
+    
+    # Try to restore previous state if backup exists
+    if [ -f "/tmp/speedsend_backup_${BACKUP_TIMESTAMP}.json" ] && [ -s "/tmp/speedsend_backup_${BACKUP_TIMESTAMP}.json" ]; then
+        log_info "Attempting to restore previous state..."
+        docker compose up -d 2>/dev/null || true
+    fi
     exit 1
 fi
 

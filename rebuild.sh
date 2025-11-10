@@ -12,7 +12,7 @@ docker system prune -af
 
 # Remove specific images if they exist
 echo "Removing old images..."
-docker rmi speed-send-backend speed-send-frontend speed-send-celery_worker speed-send-celery_beat 2>/dev/null || true
+docker rmi gmail-saas-backend gmail-saas-frontend 2>/dev/null || true
 
 # Clean up volumes (be careful - this removes data!)
 echo "Cleaning up unused volumes..."
