@@ -1,0 +1,49 @@
+# Multi-stage Dockerfile for Next.js 14 app with standalone output
+
+# 1) Install dependencies (including devDependencies for build)
+FROM node:20-alpine AS deps
+WORKDIR /app
+
+# Leverage Docker layer caching: only re-run npm ci when lockfile or package.json changes
+COPY package.json package-lock.json* ./
+RUN if [ -f package-lock.json ]; then \
+      npm ci --verbose; \
+    else \
+      npm install --verbose; \
+    fi
+
+# 2) Build the application
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Optional build-time configuration
+ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+# Bring in node_modules from deps stage, then copy source
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Simple validation: Check that critical API file exists
+RUN test -f src/lib/api.ts || (echo "ERROR: API file missing" && exit 1)
+
+# Build for production (standalone output is enabled in next.config.js)
+RUN npm run build
+
+# 3) Create a minimal runtime image using Next.js standalone output
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+
+# Copy the standalone server and static assets
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+
+# Start the Next.js server
+CMD ["node", "server.js"]

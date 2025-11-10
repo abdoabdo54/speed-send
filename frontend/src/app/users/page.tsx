@@ -21,7 +21,7 @@ export default function UsersPage() {
   const loadData = async () => {
     try {
       const [usersRes, accountsRes] = await Promise.all([
-        usersApi.list(selectedAccount || undefined),
+        usersApi.list(selectedAccount ? { service_account_id: selectedAccount } : undefined),
         serviceAccountsApi.list(),
       ]);
       setUsers(usersRes.data);
