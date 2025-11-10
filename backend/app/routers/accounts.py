@@ -69,12 +69,12 @@ async def create_service_account(account: ServiceAccountCreate, db: Session = De
             encrypted_json=encrypted_json
         )
         
-    db.add(db_account)
-    db.commit()
-    db.refresh(db_account)
+        db.add(db_account)
+        db.commit()
+        db.refresh(db_account)
         
         logger.info(f"Successfully created service account: {db_account.name} (ID: {db_account.id})")
-    return db_account
+        return db_account
         
     except Exception as e:
         db.rollback()
