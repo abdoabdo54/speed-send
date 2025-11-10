@@ -106,7 +106,7 @@ async def update_service_account(
         for field, value in update_data.items():
             setattr(account, field, value)
         
-    db.commit()
+        db.commit()
         db.refresh(account)
         
         logger.info(f"Successfully updated service account: {account.name}")
